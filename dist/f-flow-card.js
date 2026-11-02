@@ -1,4 +1,4 @@
-// k-flow-card.js – Unified Edition v1.2.0
+// f-flow-card.js – Unified Edition v1.2.0
 // Changes v1.2.0 (Sigenergy-style layout options — all opt-in, default look unchanged):
 //   NEW  – card_title: custom header title (default 'Energy Flow').
 //   NEW  – grid_status_entity: ON GRID / OFF GRID pill in the header.
@@ -83,7 +83,7 @@
 // ═══════════════════════════════════════════════════════════════
 // VISUAL EDITOR
 // ═══════════════════════════════════════════════════════════════
-class KFlowCardEditor extends HTMLElement {
+class FFlowCardEditor extends HTMLElement {
   constructor() {
     super();
     this._config = {};
@@ -700,12 +700,12 @@ class KFlowCardEditor extends HTMLElement {
     this._rendered = true; // Fix #2: mark rendered so hass setter stops triggering full DOM rebuilds
   }
 }
-customElements.define('k-flow-card-editor', KFlowCardEditor);
+customElements.define('f-flow-card-editor', FFlowCardEditor);
 
 // ═══════════════════════════════════════════════════════════════
 // MAIN CARD
 // ═══════════════════════════════════════════════════════════════
-class KFlowCard extends HTMLElement {
+class FFlowCard extends HTMLElement {
   constructor() {
     super();
     this._hass = null;
@@ -796,10 +796,10 @@ class KFlowCard extends HTMLElement {
   }
 
   getCardSize() { return 8; }
-  static getConfigElement() { return document.createElement('k-flow-card-editor'); }
+  static getConfigElement() { return document.createElement('f-flow-card-editor'); }
 
   setConfig(config) {
-    this.config = { ...KFlowCard.getStubConfig(), ...config };
+    this.config = { ...FFlowCard.getStubConfig(), ...config };
     this._buildStaticSVG();
   }
 
@@ -950,7 +950,7 @@ class KFlowCard extends HTMLElement {
     const showBatt1 = !!(this.config._show_battery !== false);
     const ev   = !!(this.config._show_ev);
     const showPvExtra = !!(this.config._show_pv_extra);
-    const iconPath = '/local/community/k-flow-card';    // icons served from HACS community folder
+    const iconPath = '/local/community/f-flow-card';    // icons served from HACS community folder
     const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const cardTitle   = esc(this.config.card_title || 'Energy Flow');
     const invImage    = this.config.inverter_image ? esc(this.config.inverter_image) : '';
@@ -1838,10 +1838,10 @@ class KFlowCard extends HTMLElement {
 }
 window.customCards = window.customCards || [];
 window.customCards.push({
-  type: 'k-flow-card',
-  name: 'K-Flow Card',
+  type: 'f-flow-card',
+  name: 'F-Flow Card',
   description: 'Real-time solar/battery/grid energy flow card with animated power paths, dual-battery support, EV charger integration, and per-tile label overrides.',
   preview: true,
   version: '1.2.0',
 });
-customElements.define('k-flow-card', KFlowCard);
+customElements.define('f-flow-card', FFlowCard);

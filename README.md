@@ -1,7 +1,7 @@
-# k-flow-card
+# f-flow-card
 
-**Khan Automation — Home Assistant Custom Energy Flow Card**
-`k-flow-card.js` · Unified Edition  Sigenergy-style layout options **V1.2.0**
+**Home Assistant Custom Energy Flow Card** — fork of [k-flow-card](https://github.com/thekhan1122/k-flow-card) by Khan Automation (thekhan1122), MIT licensed
+`f-flow-card.js` · Unified Edition  Sigenergy-style layout options **V1.2.0**
 <img width="1708" height="2520" alt="IMG_20260513_114249" src="https://github.com/user-attachments/assets/e4c54570-5b9e-43c4-9326-b44d4105a5d1" />
 <img width="1108" height="1688" alt="IMG_20260516_011350" src="https://github.com/user-attachments/assets/6914d4ab-daa6-432a-983d-6abac15a1cac" />
 <img width="1114" height="1744" alt="IMG_20260516_011300" src="https://github.com/user-attachments/assets/ce97703f-ed71-4ab9-a79d-8d7cf3bcd3f6" />
@@ -10,7 +10,7 @@
 
 ## Overview
 
-`k-flow-card` is a fully custom Home Assistant Lovelace card that renders a live, animated energy-flow diagram for a GoodWe solar inverter system with JK BMS battery storage. It is self-contained in a single JavaScript file — no dependencies, no HACS card required beyond loading the resource.
+`f-flow-card` is a fully custom Home Assistant Lovelace card that renders a live, animated energy-flow diagram for a GoodWe solar inverter system with JK BMS battery storage. It is self-contained in a single JavaScript file — no dependencies, no HACS card required beyond loading the resource.
 
 The card combines an SVG energy-flow canvas (sun arc, animated flow paths, inverter, battery, grid, home, EV nodes) with an HTML stat panel showing real-time battery telemetry. Everything updates live via the standard `hass` setter.
 
@@ -38,11 +38,11 @@ The card combines an SVG energy-flow canvas (sun arc, animated flow paths, inver
 ### Method 1 — HACS (Recommended)
 
 1. In HACS, go to **Frontend → ⋮ → Custom repositories**
-2. Paste: `https://github.com/thekhan1122/k-flow-card` (without `.git`)
+2. Paste: `https://github.com/fabiustek/f-flow-card` (without `.git`)
 3. Category: **Lovelace**
 4. Install the card – the resource is added automatically.
 5. Click the **+ Explore & Download Repositories** button.
-6. Search for **k-flow-card**.
+6. Search for **f-flow-card**.
 7. Click **Download** the resource is added automatically.
 8. **Hard refresh** your browser (`Ctrl + Shift + R` / `Cmd + Shift + R`).
 9. Open the visual editor to configure entities.
@@ -53,21 +53,21 @@ The card combines an SVG energy-flow canvas (sun arc, animated flow paths, inver
 
 ### Method 2 — Manual
 
-1. Copy `k-flow-card.js` to your HA config folder:
+1. Copy `f-flow-card.js` to your HA config folder:
    ```
-   /config/www/k-flow-card.js
+   /config/www/f-flow-card.js
    ```
 
 2. Register as a Lovelace resource:
    *(Settings → Dashboards → Resources → Add)*
    ```yaml
-   url: /local/k-flow-card.js
+   url: /local/f-flow-card.js
    type: module
    ```
 
 3. Add to a dashboard view:
    ```yaml
-   type: custom:k-flow-card
+   type: custom:f-flow-card
    ```
 
 4. Open the visual editor to configure entities.
@@ -92,7 +92,7 @@ All options are opt-in — without them the card looks as before. They are also 
 PV1 / PV2 labels are hidden automatically when `pv1_power` / `pv2_power` are empty.
 
 ```yaml
-type: custom:k-flow-card
+type: custom:f-flow-card
 card_title: Sigenergy System
 inverter_name: Sigen
 grid_status_entity: sensor.sigen_grid_status
@@ -307,9 +307,9 @@ All keys are configured through the visual editor. The YAML equivalents are list
 ## File Structure
 
 ```
-k-flow-card.js
+f-flow-card.js
 │
-├── class KFlowCardEditor   (visual editor — HTMLElement, shadow DOM)
+├── class FFlowCardEditor   (visual editor — HTMLElement, shadow DOM)
 │   ├── _render()           builds editor sections
 │   ├── makeSection()       collapsible section with optional chip toggle
 │   ├── picker()            ha-selector entity picker
@@ -319,7 +319,7 @@ k-flow-card.js
 │   ├── labelRow()          text field + conditionally-enabled entity picker
 │   └── pickerMaybeDisabled() picker with override veil overlay
 │
-└── class KFlowCard         (main card — HTMLElement, shadow DOM)
+└── class FFlowCard         (main card — HTMLElement, shadow DOM)
     ├── setConfig()         merges config with stub defaults, triggers static build
     ├── _buildStaticSVG()   renders full SVG + HTML stat panel (called once per config)
     ├── _updateDynamic()    updates all live values, colours, animations (called on every hass update)
@@ -348,17 +348,17 @@ k-flow-card.js
 
 ### Card does not appear / shows "Custom element doesn't exist"
 
-- Confirm the resource is registered: **Settings → Dashboards → Resources**. You should see `/hacsfiles/k-flow-card/k-flow-card.js` (HACS) or `/local/k-flow-card.js` (manual) with type `JavaScript Module`.
+- Confirm the resource is registered: **Settings → Dashboards → Resources**. You should see `/hacsfiles/f-flow-card/f-flow-card.js` (HACS) or `/local/f-flow-card.js` (manual) with type `JavaScript Module`.
 - Hard refresh the browser: `Ctrl + Shift + R` (Windows/Linux) or `Cmd + Shift + R` (Mac).
 - If using the mobile app, clear app cache or force-close and reopen.
-- If installed manually, confirm the file is at `/config/www/k-flow-card.js` — not inside a subfolder.
+- If installed manually, confirm the file is at `/config/www/f-flow-card.js` — not inside a subfolder.
 
 ---
 
 ### Visual editor is blank or fails to load
 
-- Open browser DevTools (`F12`) → Console tab. Look for any red errors referencing `k-flow-card`.
-- Ensure no other version of `k-flow-card.js` is registered as a duplicate resource. Go to Resources and remove any stale entries.
+- Open browser DevTools (`F12`) → Console tab. Look for any red errors referencing `f-flow-card`.
+- Ensure no other version of `f-flow-card.js` is registered as a duplicate resource. Go to Resources and remove any stale entries.
 - Try clearing the HA frontend cache: **Developer Tools → Template** → reload page.
 
 ---
@@ -406,7 +406,7 @@ k-flow-card.js
 ### After update via HACS, card looks wrong or broken
 
 1. Hard refresh the browser (`Ctrl + Shift + R`).
-2. If the issue persists, go to **Settings → Dashboards → Resources**, delete the k-flow-card entry, then re-add it (HACS will re-register it on the next HA restart).
+2. If the issue persists, go to **Settings → Dashboards → Resources**, delete the f-flow-card entry, then re-add it (HACS will re-register it on the next HA restart).
 3. Restart Home Assistant and hard refresh again.
 
 ---
@@ -415,10 +415,10 @@ k-flow-card.js
 
 When reporting an issue, include:
 - Home Assistant version
-- k-flow-card version (visible in browser DevTools console on load)
+- f-flow-card version (visible in browser DevTools console on load)
 - Browser console errors (screenshot or copy-paste)
 - Relevant section of your card YAML config (remove sensitive entity names if needed)
 
 ---
 
-*Khan Automation · k-flow-card · Last updated: v1.1.1*
+*Khan Automation · f-flow-card · Last updated: v1.1.1*
