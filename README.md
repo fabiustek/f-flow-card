@@ -1,95 +1,98 @@
 # f-flow-card
 
-**Home Assistant Custom Energy Flow Card** — fork of [k-flow-card](https://github.com/thekhan1122/k-flow-card) by Khan Automation (thekhan1122), MIT licensed
-`f-flow-card.js` · Unified Edition  Sigenergy-style layout options **V1.2.0**
+**Card personalizzata per Home Assistant con i flussi energetici in tempo reale** — fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), con licenza MIT.
+`f-flow-card.js` · Unified Edition · layout in stile Sigenergy e interfaccia in italiano **V1.2.0**
+
 <img width="1708" height="2520" alt="IMG_20260513_114249" src="https://github.com/user-attachments/assets/e4c54570-5b9e-43c4-9326-b44d4105a5d1" />
 <img width="1108" height="1688" alt="IMG_20260516_011350" src="https://github.com/user-attachments/assets/6914d4ab-daa6-432a-983d-6abac15a1cac" />
 <img width="1114" height="1744" alt="IMG_20260516_011300" src="https://github.com/user-attachments/assets/ce97703f-ed71-4ab9-a79d-8d7cf3bcd3f6" />
 
----
-
-## Overview
-
-`f-flow-card` is a fully custom Home Assistant Lovelace card that renders a live, animated energy-flow diagram for a GoodWe solar inverter system with JK BMS battery storage. It is self-contained in a single JavaScript file — no dependencies, no HACS card required beyond loading the resource.
-
-The card combines an SVG energy-flow canvas (sun arc, animated flow paths, inverter, battery, grid, home, EV nodes) with an HTML stat panel showing real-time battery telemetry. Everything updates live via the standard `hass` setter.
+> Le immagini qui sopra vengono dal progetto originale e mostrano l'interfaccia in inglese.
 
 ---
 
-## Features
+## Panoramica
 
-- Animated S-curve energy flow paths (solar → inverter → battery / grid / home / EV)
-- Live sun position tracking along an arc based on `sun.sun` elevation
-- Battery SOC colour coding with dynamic charge/discharge indicators
-- Dual battery support (primary + secondary, stacked layout)
-- EV / car charger node with live state, SOC, and ETA
-- Extra PV strings (PV3 / PV4) with combined toggle
-- System limits panel (battery Ah/Wh, inverter max, PV max)
-- Battery stat tiles: Cell Temp, BMS Temp, Min/Max Cell Voltage, Batt Discharge, Total PV Gen
-- Endurance tile: charge/discharge time remaining or ETA timestamp
-- Full visual editor with section toggles — no YAML required for setup
-- Per-row custom label and entity overrides for all 6 stat tiles
-- Fully dark-themed, mobile-friendly
+`f-flow-card` è una card Lovelace per Home Assistant che disegna un diagramma animato e in tempo reale dei flussi di energia di un impianto fotovoltaico con accumulo. È nata per inverter GoodWe con batterie gestite da JK BMS, ma funziona con qualsiasi integrazione che esponga sensori di potenza ed energia (ad esempio Sigenergy). Tutto è contenuto in un unico file JavaScript, senza dipendenze.
+
+La card unisce un'area SVG con i flussi (arco del sole, percorsi animati, inverter, batteria, rete, casa, auto elettrica) a un pannello HTML con i dati della batteria. Tutto si aggiorna in tempo reale tramite l'oggetto `hass` standard.
 
 ---
 
-## Installation
+## Funzionalità
 
-### Method 1 — HACS (Recommended)
-
-1. In HACS, go to **Frontend → ⋮ → Custom repositories**
-2. Paste: `https://github.com/fabiustek/f-flow-card` (without `.git`)
-3. Category: **Lovelace**
-4. Install the card – the resource is added automatically.
-5. Click the **+ Explore & Download Repositories** button.
-6. Search for **f-flow-card**.
-7. Click **Download** the resource is added automatically.
-8. **Hard refresh** your browser (`Ctrl + Shift + R` / `Cmd + Shift + R`).
-9. Open the visual editor to configure entities.
-
-> HACS handles resource registration automatically. No manual resource entry needed.
+- Percorsi animati dei flussi (fotovoltaico → inverter → batteria / rete / casa / auto)
+- Posizione del sole in tempo reale lungo un arco, basata su `sun.sun`; luna di notte
+- Colore della batteria in base al SOC, con indicatori di carica e scarica
+- Supporto per due batterie (principale e secondaria)
+- Nodo per auto elettrica / wallbox con stato, SOC e tempo alla carica completa
+- Stringhe FV aggiuntive (FV3 / FV4) con un unico interruttore
+- Riquadri batteria: temperatura celle, temperatura BMS, tensione cella min/max, scarica, produzione FV totale
+- Riquadro autonomia: tempo residuo in scarica o tempo alla carica completa
+- Layout in stile Sigenergy (facoltativo): indicatore IN RETE / FUORI RETE, modalità EMS, immagine dell'inverter, barra fonti energia, pannello autonomia, 6 riquadri giornalieri
+- Editor visuale completo, diviso in sezioni: non serve scrivere YAML
+- Etichette ed entità personalizzabili per i 6 riquadri statistici
+- Tema scuro, adatto anche al telefono
 
 ---
 
-### Method 2 — Manual
+## Installazione
 
-1. Copy `f-flow-card.js` to your HA config folder:
+### Metodo 1 — HACS (consigliato)
+
+1. In HACS vai su **⋮ → Repository personalizzati** (Custom repositories).
+2. Incolla `https://github.com/fabiustek/f-flow-card` (senza `.git`).
+3. Categoria: **Dashboard** (nelle versioni meno recenti di HACS si chiama **Lovelace** o **Plugin**).
+4. Cerca **f-flow-card** e premi **Scarica**: la risorsa viene registrata automaticamente.
+5. Ricarica il browser forzando l'aggiornamento (`Ctrl + Shift + R` / `Cmd + Shift + R`).
+6. Aggiungi la card a una dashboard e configurala con l'editor visuale.
+
+> HACS registra la risorsa da solo e installa anche le icone (`grid-icon.png`, `home-icon.png`, `ev-charger-icon.png`) nel percorso giusto.
+
+---
+
+### Metodo 2 — Manuale
+
+1. Copia il contenuto della cartella `dist/` (il file `f-flow-card.js` e le tre icone PNG) in:
    ```
-   /config/www/f-flow-card.js
+   /config/www/community/f-flow-card/
    ```
+   La card cerca le icone in `/local/community/f-flow-card/`, quindi la cartella deve chiamarsi così.
 
-2. Register as a Lovelace resource:
-   *(Settings → Dashboards → Resources → Add)*
+2. Registra la risorsa:
+   *(Impostazioni → Plance → Risorse → Aggiungi risorsa)*
    ```yaml
-   url: /local/f-flow-card.js
+   url: /local/community/f-flow-card/f-flow-card.js
    type: module
    ```
 
-3. Add to a dashboard view:
+3. Aggiungi la card a una dashboard:
    ```yaml
    type: custom:f-flow-card
    ```
 
-4. Open the visual editor to configure entities.
+4. Configura le entità con l'editor visuale.
 
 ---
 
-## Sigenergy-style Layout (v1.2.0)
+## Layout in stile Sigenergy (v1.2.0)
 
-All options are opt-in — without them the card looks as before. They are also available in the visual editor under **🎨 Layout & Header**.
+Tutte queste opzioni sono facoltative: se non le attivi, la card ha l'aspetto classico. Le trovi anche nell'editor visuale, nella sezione **🎨 Layout e intestazione**.
 
-| Option | Type | Description |
+| Opzione | Tipo | Descrizione |
 |---|---|---|
-| `card_title` | string | Header title (default `Energy Flow`) |
-| `grid_status_entity` | entity | Shows an **ON GRID / OFF GRID** pill in the header |
-| `ems_mode_entity` | entity | Shows an **EMS Mode** chip under the header |
-| `inverter_image` | URL | Picture used instead of the drawn INV box (e.g. `/local/sigenergy-inverter.png`) |
-| `_show_energy_supply` | bool | Stacked Solar / Chg / Dis / Grid bar |
-| `_show_backup_panel` | bool | Backup time + remaining kWh panel |
-| `_daily_tiles_extended` | bool | 6 daily tiles (PV, Batt Chg, Batt Dis, Grid Import, Grid Export, Load) |
-| `_show_battery_stats` | bool | Set `false` to hide the JK BMS stat tiles (default `true`) |
+| `card_title` | testo | Titolo nell'intestazione (predefinito `Flusso Energia`) |
+| `grid_status_entity` | entità | Mostra l'indicatore **IN RETE / FUORI RETE** nell'intestazione |
+| `ems_mode_entity` | entità | Mostra la **Modalità EMS** sotto il titolo |
+| `inverter_image` | URL | Immagine al posto del riquadro INV disegnato (es. `/local/sigenergy-inverter.png`) |
+| `_show_energy_supply` | booleano | Barra delle fonti: Solare / Carica / Scarica / Rete |
+| `_show_backup_panel` | booleano | Pannello con autonomia e kWh residui |
+| `_daily_tiles_extended` | booleano | 6 riquadri giornalieri (FV, carica, scarica, prelievo, immissione, consumo) |
+| `_show_battery_stats` | booleano | Imposta `false` per nascondere i riquadri JK BMS (predefinito `true`) |
 
-PV1 / PV2 labels are hidden automatically when `pv1_power` / `pv2_power` are empty.
+Le righe FV1 / FV2 spariscono da sole se `pv1_power` / `pv2_power` sono vuoti.
+
+L'indicatore dello stato rete riconosce stati come `on grid`, `connected`, `on` (→ **IN RETE**) e `off grid`, `island`, `disconnected`, `backup` (→ **FUORI RETE**). Qualsiasi altro stato viene mostrato così com'è.
 
 ```yaml
 type: custom:f-flow-card
@@ -108,317 +111,315 @@ battery_cap_unit: kwh
 battery_full_wh: 48
 ```
 
----
-
-## Configuration Reference
-
-All keys are configured through the visual editor. The YAML equivalents are listed below for reference or manual setup.
-
-### Core / Solar
-
-| Key | Default | Description |
-|---|---|---|
-| `inverter_name` | `''` | Label shown in the inverter node |
-| `pv1_power` | `sensor.goodwe_pv1_power` | PV string 1 power (W) |
-| `pv2_power` | `sensor.goodwe_pv2_power` | PV string 2 power (W) |
-| `pv3_power` | `''` | PV string 3 — optional, enable via Extra PV toggle |
-| `pv4_power` | `''` | PV string 4 — optional, enable via Extra PV toggle |
-| `pv_total_power` | `sensor.goodwe_pv_power` | Total PV power (W) |
-| `pv_max_power` | `7500` | Max PV power for bar scaling (W) |
-| `today_pv` | `sensor.goodwe_today_s_pv_generation` | Today's PV generation (kWh) |
-| `total_pv_gen_entity` | `sensor.goodwe_total_pv_generation` | Lifetime PV generation (kWh) |
-| `inv_temp` | `sensor.goodwe_inverter_temperature_module` | Inverter temperature |
-| `today_batt_chg` | `sensor.goodwe_today_battery_charge` | Today battery charge (kWh) |
-| `today_load` | `sensor.goodwe_today_load` | Today load (kWh) |
-| `sun` | `sun.sun` | Sun entity for arc position |
-
-### Grid
-
-| Key | Default | Description |
-|---|---|---|
-| `grid_active_power` | `sensor.goodwe_active_power` | Grid active power (W) |
-| `grid_import_energy` | `sensor.goodwe_today_energy_import` | Today grid import (kWh) |
-| `grid_export_energy` | `''` | Today grid export (kWh) — optional |
-| `grid_power_alt` | `sensor.grid_phase_a_power` | Alternate grid power sensor |
-| `invert_grid_power` | `false` | Invert sign — enable if positive = exporting |
-| `consump` | `sensor.goodwe_house_consumption` | House consumption (W) |
-
-### Primary Battery
-
-| Key | Default | Description |
-|---|---|---|
-| `_show_battery` | `true` | Show primary battery section |
-| `battery_soc` | `sensor.jk_soc` | Battery state of charge (%) |
-| `battery_power` | `sensor.jk_power` | Battery power (W) |
-| `battery_current` | `sensor.jk_current` | Battery current (A) |
-| `battery_voltage` | `sensor.jk_voltage` | Battery voltage (V) |
-| `battery_temp1` | `sensor.jk_temp1` | Cell temp probe 1 |
-| `battery_temp2` | `sensor.jk_temp2` | Cell temp probe 2 |
-| `battery_mos` | `sensor.jk_mos` | BMS MOS temperature |
-| `battery_min_cell` | `sensor.jk_cellmin` | Min cell voltage |
-| `battery_max_cell` | `sensor.jk_cellmax` | Max cell voltage |
-| `batt_dis` | `sensor.goodwe_today_battery_discharge` | Today discharge (kWh) |
-| `battery_full_ah` | `314` | Battery capacity (Ah) |
-| `battery_full_wh` | `16076` | Battery capacity (Wh) |
-| `goodwe_battery_soc` | `sensor.goodwe_battery_state_of_charge` | Fallback SOC |
-| `goodwe_battery_curr` | `sensor.goodwe_battery_current` | Fallback current |
-| `invert_battery_power` | `false` | Invert sign — enable if positive = discharging |
-
-### Secondary Battery
-
-| Key | Default | Description |
-|---|---|---|
-| `_show_battery2` | `false` | Enable secondary battery (chip toggle) |
-| `battery2_soc` | `''` | Secondary SOC (%) |
-| `battery2_power` | `''` | Secondary power (W) |
-| `battery2_current` | `''` | Secondary current (A) |
-| `battery2_voltage` | `''` | Secondary voltage (V) |
-| `battery2_mos` | `''` | Secondary BMS temperature |
-
-### EV / Car Charger
-
-| Key | Default | Description |
-|---|---|---|
-| `_show_ev` | `false` | Enable EV section (chip toggle) |
-| `charger_state` | `''` | Charger state entity (string: `charging`, `completed`, etc.) |
-| `charger_power` | `''` | Charger power (W) |
-| `charger_current` | `''` | Charger current (A) |
-| `charger_soc` | `''` | Car battery SOC (%) |
-| `charger_eta` | `''` | Charge ETA in minutes — optional |
-| `charger_battery_capacity_wh` | `''` | EV battery capacity (Wh) |
-
-### System Limits
-
-| Key | Default | Description |
-|---|---|---|
-| `_show_limits` | `false` | Show limits section (chip toggle) |
-| `inverter_max_power` | `6000` | Inverter max power for bar scaling (W) |
-
-### Labels
-
-| Key | Default | Description |
-|---|---|---|
-| `_labels_custom_entities` | `false` | Enable Labels section (chip toggle) |
-| `label_cell_temp_minmax` | `CELL TEMP MIN/MAX` | Tile label — cell temp |
-| `label_bms_temp` | `BMS TEMP` | Tile label — BMS temp |
-| `label_min_cell` | `Min Cell` | Tile label — min cell voltage |
-| `label_max_cell` | `Max Cell` | Tile label — max cell voltage |
-| `label_batt_dis` | `Batt Dis.` | Tile label — battery discharge |
-| `label_total_pv_gen` | `TOTAL PV GEN.` | Tile label — total PV generation |
-| `label_entity_cell_temp` | `''` | Override entity for cell temp tile |
-| `label_entity_bms_temp` | `''` | Override entity for BMS temp tile |
-| `label_entity_min_cell` | `''` | Override entity for min cell tile |
-| `label_entity_max_cell` | `''` | Override entity for max cell tile |
-| `label_entity_batt_dis` | `''` | Override entity for batt dis tile |
-
-> **Entity override rule:** An entity picker in the Labels section activates only when its corresponding label text has been changed from the default. Once active, the matching picker in the Battery section is locked with an "Overridden by Labels" veil to prevent duplication.
+> I nomi delle entità nell'esempio sono indicativi: scegli quelli del tuo impianto con l'editor visuale.
 
 ---
 
-## Visual Editor Sections
+## Riferimento della configurazione
 
-| Section | Toggle | Description |
+Tutte le opzioni si impostano dall'editor visuale. Qui sotto trovi le chiavi YAML corrispondenti, utili per la configurazione manuale.
+
+### Generale / Fotovoltaico
+
+| Chiave | Predefinito | Descrizione |
 |---|---|---|
-| General | — | Inverter name |
-| Labels | `+ Enable` chip | Rename stat tiles; per-row entity overrides |
-| Solar | — | PV1, PV2 entities |
-| Extra PV Strings | `+ Enable` chip | PV3, PV4 |
-| Solar Extras | — | Totals, temperatures, today stats |
-| Grid | — | Grid power, import/export, consumption |
-| Primary Battery | `+ Enable` chip | Full BMS telemetry |
-| Secondary Battery | `+ Enable` chip | Second pack |
-| System Limits | `+ Enable` chip | Capacity and power limits |
-| EV / Car Charger | `+ Enable` chip | Charger state, SOC, ETA |
+| `inverter_name` | `''` | Nome mostrato nel riquadro dell'inverter e nel titolo dei riquadri giornalieri |
+| `pv1_power` | `sensor.goodwe_pv1_power` | Potenza stringa FV 1 (W) |
+| `pv2_power` | `sensor.goodwe_pv2_power` | Potenza stringa FV 2 (W) |
+| `pv3_power` | `''` | Stringa FV 3 — facoltativa, si attiva con "Stringhe FV aggiuntive" |
+| `pv4_power` | `''` | Stringa FV 4 — facoltativa, si attiva con "Stringhe FV aggiuntive" |
+| `pv_total_power` | `sensor.goodwe_pv_power` | Potenza FV totale (W) |
+| `pv_max_power` | `7500` | Potenza FV massima, per la scala della barra (W) |
+| `inverter_max_power` | `6000` | Potenza massima dell'inverter, per la scala della barra (W) |
+| `today_pv` | `sensor.goodwe_today_s_pv_generation` | Produzione FV di oggi (kWh) |
+| `total_pv_gen_entity` | `sensor.goodwe_total_pv_generation` | Produzione FV totale (kWh) |
+| `inv_temp` | `sensor.goodwe_inverter_temperature_module` | Temperatura dell'inverter |
+| `today_batt_chg` | `sensor.goodwe_today_battery_charge` | Carica della batteria di oggi (kWh) |
+| `today_load` | `sensor.goodwe_today_load` | Consumo di oggi (kWh) |
+| `sun` | `sun.sun` | Entità del sole per la posizione sull'arco |
+
+### Rete
+
+| Chiave | Predefinito | Descrizione |
+|---|---|---|
+| `grid_active_power` | `sensor.goodwe_active_power` | Potenza attiva della rete (W) |
+| `grid_import_energy` | `sensor.goodwe_today_energy_import` | Energia prelevata oggi (kWh) |
+| `grid_export_energy` | `''` | Energia immessa oggi (kWh) — facoltativa |
+| `grid_power_alt` | `sensor.grid_phase_a_power` | Sensore di potenza rete alternativo |
+| `invert_grid_power` | `false` | Inverte il segno — attivalo se positivo = immissione |
+| `consump` | `sensor.goodwe_house_consumption` | Consumo della casa (W) |
+
+### Batteria principale
+
+| Chiave | Predefinito | Descrizione |
+|---|---|---|
+| `_show_battery` | `true` | Mostra la batteria principale |
+| `battery_soc` | `sensor.jk_soc` | Stato di carica (%) |
+| `battery_power` | `sensor.jk_power` | Potenza (W) |
+| `battery_current` | `sensor.jk_current` | Corrente (A) |
+| `battery_voltage` | `sensor.jk_voltage` | Tensione (V) |
+| `battery_temp1` | `sensor.jk_temp1` | Sonda temperatura celle 1 |
+| `battery_temp2` | `sensor.jk_temp2` | Sonda temperatura celle 2 |
+| `battery_mos` | `sensor.jk_mos` | Temperatura MOS del BMS |
+| `battery_min_cell` | `sensor.jk_cellmin` | Tensione cella minima |
+| `battery_max_cell` | `sensor.jk_cellmax` | Tensione cella massima |
+| `batt_dis` | `sensor.goodwe_today_battery_discharge` | Scarica di oggi (kWh) |
+| `battery_cap_unit` | `ah` | Unità della capacità: `ah` oppure `kwh` |
+| `battery_full_ah` | `0` | Capacità della batteria (Ah), usata se `battery_cap_unit: ah` |
+| `battery_full_wh` | `0` | Capacità della batteria **in kWh**, usata se `battery_cap_unit: kwh` |
+| `goodwe_battery_soc` | `sensor.goodwe_battery_state_of_charge` | SOC di riserva |
+| `goodwe_battery_curr` | `sensor.goodwe_battery_current` | Corrente di riserva |
+| `invert_battery_power` | `false` | Inverte il segno — attivalo se positivo = scarica |
+
+### Batteria secondaria
+
+| Chiave | Predefinito | Descrizione |
+|---|---|---|
+| `_show_battery2` | `false` | Attiva la batteria secondaria |
+| `battery2_soc` | `''` | SOC (%) |
+| `battery2_power` | `''` | Potenza (W) |
+| `battery2_current` | `''` | Corrente (A) |
+| `battery2_voltage` | `''` | Tensione (V) |
+| `battery2_mos` | `''` | Temperatura del BMS |
+| `battery2_full_ah` | `0` | Capacità (Ah), se diversa dalla batteria 1 |
+| `battery2_full_wh` | `0` | Capacità (kWh), se diversa dalla batteria 1 |
+
+### Auto elettrica / Wallbox
+
+| Chiave | Predefinito | Descrizione |
+|---|---|---|
+| `_show_ev` | `false` | Attiva la sezione auto elettrica |
+| `charger_state` | `''` | Stato della wallbox (testo: `charging`, `completed`, ecc.) |
+| `charger_power` | `''` | Potenza della wallbox (W) |
+| `charger_current` | `''` | Corrente della wallbox (A) |
+| `charger_soc` | `''` | SOC della batteria dell'auto (%) |
+| `charger_eta` | `''` | Minuti alla carica completa — facoltativo |
+| `charger_battery_capacity_wh` | `''` | Capacità della batteria dell'auto (Wh) |
+
+### Etichette
+
+| Chiave | Predefinito | Descrizione |
+|---|---|---|
+| `_labels_custom_entities` | `false` | Attiva la sezione Etichette |
+| `label_cell_temp_minmax` | `TEMP CELLE MIN/MAX` | Etichetta del riquadro temperatura celle |
+| `label_bms_temp` | `TEMP BMS` | Etichetta del riquadro temperatura BMS |
+| `label_min_cell` | `Cella Min` | Etichetta del riquadro tensione cella minima |
+| `label_max_cell` | `Cella Max` | Etichetta del riquadro tensione cella massima |
+| `label_batt_dis` | `Scarica Batt.` | Etichetta del riquadro scarica batteria |
+| `label_total_pv_gen` | `PRODUZIONE FV TOT.` | Etichetta del riquadro produzione FV totale |
+| `label_endurance` | `AUTONOMIA` | Etichetta del riquadro autonomia |
+| `label_entity_cell_temp` | `''` | Entità alternativa per il riquadro temperatura celle |
+| `label_entity_bms_temp` | `''` | Entità alternativa per il riquadro temperatura BMS |
+| `label_entity_min_cell` | `''` | Entità alternativa per il riquadro cella minima |
+| `label_entity_max_cell` | `''` | Entità alternativa per il riquadro cella massima |
+| `label_entity_batt_dis` | `''` | Entità alternativa per il riquadro scarica batteria |
+
+> **Regola per le entità alternative:** nella sezione Etichette, la scelta dell'entità si sblocca solo dopo aver cambiato il testo dell'etichetta rispetto a quello predefinito. Da quel momento il sensore corrispondente nella sezione Batteria viene bloccato con la scritta "Sostituito dalla sezione Etichette", per evitare duplicati.
+
+> **Se aggiorni da k-flow-card:** le etichette predefinite ora sono in italiano. Se nella tua configurazione sono salvate quelle inglesi (es. `CELL TEMP MIN/MAX`), la card le considera personalizzate. Cancellale dal YAML per tornare a quelle predefinite.
 
 ---
 
-## Colour Logic
+## Sezioni dell'editor visuale
 
-| Metric | Thresholds |
+| Sezione | Interruttore | Contenuto |
+|---|---|---|
+| Generale | — | Nome inverter, capacità batteria (Ah/kWh), potenze massime |
+| Layout e intestazione | — | Titolo, stato rete, modalità EMS, immagine inverter, opzioni stile Sigenergy |
+| Etichette | `＋ Attiva` | Rinomina i riquadri; entità alternative riga per riga |
+| Fotovoltaico | — | Entità FV1, FV2 |
+| Stringhe FV aggiuntive | `＋ Attiva` | FV3, FV4 |
+| Altri dati fotovoltaico | — | Totali, temperatura inverter, dati di oggi, consumo casa |
+| Rete | — | Potenza rete, prelievo e immissione |
+| Batteria principale | `＋ Attiva` | Tutti i dati del BMS |
+| Batteria secondaria | `＋ Attiva` | Secondo pacco batterie |
+| Auto elettrica / Wallbox | `＋ Attiva` | Stato wallbox, SOC, tempo alla carica completa |
+
+---
+
+## Logica dei colori
+
+| Valore | Soglie |
 |---|---|
-| **SOC** | ≤25% red · ≤50% orange · ≤75% blue · >75% green |
-| **Cell Temp** | ≤15°C blue · ≤35°C green · ≤45°C orange · >45°C red |
-| **Cell Voltage** | <3.0V red · <3.1V orange · <3.4V yellow · ≤3.65V green · >3.65V red |
-| **Inverter / Env Temp** | ≤25°C green · ≤45°C orange · >45°C red |
+| **SOC** | ≤25% rosso · ≤50% arancione · ≤75% blu · >75% verde |
+| **Temperatura celle** | ≤15°C blu · ≤35°C verde · ≤45°C arancione · >45°C rosso |
+| **Tensione celle** | <3,0 V rosso · <3,1 V arancione · <3,4 V giallo · ≤3,65 V verde · >3,65 V rosso |
+| **Temperatura inverter / ambiente** | ≤25°C verde · ≤45°C arancione · >45°C rosso |
 
 ---
 
-## Changelog
+## Registro delle modifiche
 
-### v7.4.0
-- **Labels section — header chip toggle** (same style as Secondary Battery, Extra PV, EV, Limits sections). Body is hidden when disabled.
-- **Per-row auto-enable logic:** each label row's entity picker activates independently — only when that row's text has been changed from its default value. No global unlock needed.
-- **Per-row Battery/Solar locking:** corresponding pickers in Battery and Solar Extras sections lock individually when their label row is active, not all-at-once.
-- `_updateDynamic` refactored: dead `_readEntity` helper removed; replaced with clean `_rowActive`, `_readNum`, `_readStr` helpers.
-- `_set` now triggers a re-render on any of the 6 label text key changes (live editor feedback).
+### v1.2.0 (f-flow-card)
+- Progetto rinominato in **f-flow-card** (`type: custom:f-flow-card`).
+- Interfaccia della card ed editor visuale tradotti in italiano; orari nel formato 24 ore.
+- Layout in stile Sigenergy, tutto facoltativo: titolo personalizzato, indicatore IN RETE / FUORI RETE, modalità EMS, immagine dell'inverter, barra fonti energia, pannello autonomia, 6 riquadri giornalieri, possibilità di nascondere i riquadri JK BMS.
+- Lo stato della batteria (CARICA / SCARICA / RIPOSO) ora compare sotto l'icona della batteria.
+- Le righe FV1 / FV2 spariscono se le entità non sono configurate.
 
-### v7.3.0
-- **Labels editor** reduced to exactly 6 rows matching the 2×3 stat tile grid.
-- `label_endurance` text field removed from editor (endurance tile exists on card but label is fixed).
-- `label_endu_eta` / `label_entity_endu_eta` row removed from editor.
-- **Battery voltage** (`battery_voltage`, `battery2_voltage`) is never locked — always freely editable regardless of Labels state.
-- **Cell Temp override:** when a custom entity is selected, tile shows a single value only (no `temp1 / temp2` pair).
-- **Endurance tile** layout: full card width, vertically compact row, all content bottom-aligned (`align-items:flex-end`).
-- Dead stub config keys purged: `label_endu_eta`, `label_entity_endu_eta`, `label_entity_cell_temp2`, `label_entity_endurance`.
+### Versioni precedenti (k-flow-card originale)
 
-### v7.2.1
-- **Endurance tile** redesigned from narrow column to full-width single row (horizontally full, vertically compact).
-- **Cell Temp Min/Max** entity override: added second entity picker (`label_entity_cell_temp2`) to allow independent min/max overrides. *(Superseded in v7.3.0)*
+Le versioni seguenti appartengono al progetto originale; la loro numerazione interna (v4–v7) è precedente all'attuale numerazione 1.x.
 
-### v7.2.0
-- **Labels section** introduced with `switchRow` global toggle for custom entities.
-- Six stat tiles made label-customisable: Cell Temp Min/Max, BMS Temp, Min Cell, Max Cell, Batt Dis, Total PV Gen.
-- `pickerMaybeDisabled` helper added — renders override veil on Battery section pickers when Labels global toggle is ON.
-- Battery voltage pickers exempted from locking.
-- Info banner added above label rows.
+#### v7.4.0
+- **Sezione Etichette con interruttore nell'intestazione**, come per batteria secondaria, FV aggiuntivo e auto elettrica. Il contenuto è nascosto quando è disattivata.
+- **Sblocco riga per riga:** la scelta dell'entità di ogni riga si attiva solo quando il testo di quella riga è diverso da quello predefinito.
+- **Blocco riga per riga** dei sensori corrispondenti nelle sezioni Batteria e Altri dati fotovoltaico.
+- `_updateDynamic` riorganizzato con gli helper `_rowActive`, `_readNum`, `_readStr`.
+- L'editor si aggiorna subito quando cambi una delle 6 etichette.
 
-### v7.1.x
-- **Dual battery** support: Secondary Battery section with independent SOC, power, current, voltage, BMS temp.
-- Battery current and power values moved outside the battery icon SVG: power displayed above flow bar, current below.
-- Dual battery values stacked in stat tiles where applicable (e.g. `mos1 / mos2`).
+#### v7.3.0
+- Editor delle etichette ridotto alle 6 righe corrispondenti alla griglia 2×3 dei riquadri.
+- La tensione della batteria non viene mai bloccata.
+- Con un'entità alternativa, il riquadro temperatura celle mostra un solo valore.
+- Riquadro autonomia a tutta larghezza, compatto in altezza.
+- Rimosse chiavi di configurazione inutilizzate.
 
-### v7.0.x
-- **EV / Car Charger** node added to SVG canvas with animated flow path, SOC arc, and ETA display.
-- `_show_ev` chip toggle added to editor.
-- Charger state machine: `charging`, `completed`, `finished`, `disconnected` with colour and icon changes.
+#### v7.2.x
+- Riquadro autonomia ridisegnato su una sola riga.
+- Introdotta la sezione Etichette, con 6 riquadri personalizzabili e il velo di blocco sui sensori della batteria.
 
-### v6.x
-- **Extra PV Strings** (PV3 + PV4) merged under one `_show_pv_extra` chip toggle (previously two separate toggles).
-- **System Limits** section added with numeric fields: battery Ah, battery Wh, inverter max, PV max.
-- `_show_limits` chip toggle added.
-- `inverter_name` moved to General section as `ha-textfield` input.
-- `charger_battery_capacity_wh` and other numeric fields migrated to explicit `ha-textfield` / `numberField` inputs.
+#### v7.1.x
+- Supporto per la **doppia batteria**, con SOC, potenza, corrente, tensione e temperatura BMS indipendenti.
+- Corrente e potenza della batteria spostate fuori dall'icona.
 
-### v5.x
-- Sun arc introduced: sun SVG node tracks real elevation angle from `sun.sun`, stays pinned on the arc path.
-- Animated S-curve flow paths replacing straight lines.
-- Cross / T-shape layout established: sun arc at top → inverter centre → Battery left, Grid right, Home below.
-- Static SVG rebuilt via `_buildStaticSVG()` on `setConfig`; dynamic updates isolated to `_updateDynamic()`.
+#### v7.0.x
+- Aggiunto il nodo **auto elettrica / wallbox** con percorso animato, SOC e tempo alla carica completa.
+- Stati della wallbox: `charging`, `completed`, `finished`, `disconnected`.
 
-### v4.x and earlier
-- Initial card structure: basic SVG energy flow with GoodWe + JK BMS entity mapping.
-- Visual editor scaffolded with `makeSection`, `picker`, `textField`, `switchRow` helpers.
-- `ha-selector` entity pickers introduced.
-- SOC colour logic, cell temp/voltage colour helpers defined.
-- Endurance calculation introduced (hours remaining based on current draw / charge rate).
+#### v6.x
+- Stringhe FV3 e FV4 riunite sotto un unico interruttore.
+- Aggiunti i limiti di sistema (capacità batteria, potenza max inverter e FV), poi spostati nella sezione Generale.
+
+#### v5.x
+- Introdotto l'arco del sole, che segue l'elevazione reale di `sun.sun`.
+- Percorsi animati al posto delle linee dritte; layout con inverter al centro, batteria a sinistra, rete a destra e casa in basso.
+- Parte statica costruita una sola volta in `_buildStaticSVG()`, aggiornamenti in `_updateDynamic()`.
+
+#### v4.x e precedenti
+- Struttura iniziale della card con GoodWe e JK BMS, editor visuale e colori per SOC, temperature e tensioni.
+- Primo calcolo dell'autonomia.
 
 ---
 
-## File Structure
+## Struttura del file
 
 ```
 f-flow-card.js
 │
-├── class FFlowCardEditor   (visual editor — HTMLElement, shadow DOM)
-│   ├── _render()           builds editor sections
-│   ├── makeSection()       collapsible section with optional chip toggle
-│   ├── picker()            ha-selector entity picker
-│   ├── textField()         ha-textfield input
-│   ├── numberField()       ha-textfield numeric input
-│   ├── switchRow()         pill toggle (used for invert flags)
-│   ├── labelRow()          text field + conditionally-enabled entity picker
-│   └── pickerMaybeDisabled() picker with override veil overlay
+├── class FFlowCardEditor   (editor visuale)
+│   ├── _render()           costruisce le sezioni dell'editor
+│   ├── makeSection()       sezione richiudibile con interruttore facoltativo
+│   ├── picker()            scelta di un'entità (ha-selector)
+│   ├── textField()         campo di testo
+│   ├── numberField()       campo numerico
+│   ├── switchRow()         interruttore (per esempio per invertire i segni)
+│   ├── labelRow()          campo etichetta + scelta entità che si sblocca
+│   └── pickerMaybeDisabled() scelta entità con velo di blocco
 │
-└── class FFlowCard         (main card — HTMLElement, shadow DOM)
-    ├── setConfig()         merges config with stub defaults, triggers static build
-    ├── _buildStaticSVG()   renders full SVG + HTML stat panel (called once per config)
-    ├── _updateDynamic()    updates all live values, colours, animations (called on every hass update)
-    ├── _val()              safe numeric entity reader
-    ├── _strVal()           safe string entity reader
-    ├── _socColor()         SOC → hex colour
-    ├── _cellTempColor()    temperature → hex colour
-    ├── _cellVoltColor()    cell voltage → hex colour
-    ├── _tempColor()        general temperature → hex colour
-    ├── _remCapColor()      remaining capacity → hex colour
-    └── _fmtTill()          hours → "Till HH:MM" or "in Xh Ym" string
+└── class FFlowCard         (card principale, shadow DOM)
+    ├── setConfig()         unisce la configurazione ai valori predefiniti e costruisce la parte statica
+    ├── _buildStaticSVG()   disegna l'SVG e il pannello HTML (una volta per configurazione)
+    ├── _updateDynamic()    aggiorna valori, colori e animazioni a ogni aggiornamento di hass
+    ├── _val()              lettura sicura di un valore numerico
+    ├── _strVal()           lettura sicura di un valore testuale
+    ├── _socColor()         SOC → colore
+    ├── _cellTempColor()    temperatura → colore
+    ├── _cellVoltColor()    tensione cella → colore
+    ├── _tempColor()        temperatura generica → colore
+    ├── _remCapColor()      capacità residua → colore
+    └── _fmtTill()          ore → "Fino a lun 18:30"
 ```
 
 ---
 
-## Notes
+## Note
 
-- Tested on Home Assistant OS (HAOS) with GoodWe ET/ES inverter integration and JK BMS Bluetooth integration.
-- The card uses shadow DOM — custom CSS from themes does not penetrate the card. All colours are hardcoded or driven by entity values.
-- Config keys prefixed with `_` (e.g. `_show_battery`) are editor-only boolean toggles — they control visibility but are stored in the card config YAML.
-- When installed via HACS, the resource is registered automatically. When installed manually, register as `type: module`.
-
----
-
-## Troubleshooting
-
-### Card does not appear / shows "Custom element doesn't exist"
-
-- Confirm the resource is registered: **Settings → Dashboards → Resources**. You should see `/hacsfiles/f-flow-card/f-flow-card.js` (HACS) or `/local/f-flow-card.js` (manual) with type `JavaScript Module`.
-- Hard refresh the browser: `Ctrl + Shift + R` (Windows/Linux) or `Cmd + Shift + R` (Mac).
-- If using the mobile app, clear app cache or force-close and reopen.
-- If installed manually, confirm the file is at `/config/www/f-flow-card.js` — not inside a subfolder.
+- Il progetto originale è stato provato su Home Assistant OS con l'integrazione GoodWe ET/ES e il BMS JK via Bluetooth.
+- La card usa lo shadow DOM: il CSS dei temi non la modifica. I colori sono fissi o dipendono dai valori delle entità.
+- Le chiavi che iniziano con `_` (es. `_show_battery`) sono interruttori dell'editor: controllano cosa si vede, ma vengono salvate nel YAML della card.
+- I commenti nel codice sono rimasti in inglese.
 
 ---
 
-### Visual editor is blank or fails to load
+## Risoluzione dei problemi
 
-- Open browser DevTools (`F12`) → Console tab. Look for any red errors referencing `f-flow-card`.
-- Ensure no other version of `f-flow-card.js` is registered as a duplicate resource. Go to Resources and remove any stale entries.
-- Try clearing the HA frontend cache: **Developer Tools → Template** → reload page.
+### La card non compare / "Custom element doesn't exist"
 
----
-
-### Entities show `--` or do not update
-
-- Open **Developer Tools → States** and confirm the entity ID exists and has a valid numeric state (not `unavailable` or `unknown`).
-- Entity IDs are case-sensitive. Check for typos in the editor.
-- If using GoodWe integration, ensure the inverter is online and the integration is polling correctly.
-- The card skips `unavailable` and `unknown` states by design — the tile will show `--` until the entity returns a valid value.
+- Controlla che la risorsa sia registrata in **Impostazioni → Plance → Risorse**. Deve esserci `/hacsfiles/f-flow-card/f-flow-card.js` (HACS) oppure `/local/community/f-flow-card/f-flow-card.js` (manuale), di tipo `Modulo JavaScript`.
+- Ricarica il browser forzando l'aggiornamento: `Ctrl + Shift + R` (Windows/Linux) o `Cmd + Shift + R` (Mac).
+- Nell'app per telefono svuota la cache, oppure chiudi l'app e riaprila.
+- Se aggiorni da k-flow-card, cambia `type: custom:k-flow-card` in `type: custom:f-flow-card`.
 
 ---
 
-### Flow animations not showing
+### L'editor visuale è vuoto o non si carica
 
-- The card requires `sun.sun` to be present for the sun arc. If it is missing, the sun node will not animate but the rest of the card will function normally.
-- Flow path animations are driven by power values. A path will only animate when its corresponding power reading is above zero.
-- If all flows are static, check that your inverter entities are returning live values and not stale/unavailable states.
-
----
-
-### Battery section is missing
-
-- The Primary Battery section requires `_show_battery: true`. In the visual editor, click the **+ Enable** chip next to **Primary Battery**.
-- Secondary Battery, EV, Extra PV Strings, System Limits, and Labels sections each have their own **+ Enable** chip — they are hidden by default.
+- Apri gli strumenti per sviluppatori del browser (`F12`) → scheda Console, e cerca errori in rosso che citano `f-flow-card`.
+- Controlla che non ci siano risorse duplicate di `f-flow-card.js` in Risorse.
 
 ---
 
-### Endurance tile shows `--` or incorrect time
+### Le entità mostrano `--` o non si aggiornano
 
-- The endurance calculation requires `battery_full_ah` (capacity in Ah) and `battery_current` to be set and returning valid values.
-- If the battery is neither charging nor discharging (current ≈ 0), the tile will show `--` as no meaningful estimate is possible.
-- Ensure `battery_full_ah` in **System Limits** matches your actual battery capacity.
-
----
-
-### Labels section entity pickers are greyed out
-
-- The **Labels** section must be enabled first via the **+ Enable** chip in the section header.
-- Once enabled, each entity picker unlocks **only after you change that row's label text** away from its default. This is by design — it prevents accidental entity overrides.
-- To unlock the Cell Temp entity picker, for example, change the label text from `CELL TEMP MIN/MAX` to anything else.
+- In **Strumenti per sviluppatori → Stati** controlla che l'entità esista e abbia un valore numerico valido (non `unavailable` o `unknown`).
+- Gli ID delle entità distinguono maiuscole e minuscole: controlla che non ci siano errori di battitura.
+- La card ignora di proposito gli stati `unavailable` e `unknown`: il riquadro mostra `--` finché l'entità non torna valida.
 
 ---
 
-### After update via HACS, card looks wrong or broken
+### Le animazioni dei flussi non si vedono
 
-1. Hard refresh the browser (`Ctrl + Shift + R`).
-2. If the issue persists, go to **Settings → Dashboards → Resources**, delete the f-flow-card entry, then re-add it (HACS will re-register it on the next HA restart).
-3. Restart Home Assistant and hard refresh again.
-
----
-
-### Reporting a bug
-
-When reporting an issue, include:
-- Home Assistant version
-- f-flow-card version (visible in browser DevTools console on load)
-- Browser console errors (screenshot or copy-paste)
-- Relevant section of your card YAML config (remove sensitive entity names if needed)
+- Per l'arco del sole serve l'entità `sun.sun`. Se manca, il sole non si muove ma il resto della card funziona.
+- Un percorso si anima solo quando la potenza corrispondente è maggiore di zero.
+- Se tutti i flussi sono fermi, controlla che le entità dell'inverter restituiscano valori aggiornati.
 
 ---
 
-*Khan Automation · f-flow-card · Last updated: v1.1.1*
+### Le icone di rete, casa o auto non si vedono
+
+- La card cerca le icone in `/local/community/f-flow-card/`. Con HACS è automatico; con l'installazione manuale copia le tre PNG in `/config/www/community/f-flow-card/`.
+
+---
+
+### Manca la sezione batteria
+
+- La batteria principale richiede `_show_battery: true`. Nell'editor premi **＋ Attiva** accanto a **Batteria principale**.
+- Batteria secondaria, auto elettrica, stringhe FV aggiuntive ed etichette hanno ciascuna il proprio **＋ Attiva** e sono nascoste di default.
+
+---
+
+### Il riquadro autonomia mostra `--` o un tempo sbagliato
+
+- Per il calcolo serve la capacità della batteria (sezione **Generale**, in Ah o in kWh) e un sensore di potenza della batteria valido.
+- Se la batteria non si sta né caricando né scaricando, il riquadro mostra `--` perché non è possibile fare una stima.
+- In modalità Ah serve anche la tensione della batteria.
+
+---
+
+### Nella sezione Etichette la scelta delle entità è grigia
+
+- Prima attiva la sezione Etichette con **＋ Attiva** nell'intestazione.
+- Poi ogni scelta di entità si sblocca **solo dopo aver cambiato il testo dell'etichetta** di quella riga. Per esempio, per sbloccare la temperatura celle cambia `TEMP CELLE MIN/MAX` in qualsiasi altro testo.
+
+---
+
+### Dopo un aggiornamento con HACS la card è rovinata
+
+1. Ricarica il browser forzando l'aggiornamento (`Ctrl + Shift + R`).
+2. Se non basta, in **Impostazioni → Plance → Risorse** elimina la voce di f-flow-card e riavvia Home Assistant: HACS la registrerà di nuovo.
+3. Ricarica di nuovo il browser.
+
+---
+
+### Segnalare un problema
+
+Apri una issue su [GitHub](https://github.com/fabiustek/f-flow-card/issues) e includi:
+- versione di Home Assistant
+- versione di f-flow-card
+- eventuali errori nella console del browser (screenshot o testo)
+- la parte rilevante del YAML della card
+
+---
+
+*f-flow-card · fork di k-flow-card (Khan Automation) · Ultimo aggiornamento: v1.2.0*

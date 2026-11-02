@@ -1,21 +1,16 @@
+## 🔒 Sicurezza
 
-## 🔒 Security
+Questa card funziona interamente nel browser e **non** raccoglie, salva né invia dati.
+Usa l'oggetto `hass` del frontend di Home Assistant: nessun token a lunga durata, nessuna chiamata verso servizi esterni.
 
-This card runs entirely in the browser and does **not** collect, store, or transmit any data.  
-It uses the Home Assistant frontend’s built‑in `hass` object – no long‑lived tokens, no external network calls.
+| Versione | Supportata         |
+|----------|--------------------|
+| 1.x.x    | :white_check_mark: |
 
-| Version | Supported          |
-|---------|--------------------|
-| 4.x.x   | :white_check_mark: |
-| 3.x.x   | :white_check_mark: |
-| 2.x.x   | :white_check_mark: |
-| 1.x.x   | :white_check_mark: |
+## Segnalare una vulnerabilità
 
-## Reporting a Vulnerability
+Se trovi un problema di sicurezza in questa card,
+[apri una issue](https://github.com/fabiustek/f-flow-card/issues)
+oppure contatta direttamente il manutentore.
 
-If you discover a security issue in this card, please
-[open an issue](https://github.com/fabiustek/f-flow-card/issues)
-or contact the maintainer directly.
-
-There are no known vulnerabilities at this time.
-
+Al momento non sono note vulnerabilità.
