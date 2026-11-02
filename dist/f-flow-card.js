@@ -1,5 +1,12 @@
-// f-flow-card.js – Unified Edition v1.7.1
-const FFC_VERSION = '1.7.1';
+// f-flow-card.js – Unified Edition v1.8.0
+const FFC_VERSION = '1.8.0';
+// Changes v1.8.0:
+//   NEW  – Statistics section (collapsible): today's PV as hourly stacked bars per string with an
+//           optional forecast curve (Solcast/Forecast.Solar attributes or the sensor's history),
+//           house load over 24 h coloured by power with the peak marked, battery charge/discharge
+//           power and SOC over 24 h. Tooltips on tap/hover.
+//   NEW  – pv1_name…pv4_name: string names on the house and in the statistics.
+//   CHG  – Thinner flow lines (like the sun → inverter wave); battery flow always battery blue.
 // Changes v1.7.1:
 //   CHG  – Flows back to dashed lines (instead of round particles), keeping the smooth curves and glow.
 // Changes v1.7.0:
@@ -183,7 +190,7 @@ class FFlowCardEditor extends HTMLElement {
     this._fireChanged();
     if (key === '_show_battery' || key === '_show_battery2' || key === '_show_pv_extra' ||
         key === '_show_ev'      || key === 'battery_cap_unit' ||
-        key === '_show_consumers' || key === '_show_ventilation' || key === '_labels_custom_entities' ||
+        key === '_show_consumers' || key === '_show_ventilation' || key === '_show_stats' || key === '_labels_custom_entities' ||
         key === 'label_cell_temp_minmax' || key === 'label_bms_temp'         ||
         key === 'label_min_cell'         || key === 'label_max_cell'         ||
         key === 'label_batt_dis'         || key === 'label_total_pv_gen'     ||
@@ -687,6 +694,14 @@ class FFlowCardEditor extends HTMLElement {
       ], (n) => ({ name: '', entity: '', icon: 'mdi:power-plug', color: FFlowCard.PALETTE[n % FFlowCard.PALETTE.length] }), '＋ Aggiungi utilizzatore'),
     ], { toggleKey: '_show_consumers', toggleOn: showConsumers, hidden: !showConsumers }));
 
+    const showStats = !!cfg._show_stats;
+    shell.appendChild(makeSection('stats', '📈', 'Statistiche', [
+      switchRow('stats_pv', 'Produzione FV di oggi', 'Barre orarie per stringa (colori: FV1 arancione, FV2 blu, FV3 viola, FV4 verde)', true),
+      picker('stats_forecast_entity', 'Sensore di stima produzione (Solcast, Forecast.Solar…)', true),
+      switchRow('stats_load', 'Consumi casa ultime 24 ore', 'Usa il sensore "Consumo casa"; picco evidenziato', true),
+      switchRow('stats_battery', 'Batteria ultime 24 ore', 'Carica, scarica e SOC', true),
+    ], { toggleKey: '_show_stats', toggleOn: showStats, hidden: !showStats }));
+
     const showVent = !!cfg._show_ventilation;
     shell.appendChild(makeSection('ventilation', '🌀', 'Ventilazione inverter', [
       textField('vent_title', 'Titolo', 'Ventilazione inverter'),
@@ -819,12 +834,16 @@ class FFlowCardEditor extends HTMLElement {
 
     shell.appendChild(makeSection('solar', '☀️', 'Fotovoltaico', [
       picker('pv1_power', 'Potenza FV1'),
+      textField('pv1_name', 'Nome stringa FV1 (es. Sud-Est)', 'FV1'),
       picker('pv2_power', 'Potenza FV2'),
+      textField('pv2_name', 'Nome stringa FV2 (es. Nord-Ovest)', 'FV2'),
     ]));
 
     shell.appendChild(makeSection('solar_extra', '☀️', 'Stringhe FV aggiuntive', [
       picker('pv3_power', 'Potenza FV3', true),
+      textField('pv3_name', 'Nome stringa FV3', 'FV3'),
       picker('pv4_power', 'Potenza FV4', true),
+      textField('pv4_name', 'Nome stringa FV4', 'FV4'),
     ], { toggleKey: '_show_pv_extra', toggleOn: showPVExtra, hidden: !showPVExtra }));
 
     shell.appendChild(makeSection('solar_extras', '☀️', 'Altri dati fotovoltaico', [
@@ -1001,6 +1020,12 @@ class FFlowCard extends HTMLElement {
       grid_switch_confirm: true,
       battery_reserve_soc: 0,
       battery_target_soc: 100,
+      pv1_name: '', pv2_name: '', pv3_name: '', pv4_name: '',
+      _show_stats: false,
+      stats_forecast_entity: '',
+      stats_pv: true,
+      stats_load: true,
+      stats_battery: true,
       _show_ventilation: false,
       vent_title: 'Ventilazione inverter',
       vent_state_entity: '',
@@ -1014,7 +1039,7 @@ class FFlowCard extends HTMLElement {
     };
   }
 
-  getCardSize() { return 8 + (this.config._show_consumers ? 2 : 0) + (this.config._show_ventilation ? 3 : 0); }
+  getCardSize() { return 8 + (this.config._show_consumers ? 2 : 0) + (this.config._show_ventilation ? 3 : 0) + (this.config._show_stats ? 6 : 0); }
   static getConfigElement() { return document.createElement('f-flow-card-editor'); }
 
   setConfig(config) {
@@ -1201,6 +1226,7 @@ class FFlowCard extends HTMLElement {
         this._secOpen[key] = !sec.classList.contains('open');
         sec.classList.toggle('open', this._secOpen[key]);
         if (this._secOpen[key] && key === 'cons') this._renderChart();
+        if (this._secOpen[key] && key === 'stats') this._renderStats();
       });
       cb.addEventListener('change', () => {
         this._lsSet('pin:' + key, cb.checked ? '1' : '0');
@@ -1300,21 +1326,21 @@ class FFlowCard extends HTMLElement {
   }
 
   // Time-weighted average power (W) per bucket from HA's state-change list
-  _bucketize(points, eid, start, end, n) {
+  _bucketize(points, eid, start, end, n, opts = {}) {
     const out = new Float64Array(n);
     if (!Array.isArray(points) || !points.length) return out;
     const unit = (this._hass?.states?.[eid]?.attributes?.unit_of_measurement || '').trim();
-    const mul = unit === 'kW' ? 1000 : 1;
+    const mul = (unit === 'kW' ? 1000 : 1) * (opts.mul || 1);
     const step = (end - start) / n;
     const pts = points.map(p => ({
       t: p.lu != null ? p.lu * 1000 : p.lc != null ? p.lc * 1000 : Date.parse(p.last_updated || p.last_changed || 0),
       v: parseFloat(p.s != null ? p.s : p.state),
     })).sort((a, b) => a.t - b.t);
     for (let k = 0; k < pts.length; k++) {
-      const v = isFinite(pts[k].v) ? Math.max(0, pts[k].v * mul) : 0;
+      const v = isFinite(pts[k].v) ? (opts.signed ? pts[k].v * mul : Math.max(0, pts[k].v * mul)) : 0;
       if (!v) continue;
       let a = Math.max(start, pts[k].t);
-      const b = Math.min(end, k + 1 < pts.length ? pts[k + 1].t : end);
+      const b = Math.min(opts.until || end, k + 1 < pts.length ? pts[k + 1].t : end);
       let i = Math.floor((a - start) / step);
       while (a < b && i < n) {
         const be = start + (i + 1) * step;
@@ -1450,6 +1476,304 @@ class FFlowCard extends HTMLElement {
     wrap.addEventListener('pointerleave', hide);
   }
 
+
+  // ── v1.8.0: statistics section (today's PV by string + forecast, house load 24 h, battery 24 h) ──
+  static get PV_COLORS() { return ['#f39c4b', '#58a6ff', '#a78bfa', '#3fb950']; }
+  _statsEnabled() { return !!this.config._show_stats; }
+  _statsStrings() {
+    const out = [];
+    for (let i = 1; i <= 4; i++) {
+      if (i > 2 && !this.config._show_pv_extra) break;
+      const e = this.config['pv' + i + '_power'];
+      if (e) out.push({ i, e, name: this.config['pv' + i + '_name'] || 'FV' + i, col: FFlowCard.PV_COLORS[i - 1] });
+    }
+    return out;
+  }
+  _statsIds() {
+    const c = this.config, ids = this._statsStrings().map(x => x.e);
+    if (c.pv_total_power) ids.push(c.pv_total_power);
+    if (c.stats_forecast_entity) ids.push(c.stats_forecast_entity);
+    if (c.consump) ids.push(c.consump);
+    if (c.battery_soc) ids.push(c.battery_soc);
+    if (c.battery_power) ids.push(c.battery_power);
+    return [...new Set(ids.filter(Boolean))];
+  }
+
+  _buildStatsHTML(esc) {
+    if (!this._statsEnabled()) return '';
+    const box = (key, title) => `<div class="stc" id="stBox_${key}">
+        <div class="cch-h"><span>${title}</span><span class="st-info" id="stInfo_${key}"></span></div>
+        <div class="cch-w" id="stWrap_${key}">
+          <svg id="stSvg_${key}" viewBox="0 0 500 170" style="width:100%;display:block"></svg>
+          <div class="cch-tip" id="stTip_${key}"></div>
+        </div>
+        <div class="cch-leg" id="stLeg_${key}"></div>
+      </div>`;
+    let body = '';
+    if (this.config.stats_pv !== false) body += box('pv', 'Produzione FV oggi');
+    if (this.config.stats_load !== false) body += box('load', 'Consumi casa · ultime 24 ore');
+    if (this.config.stats_battery !== false) body += box('batt', 'Batteria · ultime 24 ore');
+    return '<div class="dv"></div>' + this._secHTML('stats', '📈 Statistiche', body || '<div class="st-info">Nessun grafico attivo: attivali dall’editor.</div>');
+  }
+
+  _maybeLoadStats() {
+    if (!this._statsEnabled() || !this._hass || typeof this._hass.callWS !== 'function') return;
+    const ids = this._statsIds();
+    const key = ids.join('|');
+    const now = Date.now();
+    if (this._statsLoading || !ids.length) return;
+    if (this._stats && this._stats.key === key && now - this._stats.fetched < 5 * 60000) return;
+    this._statsLoading = true;
+    const start = now - 24 * 3600000;
+    this._hass.callWS({
+      type: 'history/history_during_period',
+      start_time: new Date(start).toISOString(), end_time: new Date(now).toISOString(),
+      entity_ids: ids, minimal_response: true, no_attributes: true, significant_changes_only: false,
+    }).then(res => { this._stats = { key, start, end: now, raw: res || {}, fetched: Date.now() }; })
+      .catch(err => { this._stats = { key, error: String((err && err.message) || err), fetched: Date.now() }; })
+      .finally(() => { this._statsLoading = false; this._renderStats(); });
+  }
+
+  // shared chart pieces ------------------------------------------------------
+  _niceStep(v) { if (v <= 0) return 1; const e = Math.pow(10, Math.floor(Math.log10(v))); const m = v / e; return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 5 ? 5 : 10) * e; }
+  _yAxis(minV, maxV, geo, fmt) {
+    const { L, R, T, ph, W } = geo;
+    const span = Math.max(maxV - minV, 1e-9);
+    const step = this._niceStep(span * 1.05 / 4);
+    const yMin = minV < 0 ? -step * Math.ceil(-minV * 1.05 / step) : 0;
+    const yMax = step * Math.max(1, Math.ceil(maxV * 1.05 / step));
+    const Y = (v) => +(T + ph - ((Math.max(yMin, Math.min(yMax, v)) - yMin) / (yMax - yMin)) * ph).toFixed(1);
+    let g = '';
+    for (let v = yMin; v <= yMax + step / 2; v += step) {
+      const yy = Y(v);
+      g += `<line x1="${L}" x2="${W - R}" y1="${yy}" y2="${yy}" stroke="${Math.abs(v) < step / 2 && yMin < 0 ? '#30363d' : '#21262d'}" stroke-width="1"/>`;
+      g += `<text x="${L - 4}" y="${(yy + 3.5).toFixed(1)}" text-anchor="end" font-size="11" fill="#8b949e">${fmt(v)}</text>`;
+    }
+    return { g, Y, yMin, yMax };
+  }
+  _timeAxis(start, end, geo, stepMin) {
+    const { L, pw, T, ph, H } = geo;
+    let g = '';
+    const first = new Date(start); first.setSeconds(0, 0); first.setMinutes(Math.ceil(first.getMinutes() / 15) * 15);
+    for (let t = +first; t <= end; t += 15 * 60000) {
+      const d = new Date(t);
+      if ((d.getHours() * 60 + d.getMinutes()) % stepMin) continue;
+      const xx = (L + (t - start) / (end - start) * pw).toFixed(1);
+      if (xx > L + pw - 14) continue;   // no clipped label at the right edge
+      g += `<line x1="${xx}" x2="${xx}" y1="${T}" y2="${T + ph}" stroke="#21262d" stroke-width="1" stroke-dasharray="2 3"/>`;
+      g += `<text x="${xx}" y="${H - 6}" text-anchor="middle" font-size="11" fill="#8b949e">${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}</text>`;
+    }
+    return g;
+  }
+  _bindStatHover(key) {
+    const root = this.shadowRoot;
+    const wrap = root.getElementById('stWrap_' + key);
+    if (!wrap || wrap._bound) return;
+    wrap._bound = true;
+    const hide = () => {
+      const tip = root.getElementById('stTip_' + key), cur = root.getElementById('stCur_' + key);
+      if (tip) tip.style.display = 'none';
+      if (cur) cur.setAttribute('opacity', '0');
+    };
+    const move = (ev) => {
+      const cd = this._stData && this._stData[key]; if (!cd) return;
+      const svg = root.getElementById('stSvg_' + key), tip = root.getElementById('stTip_' + key), cur = root.getElementById('stCur_' + key);
+      const r = svg.getBoundingClientRect();
+      const px = (ev.clientX - r.left) / r.width * 500;
+      if (px < cd.L || px > cd.L + cd.pw) { hide(); return; }
+      const i = Math.max(0, Math.min(cd.N - 1, Math.floor((px - cd.L) / cd.pw * cd.N)));
+      const xx = cd.L + (i + 0.5) / cd.N * cd.pw;
+      if (cur) { cur.setAttribute('x1', xx); cur.setAttribute('x2', xx); cur.setAttribute('opacity', '.6'); }
+      tip.innerHTML = cd.rows(i);
+      tip.style.display = 'block';
+      const frac = xx / 500;
+      tip.style.left = frac > 0.6 ? '' : (frac * 100 + 2) + '%';
+      tip.style.right = frac > 0.6 ? ((1 - frac) * 100 + 2) + '%' : '';
+    };
+    wrap.addEventListener('pointermove', move);
+    wrap.addEventListener('pointerdown', move);
+    wrap.addEventListener('pointerleave', hide);
+  }
+
+  // forecast for today, hourly average W: from Solcast/Forecast.Solar-like attributes, else from history
+  _forecastHourly(dayStart, now) {
+    const eid = this.config.stats_forecast_entity;
+    const out = { hourly: null, totalKwh: null, fromHistory: false };
+    if (!eid) return out;
+    const st = this._hass && this._hass.states[eid];
+    const at = (st && st.attributes) || {};
+    const sum = new Array(24).fill(0), cnt = new Array(24).fill(0);
+    const add = (t, w) => { const h = Math.floor((t - dayStart) / 3600000); if (h >= 0 && h < 24 && isFinite(w)) { sum[h] += w; cnt[h]++; } };
+    const arr = at.detailedHourly || at.detailedForecast || at.forecast;
+    if (Array.isArray(arr) && arr.length) {
+      arr.forEach(it => {
+        const t = Date.parse(it.period_start || it.datetime || it.period_end || it.time);
+        const kw = it.pv_estimate != null ? Number(it.pv_estimate) * 1000 : it.pv_estimate50 != null ? Number(it.pv_estimate50) * 1000 : Number(it.power != null ? it.power : it.watts);
+        add(t, kw);
+      });
+    } else if (at.watts && typeof at.watts === 'object') {
+      Object.entries(at.watts).forEach(([k, w]) => add(Date.parse(k), Number(w)));
+    }
+    if (cnt.some(c => c > 0)) {
+      out.hourly = sum.map((v, h) => cnt[h] ? v / cnt[h] : 0);
+      out.totalKwh = out.hourly.reduce((a, b) => a + b, 0) / 1000;
+    } else {
+      const unit = ((st && st.attributes && st.attributes.unit_of_measurement) || '').trim();
+      if (/wh$/i.test(unit)) {
+        // energy sensor: only the total is meaningful
+        const v = parseFloat(st.state);
+        if (isFinite(v)) out.totalKwh = unit === 'Wh' ? v / 1000 : unit === 'MWh' ? v * 1000 : v;
+      } else if (this._stats && this._stats.raw && this._stats.raw[eid]) {
+        out.hourly = Array.from(this._bucketize(this._stats.raw[eid], eid, dayStart, dayStart + 24 * 3600000, 24, { until: now }));
+        out.fromHistory = true;
+      }
+    }
+    return out;
+  }
+
+  _renderStats() {
+    const root = this.shadowRoot;
+    if (!root.getElementById('stBox_pv') && !root.getElementById('stBox_load') && !root.getElementById('stBox_batt')) return;
+    const st = this._stats;
+    const msg = (key, txt) => { const svg = root.getElementById('stSvg_' + key); if (svg) svg.innerHTML = `<text x="250" y="88" text-anchor="middle" font-size="13" fill="#8b949e">${txt}</text>`; };
+    if (!st || st.error || !st.raw) { ['pv', 'load', 'batt'].forEach(k => msg(k, st && st.error ? 'Storico non disponibile' : 'Caricamento storico…')); return; }
+    if (!this._stData) this._stData = {};
+    const esc = (t) => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const fmtW = (v) => Math.abs(v) >= 1000 ? (+(v / 1000).toFixed(2)) + ' kW' : Math.round(v) + ' W';
+    const hhmm = (t) => { const d = new Date(t); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+    const geo = { W: 500, H: 170, L: 50, R: 8, T: 10, B: 22 };
+    geo.pw = geo.W - geo.L - geo.R; geo.ph = geo.H - geo.T - geo.B;
+    const now = st.end;
+
+    // 1) today's PV: hourly stacked bars per string (kWh per hour = average kW), forecast dashed
+    if (root.getElementById('stBox_pv')) {
+      const dayStart = new Date(now); dayStart.setHours(0, 0, 0, 0);
+      const d0 = +dayStart, d1 = d0 + 24 * 3600000;
+      let strings = this._statsStrings();
+      if (!strings.length && this.config.pv_total_power) strings = [{ i: 0, e: this.config.pv_total_power, name: 'Totale', col: '#f4d03f' }];
+      const ser = strings.map(x => ({ ...x, b: Array.from(this._bucketize(st.raw[x.e], x.e, d0, d1, 24, { until: now })) }));
+      const fc = this._forecastHourly(d0, now);
+      let maxV = 0;
+      for (let h = 0; h < 24; h++) maxV = Math.max(maxV, ser.reduce((a, x) => a + x.b[h], 0), fc.hourly ? fc.hourly[h] : 0);
+      const ax = this._yAxis(0, Math.max(maxV / 1000, 0.5), geo, (v) => (+v.toFixed(2)) + ' kWh');
+      const Y = (w) => ax.Y(w / 1000);
+      let g = ax.g + this._timeAxis(d0, d1, geo, 180);
+      const bw = geo.pw / 24;
+      for (let h = 0; h < 24; h++) {
+        let acc = 0;
+        ser.forEach(x => {
+          const v = x.b[h]; if (v <= 0) return;
+          const y1 = Y(acc), y2 = Y(acc + v);
+          g += `<rect x="${(geo.L + h * bw + bw * 0.14).toFixed(1)}" y="${y2}" width="${(bw * 0.72).toFixed(1)}" height="${Math.max(0.5, y1 - y2).toFixed(1)}" rx="2" fill="${x.col}" fill-opacity=".8" stroke="${x.col}" stroke-width=".8"/>`;
+          acc += v;
+        });
+      }
+      if (fc.hourly) {
+        let d = '';
+        fc.hourly.forEach((w, h) => { d += (h ? 'L' : 'M') + (geo.L + (h + 0.5) * bw).toFixed(1) + ',' + Y(w); });
+        g += `<path d="${d}" fill="none" stroke="#e6edf3" stroke-width="1.6" stroke-dasharray="5 4" opacity=".8" stroke-linejoin="round"/>`;
+      }
+      const nowX = (geo.L + (now - d0) / (d1 - d0) * geo.pw).toFixed(1);
+      g += `<line x1="${nowX}" x2="${nowX}" y1="${geo.T}" y2="${geo.T + geo.ph}" stroke="#f85149" stroke-width="1" stroke-dasharray="3 3" opacity=".7"/>`;
+      g += `<text x="${nowX}" y="${geo.T + 9}" text-anchor="${nowX > 430 ? 'end' : 'start'}" dx="${nowX > 430 ? -3 : 3}" font-size="10" fill="#f85149">adesso</text>`;
+      g += `<line id="stCur_pv" x1="0" x2="0" y1="${geo.T}" y2="${geo.T + geo.ph}" stroke="#e6edf3" stroke-width="1" opacity="0"/>`;
+      root.getElementById('stSvg_pv').innerHTML = g;
+      const kwh = (arr) => arr.reduce((a, b) => a + b, 0) / 1000;
+      const tot = ser.reduce((a, x) => a + kwh(x.b), 0);
+      const info = root.getElementById('stInfo_pv');
+      if (info) info.textContent = tot.toFixed(1) + ' kWh' + (fc.totalKwh != null ? ' · stima ' + fc.totalKwh.toFixed(1) + ' kWh' : '');
+      const leg = root.getElementById('stLeg_pv');
+      if (leg) leg.innerHTML = ser.map(x => `<span><i style="background:${x.col}"></i>${esc(x.name)} <b>${kwh(x.b).toFixed(2)} kWh</b></span>`).join('')
+        + (fc.hourly ? `<span><i class="tot"></i>Stima${fc.fromHistory ? '' : ' oggi'}${fc.totalKwh != null ? ' <b>' + fc.totalKwh.toFixed(1) + ' kWh</b>' : ''}</span>` : '');
+      this._stData.pv = { N: 24, L: geo.L, pw: geo.pw, rows: (h) => {
+        let html = `<div class="tt">${String(h).padStart(2, '0')}:00 – ${String(h + 1).padStart(2, '0')}:00</div>`;
+        ser.forEach(x => { html += `<div><i style="background:${x.col}"></i>${esc(x.name)} <b>${(x.b[h] / 1000).toFixed(2)} kWh</b></div>`; });
+        if (ser.length > 1) html += `<div>Totale <b>${(ser.reduce((a, x) => a + x.b[h], 0) / 1000).toFixed(2)} kWh</b></div>`;
+        if (fc.hourly) html += `<div><i class="tot"></i>Stima <b>${(fc.hourly[h] / 1000).toFixed(2)} kWh</b></div>`;
+        return html;
+      } };
+      this._bindStatHover('pv');
+    }
+
+    // 2) house load, last 24 h, coloured by power, peak marked
+    if (root.getElementById('stBox_load') && this.config.consump) {
+      const eid = this.config.consump, N = 288;
+      const b = this._bucketize(st.raw[eid], eid, st.start, now, N);
+      let peak = 0, pi = 0, sum = 0;
+      for (let i = 0; i < N; i++) { sum += b[i]; if (b[i] > peak) { peak = b[i]; pi = i; } }
+      const ax = this._yAxis(0, Math.max(peak, 500), geo, fmtW);
+      const X = (i) => +(geo.L + (i + 0.5) / N * geo.pw).toFixed(1);
+      // vertical gradient in absolute watts: green < 1 kW, yellow ~2.5 kW, red ≥ 4 kW
+      const yAt = (w) => ax.Y(w);
+      let g = `<defs><linearGradient id="stLoadGrad" gradientUnits="userSpaceOnUse" x1="0" x2="0" y1="${ax.Y(0)}" y2="${ax.Y(ax.yMax)}">
+        <stop offset="0" stop-color="#3fb950"/><stop offset="${Math.min(1, 1000 / ax.yMax).toFixed(3)}" stop-color="#3fb950"/>
+        <stop offset="${Math.min(1, 2500 / ax.yMax).toFixed(3)}" stop-color="#f4d03f"/><stop offset="${Math.min(1, 4000 / ax.yMax).toFixed(3)}" stop-color="#f85149"/><stop offset="1" stop-color="#f85149"/></linearGradient></defs>`;
+      g += ax.g + this._timeAxis(st.start, now, geo, 180);
+      let line = '';
+      for (let i = 0; i < N; i++) line += (i ? 'L' : 'M') + X(i) + ',' + yAt(b[i]);
+      g += `<path d="${line}L${X(N - 1)},${ax.Y(0)}L${X(0)},${ax.Y(0)}Z" fill="url(#stLoadGrad)" fill-opacity=".22"/>`;
+      g += `<path d="${line}" fill="none" stroke="url(#stLoadGrad)" stroke-width="1.6" stroke-linejoin="round"/>`;
+      if (peak > 0) {
+        const px = X(pi), py = yAt(peak);
+        g += `<circle cx="${px}" cy="${py}" r="3.5" fill="#0d1117" stroke="#58a6ff" stroke-width="2"/>`;
+        const lx = Math.min(geo.W - geo.R - 4, Math.max(geo.L + 30, px));
+        g += `<rect x="${lx - 30}" y="${Math.max(geo.T, py - 22)}" width="60" height="15" rx="4" fill="#1f6feb"/>`;
+        g += `<text x="${lx}" y="${Math.max(geo.T, py - 22) + 11}" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">${fmtW(peak)}</text>`;
+      }
+      g += `<line id="stCur_load" x1="0" x2="0" y1="${geo.T}" y2="${geo.T + geo.ph}" stroke="#e6edf3" stroke-width="1" opacity="0"/>`;
+      root.getElementById('stSvg_load').innerHTML = g;
+      const kwh = sum * 24 / N / 1000;
+      const info = root.getElementById('stInfo_load');
+      if (info) info.textContent = `${kwh.toFixed(1)} kWh · media ${fmtW(sum / N)}`;
+      const leg = root.getElementById('stLeg_load');
+      const tPeak = st.start + (pi + 0.5) * (now - st.start) / N;
+      if (leg) leg.innerHTML = `<span><i style="background:#58a6ff"></i>Picco <b>${fmtW(peak)}</b> alle ${hhmm(tPeak)}</span>
+        <span><i style="background:#3fb950"></i>&lt; 1 kW</span><span><i style="background:#f4d03f"></i>~2,5 kW</span><span><i style="background:#f85149"></i>≥ 4 kW</span>`;
+      this._stData.load = { N, L: geo.L, pw: geo.pw, rows: (i) => `<div class="tt">${hhmm(st.start + i * (now - st.start) / N)}</div><div>Consumo <b>${fmtW(b[i])}</b></div>` };
+      this._bindStatHover('load');
+    }
+
+    // 3) battery, last 24 h: charge (+, blue) / discharge (−, orange) power and SOC line (right axis)
+    if (root.getElementById('stBox_batt') && (this.config.battery_power || this.config.battery_soc)) {
+      const N = 288, pe = this.config.battery_power, se = this.config.battery_soc;
+      const p = pe ? this._bucketize(st.raw[pe], pe, st.start, now, N, { signed: true, mul: this.config.invert_battery_power ? -1 : 1 }) : new Float64Array(N);
+      const soc = se ? this._bucketize(st.raw[se], se, st.start, now, N) : null;
+      let mx = 100, mn = -100, chg = 0, dis = 0, sMin = 100, sMax = 0;
+      for (let i = 0; i < N; i++) {
+        mx = Math.max(mx, p[i]); mn = Math.min(mn, p[i]);
+        if (p[i] > 0) chg += p[i]; else dis -= p[i];
+        if (soc && soc[i] > 0) { sMin = Math.min(sMin, soc[i]); sMax = Math.max(sMax, soc[i]); }
+      }
+      const lim = Math.max(mx, -mn);
+      if (soc) { geo.R = 34; geo.pw = geo.W - geo.L - geo.R; }   // room for the SOC axis on the right
+      const ax = this._yAxis(-lim, lim, geo, fmtW);
+      const X = (i) => +(geo.L + (i + 0.5) / N * geo.pw).toFixed(1);
+      let g = ax.g + this._timeAxis(st.start, now, geo, 180);
+      let up = '', dn = '';
+      for (let i = 0; i < N; i++) { up += (i ? 'L' : 'M') + X(i) + ',' + ax.Y(Math.max(0, p[i])); dn += (i ? 'L' : 'M') + X(i) + ',' + ax.Y(Math.min(0, p[i])); }
+      const z = ax.Y(0);
+      g += `<path d="${up}L${X(N - 1)},${z}L${X(0)},${z}Z" fill="#00c8ff" fill-opacity=".35"/><path d="${up}" fill="none" stroke="#00c8ff" stroke-width="1.2"/>`;
+      g += `<path d="${dn}L${X(N - 1)},${z}L${X(0)},${z}Z" fill="#f39c4b" fill-opacity=".35"/><path d="${dn}" fill="none" stroke="#f39c4b" stroke-width="1.2"/>`;
+      if (soc) {
+        const ys = (v) => +(geo.T + geo.ph - Math.max(0, Math.min(100, v)) / 100 * geo.ph).toFixed(1);
+        let d = '', started = false;
+        for (let i = 0; i < N; i++) { if (soc[i] <= 0) continue; d += (started ? 'L' : 'M') + X(i) + ',' + ys(soc[i]); started = true; }
+        g += `<path d="${d}" fill="none" stroke="#e6edf3" stroke-width="1.6" stroke-linejoin="round"/>`;
+        [0, 50, 100].forEach(v => { g += `<text x="${geo.W - 2}" y="${ys(v) + 3.5}" font-size="10" fill="#c9d1d9" text-anchor="end">${v}%</text>`; });
+      }
+      g += `<line id="stCur_batt" x1="0" x2="0" y1="${geo.T}" y2="${geo.T + geo.ph}" stroke="#e6edf3" stroke-width="1" opacity="0"/>`;
+      root.getElementById('stSvg_batt').innerHTML = g;
+      const kwhC = chg * 24 / N / 1000, kwhD = dis * 24 / N / 1000;
+      const info = root.getElementById('stInfo_batt');
+      if (info) info.textContent = soc && sMax > 0 ? `SOC min ${Math.round(sMin)}% · max ${Math.round(sMax)}%` : '';
+      const leg = root.getElementById('stLeg_batt');
+      if (leg) leg.innerHTML = `<span><i style="background:#00c8ff"></i>Carica <b>${kwhC.toFixed(2)} kWh</b></span><span><i style="background:#f39c4b"></i>Scarica <b>${kwhD.toFixed(2)} kWh</b></span>` + (soc ? '<span><i class="tot" style="border-top-style:solid"></i>SOC</span>' : '');
+      this._stData.batt = { N, L: geo.L, pw: geo.pw, rows: (i) => `<div class="tt">${hhmm(st.start + i * (now - st.start) / N)}</div>`
+        + `<div>${p[i] >= 0 ? 'Carica' : 'Scarica'} <b>${fmtW(Math.abs(p[i]))}</b></div>` + (soc ? `<div>SOC <b>${Math.round(soc[i])}%</b></div>` : '') };
+      this._bindStatHover('batt');
+    }
+  }
+
   // ── v1.3.0: inverter ventilation ─────────────────────────────────
   _fanSVG(id, size) {
     const blade = 'M0,-2.2 C2.6,-3.6 4.8,-8.6 1.2,-10.6 C-1.6,-9 -2.4,-5 0,-2.2Z';
@@ -1511,6 +1835,7 @@ class FFlowCard extends HTMLElement {
     this._spin = { meters: {}, fans: {}, rings: {} };
     this._startAnim();
     if (this._chartEnabled()) this._renderChart();
+    if (this._statsEnabled()) this._renderStats();
   }
 
   connectedCallback() { this._connected = true; this._startAnim(); }
@@ -1556,6 +1881,7 @@ class FFlowCard extends HTMLElement {
   _updateExtraSections() {
     const sp = this._spin; if (!sp) return;
     this._maybeLoadHistory();
+    this._maybeLoadStats();
     const root = this.shadowRoot;
     const fmtW = (w) => Math.abs(w) >= 1000 ? (w / 1000).toFixed(2) + ' kW' : Math.round(w) + ' W';
     // consumers
@@ -1639,6 +1965,11 @@ class FFlowCard extends HTMLElement {
   }
 
   // ── v1.5.0: two-slope house, FV1 panels on the left slope and FV2 on the right ──
+  _pvName(i) {
+    const n = this.config['pv' + i + '_name'];
+    return n ? String(n).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])) : 'FV' + i;
+  }
+
   // true = on grid, false = off grid, null = unknown / not configured
   _gridOnState() {
     const raw = this._strVal(this.config.grid_status_entity);
@@ -1739,9 +2070,9 @@ class FFlowCard extends HTMLElement {
       <polygon points="${quad(Rq)}" fill="#1b2230" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
       ${cells(Lq, 'L')}${cells(Rq, 'R')}
     </g>
-    ${pv1Show ? `<text class="sm" id="pv1label" x="180" y="389" text-anchor="end" font-size="10.5" fill="#8b949e" letter-spacing="1">FV1</text>
+    ${pv1Show ? `<text class="sm" id="pv1label" x="180" y="389" text-anchor="end" font-size="10.5" fill="#8b949e" letter-spacing="1">${this._pvName(1)}</text>
     <text id="pv1FlowVal" x="180" y="406" text-anchor="end" font-size="14.5" font-weight="700" fill="#ffe83c">-- W</text>` : ''}
-    ${pv2Show ? `<text class="sm" id="pv2label" x="340" y="389" font-size="10.5" fill="#8b949e" letter-spacing="1">FV2</text>
+    ${pv2Show ? `<text class="sm" id="pv2label" x="340" y="389" font-size="10.5" fill="#8b949e" letter-spacing="1">${this._pvName(2)}</text>
     <text id="pv2FlowVal" x="340" y="406" font-size="14.5" font-weight="700" fill="#ffe83c">-- W</text>` : ''}
     <text id="fcLoadVal" x="${cx}" y="497" text-anchor="middle" font-size="15.5" font-weight="700" fill="#F7F6D3">-- W</text>`;
   }
@@ -1810,16 +2141,16 @@ class FFlowCard extends HTMLElement {
     const modernHome = this.config.home_icon_style !== 'classic';
 
     const modernHomeX = this.config.home_icon_style !== 'classic';
-    const pv3txt = showPvExtra && modernHomeX ? `<text class="sm" id="pv3label" x="180" y="424" text-anchor="end" font-size="10.5" fill="#8b949e" letter-spacing="1">FV3</text><text id="pv3FlowVal" x="180" y="440" text-anchor="end" font-size="14" font-weight="700" fill="#ffe83c">-- W</text>`
+    const pv3txt = showPvExtra && modernHomeX ? `<text class="sm" id="pv3label" x="180" y="424" text-anchor="end" font-size="10.5" fill="#8b949e" letter-spacing="1">${this._pvName(3)}</text><text id="pv3FlowVal" x="180" y="440" text-anchor="end" font-size="14" font-weight="700" fill="#ffe83c">-- W</text>`
       : showPvExtra ? `<text id="pv3label" x="8" y="424" font-size="11" fill="#8b949e" letter-spacing="1">FV3</text><text id="pv3FlowVal" x="8" y="438" font-size="13.5" font-weight="700" fill="#ffe83c">-- W</text>` : '';
-    const pv4txt = showPvExtra && modernHomeX ? `<text class="sm" id="pv4label" x="340" y="424" font-size="10.5" fill="#8b949e" letter-spacing="1">FV4</text><text id="pv4FlowVal" x="340" y="440" font-size="14" font-weight="700" fill="#ffe83c">-- W</text>`
+    const pv4txt = showPvExtra && modernHomeX ? `<text class="sm" id="pv4label" x="340" y="424" font-size="10.5" fill="#8b949e" letter-spacing="1">${this._pvName(4)}</text><text id="pv4FlowVal" x="340" y="440" font-size="14" font-weight="700" fill="#ffe83c">-- W</text>`
       : showPvExtra ? `<text id="pv4label" x="8" y="456" font-size="11" fill="#8b949e" letter-spacing="1">FV4</text><text id="pv4FlowVal" x="8" y="470" font-size="13.5" font-weight="700" fill="#ffe83c">-- W</text>` : '';
 
     // EV: SVG wallbox + car to the right of the house (x 344–514, y 330–480)
     const carBody = 'M2,34 Q2,24 12,22 L30,20 Q42,6 62,5 L80,5 Q94,6 104,18 L114,22 Q120,24 120,32 L120,38 Q120,40 117,40 L106,40 A11,11 0 0 0 84,40 L36,40 A11,11 0 0 0 14,40 L5,40 Q2,40 2,37 Z';
     // EV drawing: wallbox at x≈398–417, car at x≈420–514 (scaled), info right above the car
     const evtxt = ev ? `<g id="evGroup" style="color:#6e7681;transition:color .5s">
-      <path id="flowHomeEV" d="M 316,452 C 350,452 370,452 398,452" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="13 7" filter="url(#flowGlow)" opacity="0">
+      <path id="flowHomeEV" d="M 316,452 C 350,452 370,452 398,452" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="12 8" filter="url(#flowGlow)" opacity="0">
         <animate attributeName="stroke-dashoffset" from="20" to="0" dur="0.8s" repeatCount="indefinite"/>
       </path>
       <g transform="translate(398,430) scale(.8)">
@@ -1865,11 +2196,11 @@ class FFlowCard extends HTMLElement {
 
     // Battery visibility helpers – mirror EV charger pattern
     const battGhostPath = showBatt1
-      ? `<path d="M 59,175 C 140,175 120,205 205,205" fill="none" stroke="#1e3a5f" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.45"/>`
+      ? `<path d="M 59,175 C 140,175 120,205 205,205" fill="none" stroke="#1e3a5f" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>`
       : '';
     const battFlowPaths = showBatt1 ? `
-      <path id="flowBattIn"  d="M 59,175 C 140,175 120,205 205,205" fill="none" stroke="#8b949e" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="16 8" filter="url(#flowGlow)" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="-24" to="0"   dur="4.0s" repeatCount="indefinite"/></path>
-      <path id="flowBattOut" d="M 59,175 C 140,175 120,205 205,205" fill="none" stroke="#8b949e" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="16 8" filter="url(#flowGlow)" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="0"   to="-24" dur="4.0s" repeatCount="indefinite"/></path>` : '';
+      <path id="flowBattIn"  d="M 59,175 C 140,175 120,205 205,205" fill="none" stroke="#8b949e" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="12 6" filter="url(#flowGlow)" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="-24" to="0"   dur="4.0s" repeatCount="indefinite"/></path>
+      <path id="flowBattOut" d="M 59,175 C 140,175 120,205 205,205" fill="none" stroke="#8b949e" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="12 6" filter="url(#flowGlow)" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="0"   to="-24" dur="4.0s" repeatCount="indefinite"/></path>` : '';
     const modernBatt = showBatt1 && !dual && this.config.battery_style !== 'classic';
     let mbSegs = '';
     for (let i = 0; i < 10; i++) {
@@ -1944,6 +2275,8 @@ class FFlowCard extends HTMLElement {
       .cch-h .hsel{display:inline-flex;gap:3px}
       .hb{font:inherit;font-size:.68rem;font-weight:700;letter-spacing:0;padding:2px 7px;border-radius:8px;border:1px solid #30363d;background:#161b22;color:#8b949e;cursor:pointer}
       .hb.on{color:#0d1117;background:#58a6ff;border-color:#58a6ff}
+      .stc{background:#0d1117;border:1px solid #21262d;border-radius:10px;padding:8px 8px 6px;margin-bottom:8px}
+      .st-info{text-transform:none;letter-spacing:0;color:#c9d1d9;font-weight:600}
       .cch-info{font-size:.7rem;color:#8b949e;text-align:right;margin-top:3px}
       .pvf{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:2px}
       .pvi{text-align:center;background:#0d1117;border:1px solid #21262d;border-radius:8px;padding:6px 2px}
@@ -2047,7 +2380,7 @@ class FFlowCard extends HTMLElement {
       <defs>
         <filter id="arcSunF" x="-150%" y="-150%" width="400%" height="400%"><feGaussianBlur stdDeviation="7"/></filter>
         <filter id="arcSunF2" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="3"/></filter>
-        <filter id="moonF"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <filter id="moonF"><feGaussianBlur stdDeviation="1.6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
         <radialGradient id="dynAuraG" cx="50%" cy="45%" r="55%"><stop offset="0%" stop-color="rgba(30,100,200,.28)"/><stop offset="55%" stop-color="rgba(30,80,160,.10)"/><stop offset="100%" stop-color="rgba(0,0,0,0)"/></radialGradient>
         <radialGradient id="sunCG" cx="50%" cy="40%" r="60%"><stop offset="0%" stop-color="rgba(255,255,220,.98)"/><stop offset="40%" stop-color="rgb(255,125,10)"/><stop offset="100%" stop-color="rgba(255,130,10,.6)"/></radialGradient>
         <linearGradient id="arcDayGrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="rgba(255,180,50,0)"/><stop offset="20%" stop-color="rgba(255,200,70,.5)"/><stop offset="50%" stop-color="rgba(255,228,110,.92)"/><stop offset="80%" stop-color="rgba(255,200,70,.5)"/><stop offset="100%" stop-color="rgba(255,180,50,0)"/></linearGradient>
@@ -2098,15 +2431,15 @@ class FFlowCard extends HTMLElement {
       <g id="pvFlowGroup"></g>
 
       ${battGhostPath}
-      <path d="M 399,175 C 350,175 375,202 315,202" fill="none" stroke="#1e3a5f" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.45"/>
-      <path d="M 260,265 V 358" fill="none" stroke="#1e3a5f" stroke-width="2.5" stroke-linecap="round" opacity="0.45"/>
+      <path d="M 399,175 C 350,175 375,202 315,202" fill="none" stroke="#1e3a5f" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>
+      <path d="M 260,265 V 358" fill="none" stroke="#1e3a5f" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
 
-      <path id="flowGridIn" d="M 432,175 C 350,175 375,202 315,202" fill="none" stroke="#FF2929" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="16 8" filter="url(#flowGlow)" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="0" to="-24" dur="0.8s" repeatCount="indefinite"/></path>
-      <path id="flowGridOut" d="M 432,175 C 350,175 375,202 315,202" fill="none" stroke="#2ecc71" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="16 8" filter="url(#flowGlow)" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="-24" to="0" dur="0.8s" repeatCount="indefinite"/></path>
+      <path id="flowGridIn" d="M 432,175 C 350,175 375,202 315,202" fill="none" stroke="#FF2929" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="12 6" filter="url(#flowGlow)" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="0" to="-24" dur="0.8s" repeatCount="indefinite"/></path>
+      <path id="flowGridOut" d="M 432,175 C 350,175 375,202 315,202" fill="none" stroke="#2ecc71" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="12 6" filter="url(#flowGlow)" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="-24" to="0" dur="0.8s" repeatCount="indefinite"/></path>
 
       ${battFlowPaths}
 
-      <path id="flowInvLoad" d="M 260,358 V 265" fill="none" stroke="#29c4f6" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="16 8" filter="url(#flowGlow)" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="-24" to="0" dur="0.8s" repeatCount="indefinite"/></path>
+      <path id="flowInvLoad" d="M 260,358 V 265" fill="none" stroke="#29c4f6" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="12 6" filter="url(#flowGlow)" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="-24" to="0" dur="0.8s" repeatCount="indefinite"/></path>
 
       <!-- Battery current/power placed above/below flow bar -->
       ${showBatt1 ? (dual ? battTextDual : battTextSingle) : ''}
@@ -2199,6 +2532,7 @@ class FFlowCard extends HTMLElement {
       </div>`)}
       ${this._buildConsumersHTML(esc)}
       ${this._buildVentHTML(esc)}
+      ${this._buildStatsHTML(esc)}
     </div>`;
     this._bindExtraSections();
     this._bindGridSwitch();
@@ -2325,10 +2659,7 @@ class FFlowCard extends HTMLElement {
     if (absPwr1 < 10) { battShowIn = false; battShowOut = false; }
     else if (absPwr1 < 50) { battShowIn = showBattIn; battShowOut = showBattOut; battLineColor = '#8b949e'; }
     else { battShowIn = showBattIn; battShowOut = showBattOut; battDur = flowDur(absPwr1);
-      if (isCharging1) battLineColor = '#2b59ff';
-      else if (absPwr1 < 1000) battLineColor = '#f39c4b';
-      else if (absPwr1 < 2500) battLineColor = '#e67e22';
-      else battLineColor = '#f85149'; }
+      battLineColor = '#00c8ff'; }  // v1.8.0: battery flow always in the battery blue
     setFlow('flowBattIn', battShowIn, absPwr1, battDur, battLineColor);
     setFlow('flowBattOut', battShowOut, absPwr1, battDur, battLineColor);
     setFlow('flowGridIn', gridActive > 10, gridActive, flowDur(gridActive), '#FF2929');

@@ -5,7 +5,7 @@
 [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
 [![Release](https://img.shields.io/github/v/release/fabiustek/f-flow-card)](https://github.com/fabiustek/f-flow-card/releases)
 
-Versione attuale: **v1.7.1** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
+Versione attuale: **v1.8.0** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
 
 <p align="center">
   <img src="docs/images/card-overview.png" alt="F-Flow Card con tutte le sezioni attive" width="480">
@@ -28,6 +28,7 @@ Versione attuale: **v1.7.1** · Fork di [k-flow-card](https://github.com/thekhan
   - [Utilizzatori](#utilizzatori)
   - [Grafico dei consumi](#grafico-dei-consumi)
   - [Ventilazione inverter](#ventilazione-inverter)
+  - [Statistiche](#statistiche)
   - [Statistiche batteria (JK BMS)](#statistiche-batteria-jk-bms)
   - [Auto elettrica / Wallbox](#auto-elettrica--wallbox)
   - [Da telefono](#da-telefono)
@@ -44,7 +45,7 @@ Versione attuale: **v1.7.1** · Fork di [k-flow-card](https://github.com/thekhan
 
 ## Cosa fa
 
-- **Flussi animati** a curve morbide con linee tratteggiate luminose: fotovoltaico → inverter → batteria / rete / casa / auto, con velocità e colori che seguono la potenza
+- **Flussi animati** a curve morbide con linee tratteggiate sottili e luminose: fotovoltaico → inverter → batteria / rete / casa / auto, con velocità e colori che seguono la potenza
 - **Sole e luna** che si muovono su un arco in base all'ora reale (`sun.sun`), con alba e tramonto
 - **Batteria a segmenti** colorata in base al SOC, con scia che sale in carica e scende in scarica
 - **Traliccio luminoso**: rosso quando prelevi, verde quando immetti, barrato quando sei fuori rete
@@ -52,6 +53,7 @@ Versione attuale: **v1.7.1** · Fork di [k-flow-card](https://github.com/thekhan
 - **Commutazione IN RETE / FUORI RETE** dalla card: tieni premuto, conferma, fatto
 - **Utilizzatori** con icona, colore e un disco stile contatore Ferraris che gira in base al consumo
 - **Grafico dei consumi** delle ultime 24 ore: chi ha consumato e quando
+- **Statistiche**: produzione FV di oggi per stringa con la stima, consumi della casa con i picchi, batteria nelle 24 ore
 - **Ventilazione inverter** con livelli termici, temperature, PWM e ventole animate
 - **Autonomia** fino a un SOC minimo a scelta (es. 20%) e **tempo alla ricarica**, energia residua, barra delle fonti di energia, modalità EMS
 - **Wallbox e auto** disegnate accanto alla casa, con stato, potenza, SOC dell'auto e tempo alla carica completa
@@ -116,7 +118,7 @@ Tutte le funzioni aggiuntive sono facoltative: se non le attivi, non compaiono.
   - in **scarica** mostra **AUTONOMIA**: il tempo che resta fino al **SOC minimo** che scegli (es. "2h 36m · fino al 20%");
   - in **carica** mostra **TEMPO ALLA RICARICA**: il tempo per arrivare al **SOC obiettivo** (es. "fino al 100%");
   - a riposo mostra "batteria a riposo". Sotto c'è l'**energia residua** in kWh.
-- **Flussi**: curve morbide con linee tratteggiate luminose che scorrono nella direzione dell'energia, più veloci quando la potenza sale.
+- **Flussi**: curve morbide con linee tratteggiate sottili e luminose che scorrono nella direzione dell'energia, più veloci quando la potenza sale. Il flusso della batteria è sempre blu, come la batteria.
 - **Inverter** al centro: temperatura e percentuale di carico. Si può sostituire con una foto (`inverter_image`).
 - **Rete** a destra: potenza istantanea, energia prelevata (▼) e immessa (▲) oggi. Sotto, la barra **Fonti energia** mostra in proporzione solare, carica, scarica e rete.
 - **Barre FV / POT**: produzione rispetto alla potenza massima dell'impianto e potenza della batteria rispetto a quella dell'inverter.
@@ -136,7 +138,7 @@ La casa ha due falde di pannelli: **FV1 sulla sinistra** e **FV2 sulla destra**.
 
 **Stringhe aggiuntive FV3 e FV4**: attivale nella sezione **☀️ Stringhe FV aggiuntive** (＋ Attiva). **FV3** compare sotto FV1, sul lato della falda sinistra; **FV4** sotto FV2, sul lato della falda destra. Ogni falda si illumina con la somma delle sue stringhe (sinistra FV1 + FV3, destra FV2 + FV4). Con l'icona casa classica, FV3 e FV4 restano nella colonna di sinistra.
 
-Se nel tuo impianto le stringhe sono al contrario, basta scambiare i sensori FV1 e FV2 nella sezione **☀️ Fotovoltaico**. Per tornare all'immagine vecchia: **Icona casa classica** (`home_icon_style: classic`).
+Se nel tuo impianto le stringhe sono al contrario, basta scambiare i sensori FV1 e FV2 nella sezione **☀️ Fotovoltaico**. Lì puoi anche dare un **nome** a ogni stringa (es. "Sud-Est", "Nord-Ovest"): compare accanto alla casa e nelle statistiche. Per tornare all'immagine vecchia: **Icona casa classica** (`home_icon_style: classic`).
 
 ### Commutazione IN RETE / FUORI RETE
 
@@ -227,6 +229,29 @@ Ogni livello termico ha il suo colore, testo e velocità della ventola principal
 | `critical` | Critica | Temperatura critica, massima ventilazione (triangolo di avviso) |
 
 Se lo stato ha un valore diverso, la card lo mostra così com'è.
+
+### Statistiche
+
+<p align="center"><img src="docs/images/statistics.png" alt="Sezione statistiche: produzione FV, consumi casa, batteria" width="480"></p>
+
+Sezione **📈 Statistiche** → **＋ Attiva**. Ci sono tre grafici, ognuno attivabile o disattivabile; i dati arrivano dallo storico di Home Assistant e si aggiornano ogni 5 minuti. Toccando un grafico (o passandoci sopra col mouse) compare il dettaglio di quell'orario. Come le altre sezioni, si può chiudere e ha il flag 📌.
+
+**1. Produzione FV oggi**
+- Una barra per ogni ora della giornata, da mezzanotte a mezzanotte; ogni barra è divisa per stringa con colori fissi: **FV1 arancione, FV2 blu, FV3 viola, FV4 verde**. L'altezza è l'energia prodotta in quell'ora (kWh).
+- La linea rossa tratteggiata indica **adesso**.
+- **Stima**: scegli il tuo sensore in **Sensore di stima produzione**. La card lo usa così:
+  - se il sensore ha la previsione nelle **attributi** (Solcast `detailedForecast` / `detailedHourly`, oppure un attributo `watts` come Forecast.Solar), disegna la curva tratteggiata della stima per **tutta la giornata**, anche le ore future, e mostra il totale stimato;
+  - se è un sensore di **potenza** (W o kW, es. "Forecast +1h"), disegna la curva dal suo storico fino ad adesso;
+  - se è un sensore di **energia** (kWh), mostra solo il totale stimato in alto.
+- In alto: kWh prodotti oggi e stima; sotto: kWh per stringa.
+
+**2. Consumi casa · ultime 24 ore**
+- Usa il sensore **Consumo casa**. La linea e l'area cambiano colore con la potenza: **verde** sotto 1 kW, **giallo** intorno a 2,5 kW, **rosso** da 4 kW in su.
+- Il **picco** è segnato con un cerchio e il valore; sotto c'è l'orario del picco. In alto: kWh consumati nelle 24 ore e potenza media.
+
+**3. Batteria · ultime 24 ore**
+- Area **blu** sopra lo zero quando la batteria si carica, **arancione** sotto lo zero quando si scarica; la linea bianca è il **SOC** (scala in % a destra).
+- In alto: SOC minimo e massimo; sotto: kWh caricati e scaricati.
 
 ### Statistiche batteria (JK BMS)
 
@@ -401,6 +426,7 @@ Tutte le opzioni si impostano dall'editor visuale; qui trovi le chiavi YAML corr
 | Chiave | Predefinito | Descrizione |
 |---|---|---|
 | `pv1_power` / `pv2_power` | sensori GoodWe | Potenza delle stringhe FV1 (falda sinistra) e FV2 (falda destra) |
+| `pv1_name` … `pv4_name` | `''` | Nome delle stringhe (es. `Sud-Est`); se vuoto `FV1`… |
 | `_show_pv_extra` | `false` | Mostra le stringhe FV3 e FV4 |
 | `pv3_power` / `pv4_power` | `''` | Potenza delle stringhe FV3 (sotto FV1, falda sinistra) e FV4 (sotto FV2, falda destra) |
 | `pv_total_power` | `sensor.goodwe_pv_power` | Potenza FV totale (se vuota: somma delle stringhe) |
@@ -457,6 +483,16 @@ Tutte le opzioni si impostano dall'editor visuale; qui trovi le chiavi YAML corr
 | `consumers_chart_legend` | `true` | Legenda sotto il grafico (`false` per un grafico più compatto) |
 | `consumers_chart_total` | `true` | Linea tratteggiata del consumo totale (`consump`) |
 
+### Statistiche
+
+| Chiave | Predefinito | Descrizione |
+|---|---|---|
+| `_show_stats` | `false` | Mostra la sezione Statistiche |
+| `stats_pv` | `true` | Grafico produzione FV di oggi |
+| `stats_forecast_entity` | `''` | Sensore di stima produzione (Solcast, Forecast.Solar, potenza o energia) |
+| `stats_load` | `true` | Grafico consumi casa ultime 24 ore (sensore `consump`) |
+| `stats_battery` | `true` | Grafico batteria ultime 24 ore (`battery_power`, `battery_soc`) |
+
 ### Ventilazione inverter
 
 | Chiave | Descrizione |
@@ -506,12 +542,13 @@ Nella sezione Etichette la scelta di un'entità alternativa si sblocca solo dopo
 | Elemento | Colori |
 |---|---|
 | **Batteria (SOC)** | ≤20% rosso · ≤40% arancione · ≤75% verde · >75% azzurro |
-| **Flusso batteria** | blu in carica · da arancione a rosso in scarica, in base alla potenza |
 | **Rete** | rosso prelievo · verde immissione · grigio a riposo · barrato fuori rete |
 | **Casa** | colore della fonte principale: giallo FV · arancione batteria · rosso rete |
 | **Temperatura celle** | ≤15°C blu · ≤35°C verde · ≤45°C arancione · >45°C rosso |
 | **Tensione celle** | <3,0 V rosso · <3,1 V arancione · <3,4 V giallo · ≤3,65 V verde · >3,65 V rosso |
 | **Ventilazione** | da grigio (idle) ad azzurro, blu, indaco, viola, fino a magenta (critical) |
+| **Flusso batteria** | sempre blu; la direzione dei trattini indica carica o scarica |
+| **Statistiche** | FV1 arancione · FV2 blu · FV3 viola · FV4 verde · consumi verde → giallo → rosso · batteria blu carica / arancione scarica |
 | **Wallbox e auto** | azzurro in carica · verde carica completa · giallo collegata · grigio scollegata / in attesa |
 
 ---
@@ -520,7 +557,7 @@ Nella sezione Etichette la scelta di un'entità alternativa si sblocca solo dopo
 
 A ogni nuova versione viene creata automaticamente una **release** su GitHub e HACS ti propone l'aggiornamento in Home Assistant. Dopo l'aggiornamento ricarica il browser con `Ctrl + Shift + R`.
 
-Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.7.1**.
+Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.8.0**.
 
 ---
 
@@ -559,6 +596,10 @@ Per sapere quale versione stai usando, apri la console del browser (`F12`): comp
 **L'autonomia mostra `--`**
 - Serve la capacità della batteria nella sezione **⚙️ Generale** e un sensore di potenza della batteria valido. Se la batteria è a riposo non c'è una stima ("batteria a riposo").
 
+**Le statistiche dicono "Storico non disponibile" o la stima non compare**
+- I grafici usano lo storico di Home Assistant: i sensori non devono essere esclusi dal `recorder`.
+- Per la curva della stima su tutta la giornata serve un sensore con la previsione negli attributi (es. Solcast "Forecast Today"). Con un sensore di energia (kWh) la card mostra solo il totale stimato.
+
 **L'autonomia sembra troppo lunga o troppo corta**
 - Controlla **SOC minimo per l'autonomia** in **⚙️ Generale**: deve corrispondere alla soglia sotto cui il tuo inverter non scarica la batteria. Se il SOC è già sotto la soglia, l'autonomia è 0.
 
@@ -571,6 +612,11 @@ Per sapere quale versione stai usando, apri la console del browser (`F12`): comp
 ---
 
 ## Registro delle modifiche
+
+### v1.8.0
+- Nuova sezione **📈 Statistiche** con tre grafici: produzione FV di oggi a barre orarie per stringa con la curva della stima, consumi della casa nelle 24 ore colorati per intensità con il picco evidenziato, batteria nelle 24 ore (carica, scarica e SOC).
+- **Nomi delle stringhe** (es. Sud-Est, Nord-Ovest) accanto alla casa e nelle statistiche.
+- **Linee dei flussi più sottili**, come quella dal sole all'inverter; il flusso della batteria è sempre **blu**.
 
 ### v1.7.1
 - I flussi tornano a **linee tratteggiate** invece dei pallini, mantenendo curve morbide e bagliore.
@@ -632,4 +678,4 @@ Per sapere quale versione stai usando, apri la console del browser (`F12`): comp
 
 ---
 
-*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.7.1*
+*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.8.0*
