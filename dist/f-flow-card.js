@@ -1,5 +1,7 @@
-// f-flow-card.js – Unified Edition v1.10.1
-const FFC_VERSION = '1.10.1';
+// f-flow-card.js – Unified Edition v1.10.2
+const FFC_VERSION = '1.10.2';
+// Changes v1.10.2:
+//   DOCS – README images use absolute raw.githubusercontent.com URLs so they also show inside HACS.
 // Changes v1.10.1:
 //   FIX  – Section title no longer reads "Inverter Inverter" when the inverter name already says Inverter.
 //   FIX  – Classic house: FV1–FV4 labels moved below the autonomy panel (they overlapped "Energia residua").

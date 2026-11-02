@@ -15,7 +15,8 @@ Card Lovelace per Home Assistant (fork di k-flow-card), distribuita con HACS. Il
    - righe nel "Riferimento delle opzioni" per ogni nuova chiave YAML;
    - "Esempio completo", "Risoluzione dei problemi" e "Logica dei colori" se toccati;
    - voce nel "Registro delle modifiche".
-3. **Rigenera le foto**: aggiorna `tools/screenshots/demo.html` (dati e scene) se la novità non si vede, poi `node tools/screenshots/shoot.js` (se `require('playwright')` non si risolve, usa `NODE_PATH=$(npm root -g)`), controlla le immagini e committa `docs/images/`. Se servono nuove icone `mdi:` nella demo, aggiungile a `tools/screenshots/icons.json`.
-4. Nuove opzioni: aggiungile a `getStubConfig()` e all'editor; i testi visibili all'utente sono in italiano, i commenti nel codice in inglese.
-5. Le nuove funzioni devono essere facoltative o non rompere le configurazioni esistenti.
-6. Lavora su un branch, apri una PR verso `main` (via `gh api` REST) e lascia il merge al proprietario.
+3. **Immagini nel README**: usa sempre l'indirizzo completo `https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/<nome>.png` (non `docs/images/...`): HACS mostra il README fuori da GitHub e i percorsi relativi non funzionano.
+4. **Rigenera le foto**: aggiorna `tools/screenshots/demo.html` (dati e scene) se la novità non si vede, poi `node tools/screenshots/shoot.js` (se `require('playwright')` non si risolve, usa `NODE_PATH=$(npm root -g)`), controlla le immagini e committa `docs/images/`. Se servono nuove icone `mdi:` nella demo, aggiungile a `tools/screenshots/icons.json`.
+5. Nuove opzioni: aggiungile a `getStubConfig()` e all'editor; i testi visibili all'utente sono in italiano, i commenti nel codice in inglese.
+6. Le nuove funzioni devono essere facoltative o non rompere le configurazioni esistenti.
+7. Lavora su un branch, apri una PR verso `main` (via `gh api` REST) e lascia il merge al proprietario.
