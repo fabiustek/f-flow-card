@@ -1,5 +1,12 @@
-// f-flow-card.js – Unified Edition v1.3.0
-const FFC_VERSION = '1.3.0';
+// f-flow-card.js – Unified Edition v1.4.0
+const FFC_VERSION = '1.4.0';
+// Changes v1.4.0:
+//   NEW  – Consumption chart under the consumers: stacked areas per consumer over the last
+//           24 h (configurable) from HA history, dashed house-total line, tooltip, kWh legend.
+//   NEW  – Futuristic neon grid tower drawn in SVG (red import / green export / grey idle);
+//           the PNG one stays available with grid_icon_style: classic.
+//   CHG  – Ventilation section redesigned: compact, card-consistent, with the thermal levels
+//           idle / cool / low / medium / high / very high / critical (colour, text, pulse, speed).
 // Changes v1.3.0:
 //   NEW  – Consumers section (Utilizzatori): any number of appliances with mdi icon, colour and
 //           a Ferraris-style meter disc whose speed follows the measured power.
@@ -137,6 +144,7 @@ class FFlowCardEditor extends HTMLElement {
 
   _set(key, value) {
     if (key === 'battery_style_classic') { key = 'battery_style'; value = value ? 'classic' : 'modern'; }
+    if (key === 'grid_icon_classic') { key = 'grid_icon_style'; value = value ? 'classic' : 'modern'; }
     if (this._config[key] === value) return;
     this._config = { ...this._config, [key]: value };
     this._fireChanged();
@@ -442,6 +450,7 @@ class FFlowCardEditor extends HTMLElement {
       const cb = document.createElement('input');
       cb.type = 'checkbox';
       cb.checked = key === 'battery_style_classic' ? cfg.battery_style === 'classic'
+        : key === 'grid_icon_classic' ? cfg.grid_icon_style === 'classic'
         : cfg[key] === undefined ? defaultOn : !!cfg[key];
       cb.style.cssText = 'opacity:0;width:0;height:0;position:absolute;';
       const track = document.createElement('span');
@@ -526,6 +535,7 @@ class FFlowCardEditor extends HTMLElement {
       switchRow('_show_energy_supply',   'Barra fonti energia', 'Barra Solare / Carica / Scarica / Rete a destra'),
       switchRow('_show_backup_panel',    'Pannello autonomia', 'Autonomia e kWh residui nell’area del flusso'),
       switchRow('_daily_tiles_extended', '6 riquadri giornalieri', 'FV, carica, scarica, prelievo, immissione, consumo'),
+      switchRow('grid_icon_classic', 'Icona rete classica', 'Usa la vecchia immagine del traliccio invece di quella luminosa'),
       switchRow('battery_style_classic', 'Batteria stile classico', 'Usa la vecchia icona della batteria invece di quella a segmenti'),
       switchRow('_show_battery_stats',   'Riquadri statistiche batteria', 'Temp. celle, temp. BMS, celle min/max, autonomia (JK BMS)', true),
     ]));
@@ -574,6 +584,15 @@ class FFlowCardEditor extends HTMLElement {
             sel.value = item[f.key] || '';
             sel.addEventListener('value-changed', (ev) => { ev.stopPropagation(); upd(f.key, ev.detail.value || ''); });
             row.appendChild(sel);
+          } else if (f.type === 'bool') {
+            const lab = document.createElement('label');
+            lab.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:.82rem;cursor:pointer;color:var(--primary-text-color);';
+            const cb = document.createElement('input');
+            cb.type = 'checkbox'; cb.checked = item[f.key] !== false;
+            cb.style.accentColor = 'var(--primary-color,#03a9f4)';
+            cb.addEventListener('change', () => upd(f.key, cb.checked));
+            lab.appendChild(cb); lab.appendChild(document.createTextNode(f.text || 'Sì'));
+            row.appendChild(lab);
           } else if (f.type === 'color') {
             const inp = document.createElement('input');
             inp.type = 'color'; inp.value = item[f.key] || FFlowCard.PALETTE[idx % FFlowCard.PALETTE.length];
@@ -611,6 +630,9 @@ class FFlowCardEditor extends HTMLElement {
     shell.appendChild(makeSection('consumers', '🔌', 'Utilizzatori', [
       textField('consumers_title', 'Titolo sezione', 'Utilizzatori'),
       numberField('consumers_meter_speed', 'Velocità dischi contatore (1 = normale)', 0.1, 5, 0.1),
+      switchRow('consumers_chart', 'Grafico dei consumi', 'Aree colorate per utilizzatore, dallo storico di Home Assistant', true),
+      numberField('consumers_chart_hours', 'Ore mostrate nel grafico', 1, 72, 1, 'h'),
+      switchRow('consumers_chart_total', 'Linea consumo totale casa', 'Tratteggiata, usa il sensore "Consumo casa"', true),
       divider(),
       listEditor('consumers', [
         { key: 'name', label: 'Nome', type: 'text', placeholder: 'es. Lavatrice' },
@@ -618,14 +640,15 @@ class FFlowCardEditor extends HTMLElement {
         { key: 'icon', label: 'Icona', type: 'icon' },
         { key: 'color', label: 'Colore', type: 'color' },
         { key: 'threshold', label: 'Soglia "acceso" in W (predefinita 50)', type: 'number', placeholder: '50' },
+        { key: 'chart', label: 'Grafico', type: 'bool', text: 'Mostra nel grafico dei consumi (togli la spunta per il totale casa)' },
       ], (n) => ({ name: '', entity: '', icon: 'mdi:power-plug', color: FFlowCard.PALETTE[n % FFlowCard.PALETTE.length] }), '＋ Aggiungi utilizzatore'),
     ], { toggleKey: '_show_consumers', toggleOn: showConsumers, hidden: !showConsumers }));
 
     const showVent = !!cfg._show_ventilation;
     shell.appendChild(makeSection('ventilation', '🌀', 'Ventilazione inverter', [
       textField('vent_title', 'Titolo', 'Ventilazione inverter'),
-      picker('vent_state_entity',  'Stato ventilazione (es. Idle / On)', true),
-      picker('vent_status_entity', 'Descrizione stato (es. "Sistema in attesa")', true),
+      picker('vent_state_entity',  'Stato termico (idle / cool / low / medium / high / very high / critical)', true),
+      picker('vent_status_entity', 'Descrizione stato (se vuota: testo automatico dal livello)', true),
       picker('vent_ambient_temp',  'Temperatura ambiente', true),
       picker('vent_pwm',           'PWM ventole (%)', true),
       picker('vent_rpm_avg',       'RPM medio (se vuoto: media delle ventole)', true),
@@ -923,6 +946,10 @@ class FFlowCard extends HTMLElement {
       consumers_title: 'Utilizzatori',
       consumers_meter_speed: 1,
       consumers: [],
+      consumers_chart: true,
+      consumers_chart_hours: 24,
+      consumers_chart_total: true,
+      grid_icon_style: 'modern',
       _show_ventilation: false,
       vent_title: 'Ventilazione inverter',
       vent_state_entity: '',
@@ -1106,7 +1133,196 @@ class FFlowCard extends HTMLElement {
         <div class="meter"><div class="mk" id="cnMk${i}"></div></div>
       </div>`;
     });
-    return h + '</div>';
+    h += '</div>';
+    if (this._chartEnabled()) {
+      const hrs = this._chartHours();
+      h += `<div class="cch">
+        <div class="cch-h"><span>Consumi ultime ${hrs} ore</span><span id="cChartInfo"></span></div>
+        <div class="cch-w" id="cChartWrap">
+          <svg id="cChartSvg" viewBox="0 0 500 170" style="width:100%;display:block"></svg>
+          <div class="cch-tip" id="cChartTip"></div>
+        </div>
+        <div class="cch-leg" id="cChartLeg"></div>
+      </div>`;
+    }
+    return h;
+  }
+
+  // ── v1.4.0: 24 h consumption chart (HA recorder history) ─────────
+  _chartEnabled() { return !!this.config._show_consumers && this.config.consumers_chart !== false; }
+  _chartHours() { return Math.max(1, Math.min(72, Number(this.config.consumers_chart_hours) || 24)); }
+  _chartIds() {
+    const ids = this._consumers().filter(c => c.chart !== false).map(c => c.entity);
+    if (this.config.consumers_chart_total !== false && this.config.consump) ids.push(this.config.consump);
+    return [...new Set(ids)];
+  }
+
+  _maybeLoadHistory() {
+    if (!this._chartEnabled() || !this._hass || typeof this._hass.callWS !== 'function') return;
+    const ids = this._chartIds();
+    const key = ids.join('|') + '#' + this._chartHours();
+    const now = Date.now();
+    if (this._histLoading) return;
+    if (this._hist && this._hist.key === key && now - this._hist.fetched < 5 * 60000) return;
+    if (!ids.length) return;
+    this._histLoading = true;
+    const hours = this._chartHours();
+    const start = now - hours * 3600000;
+    this._hass.callWS({
+      type: 'history/history_during_period',
+      start_time: new Date(start).toISOString(), end_time: new Date(now).toISOString(),
+      entity_ids: ids, minimal_response: true, no_attributes: true, significant_changes_only: false,
+    }).then(res => {
+      this._hist = { key, start, end: now, hours, raw: res || {}, fetched: Date.now() };
+    }).catch(err => {
+      this._hist = { key, error: String((err && err.message) || err), fetched: Date.now() };
+    }).finally(() => { this._histLoading = false; this._renderChart(); });
+  }
+
+  // Time-weighted average power (W) per bucket from HA's state-change list
+  _bucketize(points, eid, start, end, n) {
+    const out = new Float64Array(n);
+    if (!Array.isArray(points) || !points.length) return out;
+    const unit = (this._hass?.states?.[eid]?.attributes?.unit_of_measurement || '').trim();
+    const mul = unit === 'kW' ? 1000 : 1;
+    const step = (end - start) / n;
+    const pts = points.map(p => ({
+      t: p.lu != null ? p.lu * 1000 : p.lc != null ? p.lc * 1000 : Date.parse(p.last_updated || p.last_changed || 0),
+      v: parseFloat(p.s != null ? p.s : p.state),
+    })).sort((a, b) => a.t - b.t);
+    for (let k = 0; k < pts.length; k++) {
+      const v = isFinite(pts[k].v) ? Math.max(0, pts[k].v * mul) : 0;
+      if (!v) continue;
+      let a = Math.max(start, pts[k].t);
+      const b = Math.min(end, k + 1 < pts.length ? pts[k + 1].t : end);
+      let i = Math.floor((a - start) / step);
+      while (a < b && i < n) {
+        const be = start + (i + 1) * step;
+        const e = Math.min(b, be);
+        if (i >= 0) out[i] += v * (e - a) / step;
+        a = e; i++;
+      }
+    }
+    return out;
+  }
+
+  _renderChart() {
+    const root = this.shadowRoot;
+    const svg = root.getElementById('cChartSvg');
+    if (!svg) return;
+    const info = root.getElementById('cChartInfo'), leg = root.getElementById('cChartLeg');
+    const h = this._hist;
+    const fmt = (v) => v >= 1000 ? (+(v / 1000).toFixed(2)).toString() + ' kW' : Math.round(v) + ' W';
+    if (!h || h.error || !h.raw) {
+      svg.innerHTML = `<text x="250" y="88" text-anchor="middle" font-size="11" fill="#8b949e">${h && h.error ? 'Storico non disponibile' : 'Caricamento storico…'}</text>`;
+      this._chartData = null;
+      return;
+    }
+    const N = Math.round(h.hours * 12);
+    const W = 500, H = 170, L = 38, R = 6, T = 8, B = 20, pw = W - L - R, ph = H - T - B;
+    const pal = FFlowCard.PALETTE;
+    const series = this._consumers().map((c, i) => ({ c, col: c.color || pal[i % pal.length] }))
+      .filter(x => x.c.chart !== false)
+      .map(x => ({ ...x, b: this._bucketize(h.raw[x.c.entity], x.c.entity, h.start, h.end, N) }));
+    const totalId = this.config.consumers_chart_total !== false ? this.config.consump : '';
+    const total = totalId && h.raw[totalId] ? this._bucketize(h.raw[totalId], totalId, h.start, h.end, N) : null;
+    const cum = series.map(() => new Float64Array(N));
+    let maxV = 0;
+    for (let i = 0; i < N; i++) {
+      let acc = 0;
+      series.forEach((sr, k) => { acc += sr.b[i]; cum[k][i] = acc; });
+      maxV = Math.max(maxV, acc, total ? total[i] : 0);
+    }
+    // round tick step (1/2/5 × 10^n) so the axis reads 0, 500 W, 1 kW, 1.5 kW…
+    const niceStep = (v) => { if (v <= 0) return 25; const e = Math.pow(10, Math.floor(Math.log10(v))); const m = v / e; return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 5 ? 5 : 10) * e; };
+    const tick = niceStep(Math.max(100, maxV * 1.05) / 4);
+    const nTicks = Math.max(1, Math.ceil(Math.max(100, maxV * 1.05) / tick));
+    const yMax = tick * nTicks;
+    const X = (i) => (L + (i / (N - 1)) * pw).toFixed(1);
+    const Y = (v) => (T + ph - (Math.min(v, yMax) / yMax) * ph).toFixed(1);
+    let g = '';
+    for (let k = 0; k <= nTicks; k++) {
+      const v = tick * k, yy = Y(v);
+      g += `<line x1="${L}" x2="${W - R}" y1="${yy}" y2="${yy}" stroke="#21262d" stroke-width="1"/>`;
+      g += `<text x="${L - 4}" y="${(+yy + 3).toFixed(1)}" text-anchor="end" font-size="8" fill="#8b949e">${fmt(v)}</text>`;
+    }
+    const stepH = h.hours <= 12 ? 2 : h.hours <= 24 ? 3 : 6;
+    const first = new Date(h.start); first.setMinutes(0, 0, 0); first.setHours(first.getHours() + 1);
+    for (let t = +first; t < h.end; t += 3600000) {
+      const d = new Date(t);
+      if (d.getHours() % stepH) continue;
+      const xx = (L + (t - h.start) / (h.end - h.start) * pw).toFixed(1);
+      g += `<line x1="${xx}" x2="${xx}" y1="${T}" y2="${T + ph}" stroke="#21262d" stroke-width="1" stroke-dasharray="2 3"/>`;
+      g += `<text x="${xx}" y="${H - 6}" text-anchor="middle" font-size="8" fill="#8b949e">${String(d.getHours()).padStart(2, '0')}:00</text>`;
+    }
+    // stacked areas, bottom series first
+    series.forEach((sr, k) => {
+      const top = cum[k], bot = k ? cum[k - 1] : null;
+      let d = 'M' + X(0) + ',' + Y(top[0]);
+      for (let i = 1; i < N; i++) d += 'L' + X(i) + ',' + Y(top[i]);
+      for (let i = N - 1; i >= 0; i--) d += 'L' + X(i) + ',' + Y(bot ? bot[i] : 0);
+      g += `<path d="${d}Z" fill="${sr.col}" fill-opacity=".5" stroke="none"/>`;
+      let ln = 'M' + X(0) + ',' + Y(top[0]);
+      for (let i = 1; i < N; i++) ln += 'L' + X(i) + ',' + Y(top[i]);
+      g += `<path d="${ln}" fill="none" stroke="${sr.col}" stroke-width="1.2" stroke-linejoin="round"/>`;
+    });
+    if (total) {
+      let ln = 'M' + X(0) + ',' + Y(total[0]);
+      for (let i = 1; i < N; i++) ln += 'L' + X(i) + ',' + Y(total[i]);
+      g += `<path d="${ln}" fill="none" stroke="#e6edf3" stroke-width="1.2" stroke-dasharray="4 3" opacity=".75"/>`;
+    }
+    g += `<line id="cChartCursor" x1="0" x2="0" y1="${T}" y2="${T + ph}" stroke="#e6edf3" stroke-width="1" opacity="0"/>`;
+    svg.innerHTML = g;
+    // legend with energy over the window
+    const hStep = h.hours / N;
+    const kwh = (arr) => { let sum = 0; for (let i = 0; i < N; i++) sum += arr[i]; return sum * hStep / 1000; };
+    const esc = (t) => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    if (leg) {
+      leg.innerHTML = series.map(sr => `<span><i style="background:${esc(sr.col)}"></i>${esc(sr.c.name || sr.c.entity)} <b>${kwh(sr.b).toFixed(2)} kWh</b></span>`).join('') +
+        (total ? `<span><i class="tot"></i>Totale casa <b>${kwh(total).toFixed(2)} kWh</b></span>` : '');
+    }
+    if (info) {
+      const meas = series.reduce((a, sr) => a + kwh(sr.b), 0);
+      info.textContent = total ? `misurato ${meas.toFixed(1)} di ${kwh(total).toFixed(1)} kWh` : `${meas.toFixed(1)} kWh`;
+    }
+    this._chartData = { series, total, N, h, L, pw, W, fmt, esc };
+    this._bindChartHover();
+  }
+
+  _bindChartHover() {
+    const root = this.shadowRoot;
+    const wrap = root.getElementById('cChartWrap');
+    if (!wrap || wrap._bound) return;
+    wrap._bound = true;
+    const move = (ev) => {
+      const cd = this._chartData; if (!cd) return;
+      const svg = root.getElementById('cChartSvg'), tip = root.getElementById('cChartTip'), cur = root.getElementById('cChartCursor');
+      const r = svg.getBoundingClientRect();
+      const px = (ev.clientX - r.left) / r.width * cd.W;
+      if (px < cd.L || px > cd.L + cd.pw) { hide(); return; }
+      const i = Math.max(0, Math.min(cd.N - 1, Math.round((px - cd.L) / cd.pw * (cd.N - 1))));
+      const xx = cd.L + i / (cd.N - 1) * cd.pw;
+      if (cur) { cur.setAttribute('x1', xx); cur.setAttribute('x2', xx); cur.setAttribute('opacity', '.6'); }
+      const t0 = new Date(cd.h.start + i * (cd.h.end - cd.h.start) / cd.N);
+      const hh = (d) => String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+      const rows = cd.series.map(sr => ({ n: sr.c.name || sr.c.entity, c: sr.col, v: sr.b[i] })).filter(x => x.v >= 1).sort((a, b) => b.v - a.v);
+      let html = `<div class="tt">${hh(t0)}</div>`;
+      if (cd.total) html += `<div><i class="tot"></i>Totale <b>${cd.fmt(cd.total[i])}</b></div>`;
+      html += rows.length ? rows.map(x => `<div><i style="background:${cd.esc(x.c)}"></i>${cd.esc(x.n)} <b>${cd.fmt(x.v)}</b></div>`).join('') : '<div style="color:#8b949e">Nessun consumo misurato</div>';
+      tip.innerHTML = html;
+      tip.style.display = 'block';
+      const frac = xx / cd.W;
+      tip.style.left = frac > 0.6 ? '' : (frac * 100 + 2) + '%';
+      tip.style.right = frac > 0.6 ? ((1 - frac) * 100 + 2) + '%' : '';
+    };
+    const hide = () => {
+      const tip = root.getElementById('cChartTip'), cur = root.getElementById('cChartCursor');
+      if (tip) tip.style.display = 'none';
+      if (cur) cur.setAttribute('opacity', '0');
+    };
+    wrap.addEventListener('pointermove', move);
+    wrap.addEventListener('pointerdown', move);
+    wrap.addEventListener('pointerleave', hide);
   }
 
   // ── v1.3.0: inverter ventilation ─────────────────────────────────
@@ -1122,31 +1338,43 @@ class FFlowCard extends HTMLElement {
     return list.filter(f => f && f.entity);
   }
 
+  // Thermal levels of the fan controller (same vocabulary as the ESPHome controller:
+  // idle / cool / low / medium / high / very high / critical)
+  static get VENT_LEVELS() {
+    return {
+      'idle':      { c: '#8b949e', l: 'Inattiva',   t: 'Sistema in attesa',                         sp: 0,    p: '' },
+      'cool':      { c: '#38bdf8', l: 'Minima',     t: 'Ventilazione minima attiva',                sp: 0.5,  p: 'vpCool' },
+      'low':       { c: '#60a5fa', l: 'Bassa',      t: 'Raffreddamento leggero',                    sp: 0.7,  p: 'vpCool' },
+      'medium':    { c: '#818cf8', l: 'Media',      t: 'Raffreddamento bilanciato',                 sp: 0.9,  p: 'vpWarm' },
+      'high':      { c: '#8b5cf6', l: 'Alta',       t: 'Ventilazione sostenuta',                    sp: 1.1,  p: 'vpWarm' },
+      'very high': { c: '#a855f7', l: 'Molto alta', t: 'Ventilazione intensa',                      sp: 1.45, p: 'vpHot' },
+      'critical':  { c: '#d61cff', l: 'Critica',    t: 'Temperatura critica, massima ventilazione', sp: 2,    p: 'vpHot' },
+    };
+  }
+
   _buildVentHTML(esc) {
     if (!this.config._show_ventilation) return '';
     const fans = this._ventFans();
+    const kpi = (id, l) => `<div class="vk"><div class="v" id="${id}">--</div><div class="l">${l}</div></div>`;
     let fh = '';
     fans.forEach((f, i) => {
-      fh += `<div class="fan"><div id="vfIco${i}" style="color:#58a6ff;display:flex;justify-content:center">${this._fanSVG('vfRot' + i, 22)}</div>
-        <div class="l">${esc(f.name || 'Ventola ' + (i + 1))}</div><div class="v" id="vfVal${i}">--</div></div>`;
+      fh += `<div class="vk"><div class="vfi" id="vfIco${i}">${this._fanSVG('vfRot' + i, 14)}<span class="v" id="vfVal${i}">--</span></div>
+        <div class="l">${esc(f.name || 'FAN' + (i + 1))}</div></div>`;
     });
     return `<div class="dv"></div>
-      <div class="vent">
-        <div class="top">
-          <div class="ico" id="ventMainIco" style="color:#8b949e">${this._fanSVG('ventMainRot', 30)}</div>
-          <div style="min-width:0">
-            <div class="ttl">${esc(this.config.vent_title || 'Ventilazione inverter')}</div>
-            <div class="sub" id="ventStatus">--</div>
-            <div class="tmp" id="ventTemps"></div>
+      <div class="ct">🌀 ${esc(this.config.vent_title || 'Ventilazione inverter')}</div>
+      <div class="vent" id="ventBox">
+        <div class="vrow">
+          <div class="vico" id="ventMainIco">${this._fanSVG('ventMainRot', 26)}
+            <svg class="vslash" id="ventSlash" viewBox="0 0 26 26" width="26" height="26"><line x1="4" y1="22" x2="22" y2="4" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+            <svg class="vslash" id="ventAlert" viewBox="0 0 26 26" width="26" height="26" style="display:none"><path d="M13 3 L24 22 H2 Z" fill="currentColor"/><rect x="12" y="9" width="2" height="7" fill="#0d1117"/><rect x="12" y="18" width="2" height="2" fill="#0d1117"/></svg>
           </div>
-          <div class="st" id="ventState">--</div>
+          <div class="vtxt"><div class="vsub" id="ventStatus">--</div><div class="vtmp" id="ventTemps"></div></div>
+          <div class="vpill" id="ventState">--</div>
         </div>
-        <div class="kpi">
-          <div><div class="v" id="ventAmb">--<small>°C</small></div><div class="l">Ambiente</div></div>
-          <div><div class="v" id="ventPwm">--<small>%</small></div><div class="l">PWM</div></div>
-          <div><div class="v" id="ventRpm">--<small>rpm</small></div><div class="l">RPM medio</div></div>
+        <div class="vgrid">
+          ${kpi('ventAmb', 'Ambiente')}${kpi('ventPwm', 'PWM')}${kpi('ventRpm', 'RPM medio')}${fh}
         </div>
-        ${fans.length ? `<div class="fans">${fh}</div>` : ''}
       </div>`;
   }
 
@@ -1158,6 +1386,7 @@ class FFlowCard extends HTMLElement {
     // animation state: meters and fans keep their own angle so speed changes are smooth
     this._spin = { meters: {}, fans: {} };
     this._startAnim();
+    if (this._chartEnabled()) this._renderChart();
   }
 
   connectedCallback() { this._connected = true; this._startAnim(); }
@@ -1195,6 +1424,7 @@ class FFlowCard extends HTMLElement {
 
   _updateExtraSections() {
     const sp = this._spin; if (!sp) return;
+    this._maybeLoadHistory();
     const root = this.shadowRoot;
     const fmtW = (w) => Math.abs(w) >= 1000 ? (w / 1000).toFixed(2) + ' kW' : Math.round(w) + ' W';
     // consumers
@@ -1228,37 +1458,41 @@ class FFlowCard extends HTMLElement {
       const invT = this._val(this.config.vent_inv_temp || this.config.inv_temp);
       const dcT = this._val(this.config.vent_dc_temp);
       const rawState = st(this.config.vent_state_entity);
-      const running = rawState !== null
-        ? /on|run|attiv|active|cool|high|low|medium|auto/i.test(rawState) && !/off|idle|stop|spent/i.test(rawState)
-        : (avg !== null && avg > 0 && (pwm === null || pwm > 0));
-      const map = { idle: 'Inattiva', on: 'Accesa', off: 'Spenta', running: 'In funzione', auto: 'Auto', unavailable: 'Non disp.' };
-      const stateTxt = rawState !== null ? (map[rawState.toLowerCase()] || rawState) : (running ? 'In funzione' : 'Inattiva');
-      const stEl = root.getElementById('ventState');
-      if (stEl) {
-        stEl.textContent = stateTxt;
-        stEl.style.color = running ? '#3fb950' : '#8b949e';
-        stEl.style.borderColor = running ? 'rgba(63,185,80,.6)' : '#30363d';
+      const key = rawState !== null ? rawState.toLowerCase().replace(/_/g, ' ').trim() : null;
+      const LV = FFlowCard.VENT_LEVELS;
+      let lv = key !== null ? LV[key] : null;
+      if (!lv) {
+        // Unknown vocabulary: fall back to a generic on/off reading
+        const on = key !== null ? !/off|idle|stop|spent|inattiv/.test(key) : (avg !== null && avg > 0 && (pwm === null || pwm > 0));
+        lv = on ? { ...LV.low, l: rawState || 'In funzione', t: 'Raffreddamento attivo' } : { ...LV.idle, l: rawState || 'Inattiva' };
       }
+      const box = root.getElementById('ventBox');
+      if (box) box.style.setProperty('--vc', lv.c);
+      const stEl = root.getElementById('ventState'); if (stEl) stEl.textContent = lv.l;
       const statusTxt = st(this.config.vent_status_entity);
-      const sEl = root.getElementById('ventStatus');
-      if (sEl) sEl.textContent = statusTxt !== null ? statusTxt : (running ? 'Raffreddamento attivo' : 'Sistema in attesa');
+      const sEl = root.getElementById('ventStatus'); if (sEl) sEl.textContent = statusTxt !== null ? statusTxt : lv.t;
       const temps = [];
       if (invT !== null) temps.push('INV ' + invT.toFixed(1) + '°');
       if (dcT !== null) temps.push('DC ' + dcT.toFixed(1) + '°');
       const tEl = root.getElementById('ventTemps'); if (tEl) tEl.textContent = temps.join(' • ');
-      setHTML('ventAmb', (amb === null ? '--' : amb.toFixed(0)) + '<small>°C</small>');
-      setHTML('ventPwm', (pwm === null ? '--' : pwm.toFixed(0)) + '<small>%</small>');
+      setHTML('ventAmb', (amb === null ? '--' : Math.round(amb)) + '<small>°C</small>');
+      setHTML('ventPwm', (pwm === null ? '--' : Math.round(pwm)) + '<small>%</small>');
       setHTML('ventRpm', (avg === null ? '--' : Math.round(avg)) + '<small>rpm</small>');
       const main = root.getElementById('ventMainIco');
-      if (main) main.style.color = running ? '#58a6ff' : '#8b949e';
-      // visual speed: 1000 rpm ≈ 1.5 giri/s on screen
+      if (main) main.className = 'vico' + (lv.p ? ' ' + lv.p : '');
+      const isIdle = lv === LV.idle || lv.sp === 0;
+      const slash = root.getElementById('ventSlash'); if (slash) slash.style.display = isIdle ? '' : 'none';
+      const crit = key === 'critical';
+      const alert = root.getElementById('ventAlert'); if (alert) alert.style.display = crit ? '' : 'none';
+      const rot = root.getElementById('ventMainRot'); if (rot) rot.parentNode.style.opacity = crit ? '0' : (isIdle ? '.55' : '1');
+      // main fan: speed from the thermal level (like the button-card), mini fans: from their real rpm
       const vis = (r) => r === null || r <= 0 ? 0 : Math.min(4, r / 650);
       if (!sp.fans.ventMainRot) sp.fans.ventMainRot = { a: 0, rps: 0 };
-      sp.fans.ventMainRot.rps = running ? vis(avg) : 0;
+      sp.fans.ventMainRot.rps = isIdle ? 0 : lv.sp;
       fans.forEach((f, i) => {
         const r = rpms[i];
         const v = root.getElementById('vfVal' + i); if (v) v.textContent = r === null ? '--' : Math.round(r);
-        const ico = root.getElementById('vfIco' + i); if (ico) ico.style.color = r !== null && r > 0 ? '#58a6ff' : '#8b949e';
+        const ico = root.getElementById('vfIco' + i); if (ico) ico.style.color = r !== null && r > 0 ? 'var(--vc)' : '#8b949e';
         const id = 'vfRot' + i;
         if (!sp.fans[id]) sp.fans[id] = { a: i * 30, rps: 0 };
         sp.fans[id].rps = vis(r);
@@ -1447,21 +1681,36 @@ class FFlowCard extends HTMLElement {
       .meter{position:relative;height:8px;margin:9px auto 0;width:78%;border-radius:4px;overflow:hidden;
              background:linear-gradient(180deg,#05070a,#1b2027 45%,#2e353e 50%,#1b2027 55%,#05070a);border:1px solid #2a313a}
       .meter .mk{position:absolute;top:1px;bottom:1px;width:4px;margin-left:-2px;left:50%;border-radius:1px;background:var(--c);box-shadow:0 0 6px var(--c)}
-      .vent{background:#0d1117;border:1px solid #21262d;border-radius:16px;padding:12px}
-      .vent .top{display:flex;align-items:center;gap:12px}
-      .vent .ico{width:52px;height:52px;border-radius:14px;background:#161b22;border:1px solid #21262d;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-      .vent .ttl{font-size:.82rem;font-weight:700;color:#e6edf3}
-      .vent .sub{font-size:.62rem;color:#c9d1d9;margin-top:2px}
-      .vent .tmp{font-size:.56rem;color:#8b949e;margin-top:2px}
-      .vent .st{margin-left:auto;align-self:flex-start;font-size:.56rem;font-weight:700;padding:3px 10px;border-radius:10px;border:1px solid #30363d;color:#8b949e;background:#161b22}
-      .vent .kpi{display:grid;grid-template-columns:repeat(3,1fr);margin:12px 0 10px;text-align:center}
-      .vent .kpi .v{font-size:1rem;font-weight:800;color:#e6edf3}
-      .vent .kpi .v small{font-size:.55rem;color:#8b949e;font-weight:600;margin-left:2px}
-      .vent .kpi .l{font-size:.46rem;color:#8b949e;letter-spacing:1px;text-transform:uppercase;margin-top:1px}
-      .vent .fans{display:grid;grid-template-columns:repeat(auto-fit,minmax(70px,1fr));gap:8px}
-      .vent .fan{background:#161b22;border:1px solid #21262d;border-radius:12px;padding:8px 4px;text-align:center}
-      .vent .fan .l{font-size:.48rem;color:#8b949e;letter-spacing:1px;text-transform:uppercase;margin:3px 0 1px}
-      .vent .fan .v{font-size:.8rem;font-weight:800;color:#e6edf3;font-variant-numeric:tabular-nums}
+      .cch{margin-top:10px;background:#0d1117;border:1px solid #21262d;border-radius:10px;padding:8px 8px 6px}
+      .cch-h{display:flex;justify-content:space-between;align-items:baseline;font-size:.5rem;letter-spacing:1px;text-transform:uppercase;color:#8b949e;margin-bottom:4px}
+      .cch-h #cChartInfo{text-transform:none;letter-spacing:0}
+      .cch-w{position:relative;touch-action:pan-y}
+      .cch-tip{display:none;position:absolute;top:4px;pointer-events:none;background:rgba(22,27,34,.95);border:1px solid #30363d;border-radius:8px;padding:6px 8px;font-size:.6rem;color:#c9d1d9;min-width:110px;box-shadow:0 4px 14px rgba(0,0,0,.5);z-index:2}
+      .cch-tip .tt{font-weight:800;color:#e6edf3;margin-bottom:3px}
+      .cch-tip div{display:flex;align-items:center;gap:5px;white-space:nowrap}
+      .cch-tip b{margin-left:auto;padding-left:8px;font-variant-numeric:tabular-nums}
+      .cch-tip i,.cch-leg i{display:inline-block;width:8px;height:8px;border-radius:2px;flex-shrink:0}
+      .cch-tip i.tot,.cch-leg i.tot{background:none;border-top:2px dashed #e6edf3;height:0;border-radius:0;margin-top:2px}
+      .cch-leg{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:5px;font-size:.56rem;color:#8b949e}
+      .cch-leg span{display:inline-flex;align-items:center;gap:4px}
+      .cch-leg b{color:#c9d1d9;font-weight:600}
+      .vent{--vc:#8b949e;background:linear-gradient(160deg,color-mix(in srgb,var(--vc) 10%,#0d1117),#0d1117 70%);border:1px solid color-mix(in srgb,var(--vc) 35%,#21262d);border-radius:10px;padding:9px;transition:border-color .5s,background .5s}
+      .vrow{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+      .vico{position:relative;width:40px;height:40px;flex-shrink:0;border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--vc);
+            background:color-mix(in srgb,var(--vc) 14%,#161b22);border:1px solid color-mix(in srgb,var(--vc) 30%,#21262d)}
+      .vico .vslash{position:absolute;inset:0;margin:auto}
+      .vico.vpCool{animation:vpulse 2s ease-in-out infinite}.vico.vpWarm{animation:vpulse 1.6s ease-in-out infinite}.vico.vpHot{animation:vpulse 1.1s ease-in-out infinite}
+      @keyframes vpulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--vc) 35%,transparent)}70%{box-shadow:0 0 0 10px transparent}100%{box-shadow:0 0 0 0 transparent}}
+      .vtxt{min-width:0;flex:1}
+      .vsub{font-size:.66rem;font-weight:700;color:color-mix(in srgb,var(--vc) 55%,#e6edf3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .vtmp{font-size:.56rem;color:#8b949e;margin-top:2px}
+      .vpill{font-size:.5rem;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 9px;border-radius:10px;color:var(--vc);border:1px solid color-mix(in srgb,var(--vc) 55%,transparent);background:color-mix(in srgb,var(--vc) 10%,transparent);white-space:nowrap}
+      .vgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(58px,1fr));gap:4px}
+      .vk{text-align:center;background:#0d1117;border:1px solid #21262d;border-radius:8px;padding:5px 2px}
+      .vk .v{font-size:.74rem;font-weight:700;color:#c9d1d9;font-variant-numeric:tabular-nums}
+      .vk .v small{font-size:.5rem;color:#8b949e;margin-left:1px}
+      .vk .l{font-size:.44rem;color:#8b949e;letter-spacing:1px;text-transform:uppercase;margin-top:1px}
+      .vfi{display:flex;align-items:center;justify-content:center;gap:3px;color:#8b949e}
     </style>
     <div style="background:#161b22;border:1px solid #21262d;border-radius:12px;padding:13px;box-shadow:0 4px 20px rgba(0,0,0,.4);width:100%;box-sizing:border-box;">
       <div class="ct hdr">⚡ <span id="cardTitle">${cardTitle}</span>
@@ -1490,6 +1739,7 @@ class FFlowCard extends HTMLElement {
         <linearGradient id="mbCapGrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#2d333b"/><stop offset="50%" stop-color="#8b949e"/><stop offset="100%" stop-color="#2d333b"/></linearGradient>
         <linearGradient id="mbSheenGrad" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="rgba(255,255,255,0)"/><stop offset="50%" stop-color="rgba(255,255,255,.35)"/><stop offset="100%" stop-color="rgba(255,255,255,0)"/></linearGradient>
         <clipPath id="mbClip"><rect x="11" y="132" width="46" height="107" rx="10"/></clipPath>
+        <filter id="gridNeon" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="1.6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
         <filter id="battGlowBolt"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
         <filter id="iconGlowOrange" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="10" result="b"/><feFlood flood-color="rgba(255,140,0,0.6)" result="c"/><feComposite in="c" in2="b" operator="in" result="d"/><feMerge><feMergeNode in="d"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
         <filter id="iconGlowBlue" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="10" result="b"/><feFlood flood-color="rgba(30,144,255,0.6)" result="c"/><feComposite in="c" in2="b" operator="in" result="d"/><feMerge><feMergeNode in="d"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
@@ -1536,7 +1786,28 @@ class FFlowCard extends HTMLElement {
 
       ${battIconSection}
 
-      <g id="gridIconImg" transform="translate(399,133)" style="opacity:1"><image href="${iconPath}/grid-icon.png" x="0" y="0" width="121" height="121" preserveAspectRatio="xMidYMid meet"/></g>
+      ${this.config.grid_icon_style === 'classic'
+        ? `<g id="gridIconImg" transform="translate(399,133)" style="opacity:1"><image href="${iconPath}/grid-icon.png" x="0" y="0" width="121" height="121" preserveAspectRatio="xMidYMid meet"/></g>`
+        : `<g id="gridIconImg" data-modern="1" transform="translate(399,133)" style="color:#8b949e;transition:color .5s">
+        <ellipse cx="61" cy="111" rx="42" ry="7" fill="none" stroke="currentColor" stroke-opacity=".35" stroke-width="1.2"/>
+        <ellipse cx="61" cy="111" rx="26" ry="4" fill="currentColor" fill-opacity=".14"/>
+        <ellipse cx="61" cy="111" rx="42" ry="7" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="6 10" opacity=".8">
+          <animate attributeName="stroke-dashoffset" from="0" to="-32" dur="3s" repeatCount="indefinite"/></ellipse>
+        <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" filter="url(#gridNeon)">
+          <path d="M45,108 L57,26 L61,10 L65,26 L77,108" stroke-width="2.2"/>
+          <path d="M28,34 H94 M36,54 H86" stroke-width="2.2"/>
+          <path d="M53,40 L69,54 M69,40 L53,54 M51,62 L71,80 M71,62 L51,80 M48,86 L74,106 M74,86 L48,106 M51,62 H71 M48,86 H74" stroke-width="1.1" stroke-opacity=".75"/>
+        </g>
+        <g fill="currentColor"><circle cx="30" cy="39" r="2.2"/><circle cx="92" cy="39" r="2.2"/><circle cx="38" cy="59" r="2"/><circle cx="84" cy="59" r="2"/>
+          <circle cx="61" cy="10" r="2.4"><animate attributeName="opacity" values="1;.3;1" dur="1.6s" repeatCount="indefinite"/></circle></g>
+        <g fill="none" stroke="currentColor" stroke-width="1" stroke-opacity=".55">
+          <path d="M92,39 Q106,48 119,43"/><path d="M84,59 Q102,68 119,63"/>
+        </g>
+        <g id="gridWires" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="3 14" opacity="0">
+          <path d="M92,39 Q106,48 119,43"><animate attributeName="stroke-dashoffset" from="0" to="-34" dur="1.2s" repeatCount="indefinite"/></path>
+          <path d="M84,59 Q102,68 119,63"><animate attributeName="stroke-dashoffset" from="0" to="-34" dur="1.2s" repeatCount="indefinite"/></path>
+        </g>
+      </g>`}
       <text id="fcGridVal" x="445" y="269" text-anchor="middle" font-size="13" font-weight="700" fill="#e05c00">-- W</text>
       <text id="gridImportVal" x="397" y="165" text-anchor="middle" font-size="10" font-weight="600" fill="#cde">-- kWh</text>
       <text id="gridExportVal" x="397" y="192" text-anchor="middle" font-size="10" font-weight="600" fill="#cde" style="display:none">-- kWh</text>
@@ -1755,7 +2026,16 @@ class FFlowCard extends HTMLElement {
     const battIconWrap = getEl('battIconWrap');
     if (battIconWrap) { battIconWrap.setAttribute('filter', absPwr1 >= 50 ? 'url(#iconGlowBlue)' : ''); }
     const gridImg = getEl('gridIconImg');
-    if (gridImg) { gridImg.style.opacity = Math.abs(gridActive) < 10 ? '0.4' : '1'; gridImg.setAttribute('filter', Math.abs(gridActive) >= 50 ? 'url(#iconGlowOrange)' : ''); }
+    if (gridImg && gridImg.dataset.modern) {
+      const gCol = gridActive > 10 ? '#FF2929' : gridActive < -10 ? '#2ecc71' : '#8b949e';
+      gridImg.style.color = gCol;
+      const wires = getEl('gridWires');
+      if (wires) {
+        wires.setAttribute('opacity', Math.abs(gridActive) > 10 ? '1' : '0');
+        // dots run toward the tower when importing, away from it when exporting
+        wires.querySelectorAll('animate').forEach(a => { a.setAttribute('from', gridActive > 10 ? '-34' : '0'); a.setAttribute('to', gridActive > 10 ? '0' : '-34'); });
+      }
+    } else if (gridImg) { gridImg.style.opacity = Math.abs(gridActive) < 10 ? '0.4' : '1'; gridImg.setAttribute('filter', Math.abs(gridActive) >= 50 ? 'url(#iconGlowOrange)' : ''); }
     const homeImg = getEl('homeIconImg');
     if (homeImg) { homeImg.style.opacity = load > 10 ? '1' : '0.7'; homeImg.setAttribute('filter', load > 10 ? 'url(#iconGlowOrange)' : ''); }
 
