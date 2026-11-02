@@ -5,7 +5,7 @@
 [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
 [![Release](https://img.shields.io/github/v/release/fabiustek/f-flow-card)](https://github.com/fabiustek/f-flow-card/releases)
 
-Versione attuale: **v1.6.0** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
+Versione attuale: **v1.7.0** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
 
 <p align="center">
   <img src="docs/images/card-overview.png" alt="F-Flow Card con tutte le sezioni attive" width="480">
@@ -44,7 +44,7 @@ Versione attuale: **v1.6.0** · Fork di [k-flow-card](https://github.com/thekhan
 
 ## Cosa fa
 
-- **Flussi animati** fotovoltaico → inverter → batteria / rete / casa / auto, con velocità e colori che seguono la potenza
+- **Flussi animati** a curve morbide con particelle luminose: fotovoltaico → inverter → batteria / rete / casa / auto, con velocità e colori che seguono la potenza
 - **Sole e luna** che si muovono su un arco in base all'ora reale (`sun.sun`), con alba e tramonto
 - **Batteria a segmenti** colorata in base al SOC, con scia che sale in carica e scende in scarica
 - **Traliccio luminoso**: rosso quando prelevi, verde quando immetti, barrato quando sei fuori rete
@@ -53,11 +53,11 @@ Versione attuale: **v1.6.0** · Fork di [k-flow-card](https://github.com/thekhan
 - **Utilizzatori** con icona, colore e un disco stile contatore Ferraris che gira in base al consumo
 - **Grafico dei consumi** delle ultime 24 ore: chi ha consumato e quando
 - **Ventilazione inverter** con livelli termici, temperature, PWM e ventole animate
-- **Autonomia** della batteria, energia residua, barra delle fonti di energia, modalità EMS
+- **Autonomia** fino a un SOC minimo a scelta (es. 20%) e **tempo alla ricarica**, energia residua, barra delle fonti di energia, modalità EMS
 - **Wallbox e auto** disegnate accanto alla casa, con stato, potenza, SOC dell'auto e tempo alla carica completa
 - **Leggibile anche da telefono**: se la card è stretta, i riquadri vanno su 3 colonne e le etichette si ingrandiscono
 - **Sezioni richiudibili** (Inverter, Utilizzatori, Ventilazione) con riepilogo su una riga e flag 📌 per tenerle sempre aperte
-- Supporto per **due batterie** e **stringhe FV aggiuntive** (FV3/FV4)
+- Supporto per **due batterie** e **stringhe FV aggiuntive** (FV3 sulla falda sinistra, FV4 sulla destra)
 - **Editor visuale** completo in italiano: non serve scrivere YAML
 - Un solo file JavaScript, nessuna dipendenza
 
@@ -111,16 +111,30 @@ Tutte le funzioni aggiuntive sono facoltative: se non le attivi, non compaiono.
 
 - **In alto**: titolo, indicatore **IN RETE / FUORI RETE** e chip della **modalità EMS** (se configurati).
 - **Arco del sole**: alba, mezzogiorno e tramonto di oggi; l'etichetta gialla mostra la produzione fotovoltaica totale.
-- **Batteria** a sinistra: SOC, tensione, potenza e corrente, stato **CARICA / SCARICA / RIPOSO**. Sotto: **autonomia** (tempo residuo, oppure tempo alla carica completa) ed **energia residua**.
+- **Batteria** a sinistra: SOC, tensione, potenza e corrente, stato **CARICA / SCARICA / RIPOSO**. La scia bianca nella batteria sale quando si carica e scende quando si scarica.
+- **Pannello autonomia** sotto la batteria, allineato al badge:
+  - in **scarica** mostra **AUTONOMIA**: il tempo che resta fino al **SOC minimo** che scegli (es. "2h 36m · fino al 20%");
+  - in **carica** mostra **TEMPO ALLA RICARICA**: il tempo per arrivare al **SOC obiettivo** (es. "fino al 100%");
+  - a riposo mostra "batteria a riposo". Sotto c'è l'**energia residua** in kWh.
+- **Flussi**: curve morbide con particelle luminose che scorrono nella direzione dell'energia, più veloci quando la potenza sale.
 - **Inverter** al centro: temperatura e percentuale di carico. Si può sostituire con una foto (`inverter_image`).
 - **Rete** a destra: potenza istantanea, energia prelevata (▼) e immessa (▲) oggi. Sotto, la barra **Fonti energia** mostra in proporzione solare, carica, scarica e rete.
 - **Barre FV / POT**: produzione rispetto alla potenza massima dell'impianto e potenza della batteria rispetto a quella dell'inverter.
 
 Nella sezione **🎨 Layout e intestazione** puoi cambiare titolo, attivare la barra delle fonti, il pannello autonomia, l'immagine dell'inverter e tornare alle icone classiche (batteria, rete, casa).
 
+**Autonomia fino a un SOC minimo** (sezione **⚙️ Generale**):
+1. **SOC minimo per l'autonomia** (`battery_reserve_soc`): per esempio `20` se l'inverter non scarica la batteria sotto il 20%. L'autonomia viene calcolata solo sull'energia sopra quella soglia. Con `0` (predefinito) arriva fino a batteria vuota.
+2. **SOC obiettivo per il tempo alla ricarica** (`battery_target_soc`): per esempio `100`, oppure `90` se carichi fino al 90%.
+3. Serve anche la **capacità della batteria** nella stessa sezione.
+
+Esempio: SOC 45%, soglia 20%, batteria da 16 kWh, scarica a 1533 W → 25% di 16 kWh = 4 kWh utilizzabili → **2h 36m**.
+
 ### Casa a due falde
 
-La casa ha due falde di pannelli: **FV1 sulla sinistra** e **FV2 sulla destra**. Ogni falda si illumina di giallo in base alla produzione della propria stringa, e il valore è scritto accanto alla falda. Sotto la casa c'è il consumo istantaneo. La casa prende il colore della fonte che la alimenta: giallo fotovoltaico, arancione batteria, rosso rete. Le finestre si accendono quando c'è consumo.
+La casa ha due falde di pannelli: **FV1 sulla sinistra** e **FV2 sulla destra**. Ogni falda si illumina di giallo in base alla produzione della propria stringa, e il valore è scritto accanto alla falda. Sotto la casa c'è il consumo istantaneo, e l'**anello alla base gira più veloce quanto più la casa consuma** (fermo sotto i 10 W). La casa prende il colore della fonte che la alimenta: giallo fotovoltaico, arancione batteria, rosso rete. Le finestre si accendono quando c'è consumo.
+
+**Stringhe aggiuntive FV3 e FV4**: attivale nella sezione **☀️ Stringhe FV aggiuntive** (＋ Attiva). **FV3** compare sotto FV1, sul lato della falda sinistra; **FV4** sotto FV2, sul lato della falda destra. Ogni falda si illumina con la somma delle sue stringhe (sinistra FV1 + FV3, destra FV2 + FV4). Con l'icona casa classica, FV3 e FV4 restano nella colonna di sinistra.
 
 Se nel tuo impianto le stringhe sono al contrario, basta scambiare i sensori FV1 e FV2 nella sezione **☀️ Fotovoltaico**. Per tornare all'immagine vecchia: **Icona casa classica** (`home_icon_style: classic`).
 
@@ -224,7 +238,7 @@ Con **Riquadri statistiche batteria** attivo (predefinito) compaiono: temperatur
 
 <p align="center"><img src="docs/images/wallbox.png" alt="Wallbox e auto in carica" width="480"></p>
 
-A destra della casa compaiono la **colonnina** e l'**auto**. Quando l'auto si carica, un flusso va dalla casa alla colonnina e il cavo si anima. Sopra l'auto ci sono la potenza di ricarica, lo stato, il SOC dell'auto (anche come barra sotto l'auto), la corrente e il tempo alla carica completa.
+A destra della casa, staccate dalle stringhe FV2/FV4, compaiono la **colonnina** e l'**auto**. Quando l'auto si carica, un flusso va dalla casa alla colonnina e il cavo si anima. Sopra l'auto ci sono la potenza di ricarica, lo stato, il SOC dell'auto (anche come barra sotto l'auto), la corrente e il tempo alla carica completa.
 
 **Configurazione** (sezione **🚗 Auto elettrica / Wallbox** → **＋ Attiva**):
 1. **Potenza wallbox**: il sensore di potenza della wallbox o della presa (W o kW). È l'unico campo necessario.
@@ -304,6 +318,8 @@ today_batt_chg: sensor.today_batt_chg
 batt_dis: sensor.today_batt_dis
 battery_cap_unit: kwh
 battery_full_wh: 16
+battery_reserve_soc: 20
+battery_target_soc: 100
 
 # Layout
 _show_energy_supply: true
@@ -367,6 +383,8 @@ Tutte le opzioni si impostano dall'editor visuale; qui trovi le chiavi YAML corr
 | `battery_cap_unit` | `ah` | Unità della capacità batteria: `ah` o `kwh` |
 | `battery_full_ah` | `0` | Capacità in Ah (se `ah`) |
 | `battery_full_wh` | `0` | Capacità **in kWh** (se `kwh`) |
+| `battery_reserve_soc` | `0` | SOC minimo (%) fino a cui calcolare l'autonomia |
+| `battery_target_soc` | `100` | SOC obiettivo (%) per il tempo alla ricarica |
 | `pv_max_power` | `7500` | Potenza massima dell'impianto FV (W) |
 | `inverter_max_power` | `6000` | Potenza massima dell'inverter (W) |
 | `_show_energy_supply` | `false` | Barra delle fonti di energia |
@@ -384,7 +402,7 @@ Tutte le opzioni si impostano dall'editor visuale; qui trovi le chiavi YAML corr
 |---|---|---|
 | `pv1_power` / `pv2_power` | sensori GoodWe | Potenza delle stringhe FV1 (falda sinistra) e FV2 (falda destra) |
 | `_show_pv_extra` | `false` | Mostra le stringhe FV3 e FV4 |
-| `pv3_power` / `pv4_power` | `''` | Potenza delle stringhe FV3 e FV4 |
+| `pv3_power` / `pv4_power` | `''` | Potenza delle stringhe FV3 (sotto FV1, falda sinistra) e FV4 (sotto FV2, falda destra) |
 | `pv_total_power` | `sensor.goodwe_pv_power` | Potenza FV totale (se vuota: somma delle stringhe) |
 | `today_pv` | `sensor.goodwe_today_s_pv_generation` | Produzione di oggi (kWh) |
 | `total_pv_gen_entity` | `sensor.goodwe_total_pv_generation` | Produzione totale (kWh) |
@@ -502,7 +520,7 @@ Nella sezione Etichette la scelta di un'entità alternativa si sblocca solo dopo
 
 A ogni nuova versione viene creata automaticamente una **release** su GitHub e HACS ti propone l'aggiornamento in Home Assistant. Dopo l'aggiornamento ricarica il browser con `Ctrl + Shift + R`.
 
-Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.6.0**.
+Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.7.0**.
 
 ---
 
@@ -539,7 +557,13 @@ Per sapere quale versione stai usando, apri la console del browser (`F12`): comp
 - Usa nomi di icone `mdi:` validi (es. `mdi:washing-machine`); nell'editor puoi cercarle per nome.
 
 **L'autonomia mostra `--`**
-- Serve la capacità della batteria nella sezione **⚙️ Generale** e un sensore di potenza della batteria valido. Se la batteria è a riposo non c'è una stima.
+- Serve la capacità della batteria nella sezione **⚙️ Generale** e un sensore di potenza della batteria valido. Se la batteria è a riposo non c'è una stima ("batteria a riposo").
+
+**L'autonomia sembra troppo lunga o troppo corta**
+- Controlla **SOC minimo per l'autonomia** in **⚙️ Generale**: deve corrispondere alla soglia sotto cui il tuo inverter non scarica la batteria. Se il SOC è già sotto la soglia, l'autonomia è 0.
+
+**In carica o in scarica, la scia della batteria va nel verso sbagliato**
+- La direzione segue il segno della potenza della batteria: se anche il badge CARICA/SCARICA è invertito, attiva **Inverti segno potenza batteria** nella sezione **🔋 Batteria principale**.
 
 **Segnalare un problema**
 - Apri una issue su [GitHub](https://github.com/fabiustek/f-flow-card/issues) con versione di Home Assistant, versione della card, eventuali errori della console del browser e la parte di YAML interessata.
@@ -547,6 +571,16 @@ Per sapere quale versione stai usando, apri la console del browser (`F12`): comp
 ---
 
 ## Registro delle modifiche
+
+### v1.7.0
+- **Autonomia fino a un SOC minimo** (`battery_reserve_soc`) e **tempo alla ricarica** fino a un SOC obiettivo (`battery_target_soc`); l'etichetta passa da AUTONOMIA a TEMPO ALLA RICARICA in base alla direzione della batteria.
+- **Flussi più morbidi**: curve invece di angoli e particelle luminose (batteria, rete, casa, wallbox).
+- La **scia nella batteria** sale in carica e scende in scarica.
+- **Wallbox e auto** più piccole e staccate da FV2, con le informazioni subito sopra l'auto.
+- **FV3 e FV4** accanto alla casa, sotto FV1 e FV2; ogni falda si illumina con le sue stringhe.
+- **Anello sotto la casa** che gira alla velocità del consumo.
+- Testi del pannello autonomia allineati al badge CARICA/SCARICA.
+- Corretto: dopo una modifica della configurazione la scia sole → inverter e la barra FV restavano vuote finché la produzione non cambiava.
 
 ### v1.6.0
 - **Wallbox rifatta**: potenza, SOC e corrente si vedono sempre; senza sensore di stato la card capisce dalla potenza quando l'auto è in carica; più stati riconosciuti (collegata, in pausa…).
@@ -595,4 +629,4 @@ Per sapere quale versione stai usando, apri la console del browser (`F12`): comp
 
 ---
 
-*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.6.0*
+*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.7.0*
