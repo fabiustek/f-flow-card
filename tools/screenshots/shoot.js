@@ -88,6 +88,14 @@ const MDI = JSON.parse(fs.readFileSync(path.join(__dirname, 'icons.json'), 'utf8
   // camera section with the PTZ pad
   await shot('camera.png', '#camBox');
 
+  // tab menu: settled on Inverter, then frozen mid-flight on the way to Statistiche
+  await open('tabs');
+  await shot('tabs.png', '#tScroll', '.tpanel:not([hidden])');
+  await page.evaluate(() => window._card.shadowRoot.querySelector('.tab[data-k="stats"]').click());
+  await page.waitForTimeout(140);
+  await page.evaluate(() => { cancelAnimationFrame(window._card._gooRaf); window._card._gooRaf = null; });
+  await shot('tabs-goo.png', '#tScroll');
+
   // night sky with stars, and a thunderstorm by day
   await open('night');
   await page.waitForTimeout(1200);

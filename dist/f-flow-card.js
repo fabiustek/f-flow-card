@@ -1,5 +1,16 @@
-// f-flow-card.js – Unified Edition v1.10.1
-const FFC_VERSION = '1.10.1';
+// f-flow-card.js – Unified Edition v1.11.0
+const FFC_VERSION = '1.11.0';
+// Changes v1.11.0:
+//   NEW  – Tab menu for the sections below the flow (default): one section open at a time, closed on
+//           load (or last used / fixed via tabs_start). The active-tab indicator is a gooey SVG droplet
+//           driven by a two-spring simulation (stiff leader + soft follower → stretch and settle);
+//           panels slide/fade in from the side of the new tab and the height animates.
+//           sections_layout: stack restores the stacked collapsible sections.
+//   NEW  – background_opacity (0–100 %) and background_blur (frosted glass) for the card background.
+//   CHG  – EMS mode moved into the animated graphic as a small badge above the sky (the SVG grows
+//           upward); holding it opens the list of the select's options to switch mode (with confirm).
+// Changes v1.10.2:
+//   DOCS – README images use absolute raw.githubusercontent.com URLs so they also show inside HACS.
 // Changes v1.10.1:
 //   FIX  – Section title no longer reads "Inverter Inverter" when the inverter name already says Inverter.
 //   FIX  – Classic house: FV1–FV4 labels moved below the autonomy panel (they overlapped "Energia residua").
@@ -209,6 +220,7 @@ class FFlowCardEditor extends HTMLElement {
     if (key === 'grid_icon_classic') { key = 'grid_icon_style'; value = value ? 'classic' : 'modern'; }
     if (key === 'home_icon_classic') { key = 'home_icon_style'; value = value ? 'classic' : 'modern'; }
     if (key === 'camera_snapshot') { key = 'camera_mode'; value = value ? 'snapshot' : 'live'; }
+    if (key === 'sections_stack') { key = 'sections_layout'; value = value ? 'stack' : 'tabs'; }
     if (this._config[key] === value) return;
     this._config = { ...this._config, [key]: value };
     this._fireChanged();
@@ -518,6 +530,7 @@ class FFlowCardEditor extends HTMLElement {
         : key === 'grid_icon_classic' ? cfg.grid_icon_style === 'classic'
         : key === 'home_icon_classic' ? cfg.home_icon_style === 'classic'
         : key === 'camera_snapshot' ? cfg.camera_mode === 'snapshot'
+        : key === 'sections_stack' ? cfg.sections_layout === 'stack'
         : cfg[key] === undefined ? defaultOn : !!cfg[key];
       cb.style.cssText = 'opacity:0;width:0;height:0;position:absolute;';
       const track = document.createElement('span');
@@ -631,14 +644,33 @@ class FFlowCardEditor extends HTMLElement {
       return wrap;
     })();
 
+    // v1.11.0: which tab opens when the page loads
+    const tabStart = (() => {
+      const wrap = document.createElement('div');
+      wrap.style.marginBottom = '14px';
+      const lbl = document.createElement('div');
+      lbl.className = 'row-label';
+      lbl.textContent = 'Menu a schede: all’apertura della pagina';
+      const sel = document.createElement('select');
+      sel.style.cssText = 'width:100%;padding:8px;border-radius:6px;border:1px solid var(--divider-color,rgba(0,0,0,.3));background:var(--input-fill-color,var(--secondary-background-color));color:var(--primary-text-color);font:inherit;';
+      [['none', 'Tutte chiuse'], ['last', 'Riapri l’ultima scheda usata'], ...FFlowCard.SECTIONS.map(([k, n]) => [k, 'Apri sempre: ' + n])].forEach(([v, t]) => {
+        const o = document.createElement('option'); o.value = v; o.textContent = t; if ((cfg.tabs_start || 'none') === v) o.selected = true; sel.appendChild(o);
+      });
+      sel.addEventListener('change', () => this._set('tabs_start', sel.value));
+      wrap.appendChild(lbl); wrap.appendChild(sel);
+      return wrap;
+    })();
+
     shell.appendChild(makeSection('layout', '🎨', 'Layout e intestazione', [
       textField('card_title', 'Titolo della card', 'Flusso Energia'),
       picker('grid_status_entity', 'Stato rete (indicatore IN RETE / FUORI RETE, es. binary_sensor.deye_grid)', true),
       picker('grid_switch_to_off', 'Comando per passare FUORI RETE (es. switch.studio_off_grid)', true),
       picker('grid_switch_to_on',  'Comando per tornare IN RETE (es. switch.studio_on_grid)', true),
       switchRow('grid_switch_confirm', 'Chiedi conferma prima di commutare', 'Tieni premuto l’indicatore o il traliccio per commutare', true),
-      picker('ems_mode_entity',    'Modalità EMS / di lavoro (sotto il titolo)', true),
+      picker('ems_mode_entity',    'Modalità EMS / di lavoro (badge nel cielo; se è un select, tieni premuto per cambiarla)', true),
       picker('weather_entity',     'Meteo (animazioni nel cielo: nuvole, pioggia, neve, temporale…)', true),
+      numberField('background_opacity', 'Opacità dello sfondo della card (0 = trasparente, 100 = pieno)', 0, 100, 5, '%'),
+      switchRow('background_blur', 'Sfoca ciò che sta dietro la card', 'Effetto vetro smerigliato quando lo sfondo è trasparente'),
       textField('inverter_image', 'URL immagine inverter (sostituisce il riquadro INV)', '/local/sigenergy-inverter.png'),
       divider(),
       switchRow('_show_energy_supply',   'Barra fonti energia', 'Barra Solare / Carica / Scarica / Rete a destra'),
@@ -646,6 +678,8 @@ class FFlowCardEditor extends HTMLElement {
       switchRow('_daily_tiles_extended', '6 riquadri giornalieri', 'FV, carica, scarica, prelievo, immissione, consumo'),
       switchRow('home_icon_classic', 'Icona casa classica', 'Usa la vecchia immagine invece della casa a due falde con FV1 / FV2'),
       divider(),
+      switchRow('sections_stack', 'Sezioni impilate (vecchio stile)', 'Spento: menu a schede con l’animazione a goccia, una sezione aperta alla volta'),
+      tabStart,
       orderList,
       divider(),
       switchRow('grid_icon_classic', 'Icona rete classica', 'Usa la vecchia immagine del traliccio invece di quella luminosa'),
@@ -1098,6 +1132,10 @@ class FFlowCard extends HTMLElement {
       consumers_chart_legend: true,
       grid_icon_style: 'modern',
       sections_order: ['bms', 'inv', 'cons', 'vent', 'stats', 'cam'],
+      sections_layout: 'tabs',
+      background_opacity: 100,
+      background_blur: false,
+      tabs_start: 'none',
       home_icon_style: 'modern',
       grid_switch_to_off: '',
       grid_switch_to_on: '',
@@ -1296,7 +1334,134 @@ class FFlowCard extends HTMLElement {
   }
   _orderSections(chunks) {
     const strip = (h) => String(h || '').trim().replace(/^<div class="dv"><\/div>/, '').trim();
-    return FFlowCard.sectionOrder(this.config).map(k => strip(chunks[k])).filter(Boolean).join('<div class="dv"></div>');
+    const keys = FFlowCard.sectionOrder(this.config).filter(k => strip(chunks[k]));
+    if (!this._tabsMode()) return keys.map(k => strip(chunks[k])).join('<div class="dv"></div>');
+    // v1.11.0: tab menu with a gooey, spring-driven indicator; one panel open at a time
+    if (!keys.length) return '';
+    const L = { bms: ['🔋', 'Batteria'], inv: ['☀️', 'Inverter'], cons: ['🔌', 'Utilizzatori'], vent: ['🌀', 'Ventilazione'], stats: ['📈', 'Statistiche'], cam: ['📹', 'Video'] };
+    const tabs = keys.map(k => `<button class="tab" data-k="${k}"><span class="ti">${L[k][0]}</span><span>${L[k][1]}</span></button>`).join('');
+    const panels = keys.map(k => `<div class="tpanel" data-k="${k}" hidden>${strip(chunks[k])}</div>`).join('');
+    return `<div class="tabs" id="tScroll"><div class="ttrack" id="tTrack">
+        <svg class="tgoo" id="tGoo" width="10" height="10"><defs>
+          <filter id="gooF" x="-20%" y="-60%" width="140%" height="220%" color-interpolation-filters="sRGB">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="b"/>
+            <feColorMatrix in="b" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -9" result="goo"/>
+            <feMorphology in="goo" operator="erode" radius="1.6" result="inner"/>
+            <feComposite in="goo" in2="inner" operator="out" result="ring"/>
+            <feFlood flood-color="#8fb4ff" result="c1"/><feComposite in="c1" in2="ring" operator="in" result="ringC"/>
+            <feGaussianBlur in="ringC" stdDeviation="3.2" result="glow"/>
+            <feFlood flood-color="#7c6cff" flood-opacity=".22" result="c2"/><feComposite in="c2" in2="goo" operator="in" result="fillC"/>
+            <feMerge><feMergeNode in="glow"/><feMergeNode in="glow"/><feMergeNode in="fillC"/><feMergeNode in="ringC"/></feMerge>
+          </filter></defs>
+          <g id="tBlobs" filter="url(#gooF)" opacity="0"><rect id="tBlobB" fill="#fff"/><rect id="tBlobA" fill="#fff"/></g>
+        </svg>${tabs}</div></div>
+      <div class="tpanels" id="tPanels">${panels}</div>`;
+  }
+  _tabsMode() { return this.config.sections_layout !== 'stack'; }
+
+  _bindTabs() {
+    const root = this.shadowRoot;
+    const track = root.getElementById('tTrack');
+    if (!track) return;
+    const keys = [...root.querySelectorAll('.tab[data-k]')].map(b => b.dataset.k);
+    root.querySelectorAll('.tab[data-k]').forEach(b => b.addEventListener('click', () => this._tabSelect(b.dataset.k)));
+    // which tab is open: kept across re-renders; on load closed, last used or a fixed one
+    if (this._tabOpen === undefined) {
+      const start = this.config.tabs_start || 'none';
+      this._tabOpen = start === 'last' ? this._lsGet('tab') : start === 'none' ? null : start;
+    }
+    if (!keys.includes(this._tabOpen)) this._tabOpen = null;
+    if (this._gooRaf) { cancelAnimationFrame(this._gooRaf); this._gooRaf = null; }
+    this._goo = null;
+    this._tabSelect(this._tabOpen, true);
+    if (window.ResizeObserver) {
+      this._tabRO && this._tabRO.disconnect();
+      this._tabRO = new ResizeObserver(() => this._gooTarget(true));
+      this._tabRO.observe(track);
+    }
+  }
+
+  _tabSelect(k, instant) {
+    const root = this.shadowRoot;
+    const prev = instant ? null : this._tabOpen;
+    const next = (!instant && k === prev) ? null : k;   // tapping the open tab closes it
+    this._tabOpen = next;
+    if (!instant) this._lsSet('tab', next || '');
+    root.querySelectorAll('.tab[data-k]').forEach(b => b.classList.toggle('on', b.dataset.k === next));
+    const wrap = root.getElementById('tPanels');
+    const panels = [...root.querySelectorAll('.tpanel[data-k]')];
+    const oldH = wrap.offsetHeight;
+    panels.forEach(p => { p.hidden = p.dataset.k !== next; });
+    const np = panels.find(p => p.dataset.k === next);
+    if (!instant) {
+      const newH = np ? wrap.scrollHeight : 0;
+      wrap.style.height = oldH + 'px';
+      void wrap.offsetHeight;
+      wrap.style.height = newH + 'px';
+      const done = () => { wrap.style.height = next ? '' : '0px'; wrap.removeEventListener('transitionend', done); };
+      wrap.addEventListener('transitionend', done);
+      setTimeout(done, 450);
+      if (np && np.animate) {
+        const keys = panels.map(p => p.dataset.k);
+        const dir = prev ? (keys.indexOf(next) > keys.indexOf(prev) ? 1 : -1) : 0;
+        np.animate([{ opacity: 0, transform: `translate(${dir * 28}px, ${dir ? 0 : -8}px) scale(.985)` }, { opacity: 1, transform: 'none' }],
+          { duration: 360, easing: 'cubic-bezier(.2,.8,.2,1)' });
+      }
+    } else wrap.style.height = next ? '' : '0px';
+    if (next === 'cons') this._renderChart();
+    if (next === 'stats') this._renderStats();
+    if (next === 'cam') this._updateCamera();
+    this._gooTarget(instant);
+  }
+
+  // spring-driven gooey indicator: blob A (stiff) leads, blob B (soft) follows → droplet stretch
+  _gooTarget(instant) {
+    const root = this.shadowRoot;
+    const track = root.getElementById('tTrack'), svg = root.getElementById('tGoo');
+    if (!track || !svg) return;
+    svg.setAttribute('width', track.scrollWidth); svg.setAttribute('height', track.offsetHeight);
+    const btn = this._tabOpen ? root.querySelector(`.tab[data-k="${this._tabOpen}"]`) : null;
+    const g = this._goo || (this._goo = { a: { x: 0, w: 0, vx: 0, vw: 0 }, b: { x: 0, w: 0, vx: 0, vw: 0 }, op: 0, y: 0, h: 0 });
+    if (btn) {
+      g.tx = btn.offsetLeft; g.tw = btn.offsetWidth; g.y = btn.offsetTop; g.h = btn.offsetHeight; g.top = 1;
+      if (instant || g.op === 0) { ['a', 'b'].forEach(n => { g[n].x = g.tx; g[n].w = g.tw; g[n].vx = g[n].vw = 0; }); }
+      // keep the chosen tab visible when the bar scrolls
+      const sc = root.getElementById('tScroll');
+      if (sc && !instant) {
+        const l = btn.offsetLeft - 12, r = btn.offsetLeft + btn.offsetWidth + 12;
+        if (l < sc.scrollLeft) sc.scrollTo({ left: l, behavior: 'smooth' });
+        else if (r > sc.scrollLeft + sc.clientWidth) sc.scrollTo({ left: r - sc.clientWidth, behavior: 'smooth' });
+      }
+    } else g.top = 0;
+    if (instant) { g.op = g.top; this._gooDraw(); return; }
+    if (this._gooRaf) return;
+    let last = performance.now();
+    const step = (now) => {
+      const f = Math.min(3, (now - last) / 16.67); last = now;
+      const spring = (o, kx, dx) => {
+        o.vx = (o.vx + (g.tx - o.x) * kx * f) * Math.pow(dx, f); o.x += o.vx * f;
+        o.vw = (o.vw + (g.tw - o.w) * kx * f) * Math.pow(dx, f); o.w += o.vw * f;
+      };
+      spring(g.a, 0.16, 0.66);   // leader: stiff, little overshoot
+      spring(g.b, 0.045, 0.8);   // follower: soft → the droplet stretches between them
+      g.op += (g.top - g.op) * Math.min(1, 0.18 * f);
+      this._gooDraw();
+      const still = ['a', 'b'].every(n => Math.abs(g[n].x - g.tx) < 0.3 && Math.abs(g[n].vx) < 0.05 && Math.abs(g[n].w - g.tw) < 0.3) && Math.abs(g.op - g.top) < 0.01;
+      if (still) { g.op = g.top; this._gooDraw(); this._gooRaf = null; return; }
+      this._gooRaf = requestAnimationFrame(step);
+    };
+    this._gooRaf = requestAnimationFrame(step);
+  }
+  _gooDraw() {
+    const root = this.shadowRoot, g = this._goo;
+    if (!g) return;
+    const set = (id, o) => {
+      const r = root.getElementById(id); if (!r) return;
+      r.setAttribute('x', o.x.toFixed(1)); r.setAttribute('y', g.y.toFixed(1));
+      r.setAttribute('width', Math.max(0, o.w).toFixed(1)); r.setAttribute('height', g.h.toFixed(1)); r.setAttribute('rx', (g.h / 2).toFixed(1));
+    };
+    set('tBlobA', g.a); set('tBlobB', g.b);
+    const grp = root.getElementById('tBlobs'); if (grp) grp.setAttribute('opacity', g.op.toFixed(3));
   }
 
   // ── v1.6.0: collapsible sections (Inverter / Utilizzatori / Ventilazione) ──
@@ -1312,6 +1477,7 @@ class FFlowCard extends HTMLElement {
     return this._secOpen[key];
   }
   _secHTML(key, titleHtml, bodyHtml) {
+    if (this._tabsMode()) return `<div class="sec tsec" data-sec="${key}">${bodyHtml}</div>`;
     const open = this._secIsOpen(key), pinned = this._secPinned(key);
     return `<div class="sec${open ? ' open' : ''}" data-sec="${key}">
       <div class="ct sec-h"><span class="chev">▸</span><span class="sec-t">${titleHtml}</span>
@@ -1322,7 +1488,7 @@ class FFlowCard extends HTMLElement {
     </div>`;
   }
   _bindSections() {
-    this.shadowRoot.querySelectorAll('.sec[data-sec]').forEach(sec => {
+    this.shadowRoot.querySelectorAll('.sec[data-sec]:not(.tsec)').forEach(sec => {
       const key = sec.dataset.sec;
       const head = sec.querySelector('.sec-h');
       const pin = sec.querySelector('.pin');
@@ -2301,6 +2467,61 @@ class FFlowCard extends HTMLElement {
     return null;
   }
 
+  // ── v1.11.0: EMS mode badge in the sky; hold to pick another mode (select / input_select) ──
+  _emsLabel(v) { return String(v).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); }
+  _emsOptions() {
+    const st = this._hass && this._hass.states[this.config.ems_mode_entity];
+    return (st && Array.isArray(st.attributes && st.attributes.options)) ? st.attributes.options : [];
+  }
+  _bindEms() {
+    const root = this.shadowRoot;
+    const badge = root.getElementById('emsBadge');
+    if (!badge) return;
+    const editable = /^(input_)?select\./.test(this.config.ems_mode_entity || '');
+    if (!editable) { badge.style.cursor = 'default'; return; }
+    badge.style.touchAction = 'none';
+    let timer = null;
+    const start = (ev) => {
+      if (ev.button > 0) return;
+      badge.classList.add('holding');
+      timer = setTimeout(() => { timer = null; badge.classList.remove('holding'); this._openEms(); }, 800);
+    };
+    const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } badge.classList.remove('holding'); };
+    badge.addEventListener('pointerdown', start);
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(e => badge.addEventListener(e, cancel));
+    badge.addEventListener('contextmenu', e => e.preventDefault());
+    const t = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+    t.textContent = 'Tieni premuto per cambiare la modalità EMS';
+    badge.appendChild(t);
+  }
+  _openEms() {
+    const root = this.shadowRoot;
+    const modal = root.getElementById('emsModal'), box = root.getElementById('emsOpts');
+    if (!modal || !box) return;
+    const cur = this._hass.states[this.config.ems_mode_entity]?.state;
+    const opts = this._emsOptions();
+    if (!opts.length) return;
+    let chosen = cur;
+    const esc = (t) => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    box.innerHTML = opts.map(o => `<button class="eo${o === cur ? ' on cur' : ''}" data-o="${esc(o)}">${esc(this._emsLabel(o))}${o === cur ? ' <small>attuale</small>' : ''}</button>`).join('');
+    box.querySelectorAll('.eo').forEach(b => b.addEventListener('click', () => {
+      chosen = b.dataset.o;
+      box.querySelectorAll('.eo').forEach(x => x.classList.toggle('on', x === b));
+      root.getElementById('emsOk').disabled = chosen === cur;
+    }));
+    const ok = root.getElementById('emsOk'), no = root.getElementById('emsNo');
+    ok.disabled = true;
+    ok.onclick = () => {
+      modal.style.display = 'none';
+      if (!chosen || chosen === cur) return;
+      const eid = this.config.ems_mode_entity;
+      this._hass.callService(eid.split('.')[0], 'select_option', { entity_id: eid, option: chosen });
+    };
+    no.onclick = () => { modal.style.display = 'none'; };
+    modal.dataset.mode = 'ems';
+    modal.style.display = 'flex';
+  }
+
   // ── v1.5.0: on-grid / off-grid switch (hold + confirm, like a button-card hold_action) ──
   _gridSwitchEnabled() { return !!(this.config.grid_status_entity && (this.config.grid_switch_to_off || this.config.grid_switch_to_on)); }
 
@@ -2408,6 +2629,11 @@ class FFlowCard extends HTMLElement {
     const iconPath = '/local/community/f-flow-card';    // icons served from HACS community folder
     const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const cardTitle   = esc(this.config.card_title || 'Flusso Energia');
+    // v1.11.0: card background opacity (0–100 %) and optional blur of what is behind it
+    const bgPct = this.config.background_opacity === undefined || this.config.background_opacity === '' ? 100 : Number(this.config.background_opacity);
+    const bgA = Math.max(0, Math.min(100, isFinite(bgPct) ? bgPct : 100)) / 100;
+    const bgCss = `rgba(22,27,34,${bgA.toFixed(2)})`;
+    const bgBlur = this.config.background_blur && bgA < 1 ? 'backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);' : '';
     const invImage    = this.config.inverter_image ? esc(this.config.inverter_image) : '';
     const showSupply  = !!(this.config._show_energy_supply);
     const showBackup  = !!(this.config._show_backup_panel);
@@ -2431,7 +2657,7 @@ class FFlowCard extends HTMLElement {
       <image id="invImg" href="${invImage}" x="200" y="140" width="120" height="130" preserveAspectRatio="xMidYMid meet"/>
       <text class="md" id="invTempFlow" x="322" y="238" font-size="13.5" font-weight="700" fill="#58a6ff">-- °C</text>
       <text class="md" id="invLoadPctFlow" x="322" y="257" font-size="14" font-weight="700" fill="#3ce878">--%</text>` : `
-      <rect id="fcInvRect" x="205" y="155" width="110" height="110" rx="18" fill="#161b22" stroke="#f4a93b" stroke-width="4"/>
+      <rect id="fcInvRect" x="205" y="155" width="110" height="110" rx="18" fill="${bgCss}" stroke="#f4a93b" stroke-width="4"/>
       <text id="invNameLabel" x="260" y="203" text-anchor="middle" font-size="14" font-weight="800" fill="#f4a93b" letter-spacing="1">INV</text>
       <text class="md" id="invTempFlow" x="260" y="224" text-anchor="middle" font-size="14" font-weight="700" fill="#58a6ff">-- °C</text>
       <text class="md" id="invLoadPctFlow" x="260" y="244" text-anchor="middle" font-size="14" font-weight="700" fill="#3ce878">--%</text>`;
@@ -2582,6 +2808,17 @@ class FFlowCard extends HTMLElement {
       .dv{height:1px;background:#21262d;margin:8px 0}
       .ct{font-size:.68rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#8b949e;margin-bottom:10px;display:flex;align-items:center;gap:7px}
       .ct::after{content:'';flex:1;height:1px;background:#21262d}
+      .tabs{position:relative;margin:2px -6px 4px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+      .tabs::-webkit-scrollbar{display:none}
+      .tabs{-webkit-mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 22px),transparent);mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 22px),transparent)}
+      .ttrack{position:relative;display:inline-flex;gap:5px;padding:8px 6px;min-width:100%;box-sizing:border-box;justify-content:center}
+      .tgoo{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
+      .tab{position:relative;z-index:1;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;font:inherit;font-size:.72rem;font-weight:700;letter-spacing:.2px;color:#8b949e;
+           background:rgba(22,27,34,.75);border:1px solid #30363d;border-radius:999px;padding:7px 10px;cursor:pointer;transition:color .3s,background .3s,border-color .3s;-webkit-tap-highlight-color:transparent}
+      .tab .ti{font-size:.86rem}
+      .tab.on{color:#e6edf3;background:transparent;border-color:transparent;text-shadow:0 0 8px rgba(143,180,255,.6)}
+      .tpanels{overflow:hidden;transition:height .38s cubic-bezier(.2,.8,.2,1)}
+      .tpanel{padding-top:6px}
       .sec-h{cursor:pointer;user-select:none;-webkit-user-select:none;margin-bottom:0}
       .sec-h::after{display:none}
       .sec-h .chev{display:inline-block;width:12px;transition:transform .2s;color:#8b949e}
@@ -2639,6 +2876,15 @@ class FFlowCard extends HTMLElement {
       .gmodal[data-mode=off] .gbox{color:#f39c4b;border-color:rgba(243,156,75,.45)}
       .gmodal[data-mode=on] .gbox{color:#3fb950;border-color:rgba(63,185,80,.45)}
       .gmodal[data-mode=on] .gx{display:none}
+      .gmodal[data-mode=ems] .gbox{color:#3fb950;border-color:rgba(63,185,80,.45)}
+      .gmodal[data-mode=ems] .gbtns button.ok{background:#3fb950;color:#0d1117}
+      .gbtns button:disabled{opacity:.4;cursor:default}
+      .ems-opts{display:flex;flex-direction:column;gap:6px;margin-top:8px;max-height:260px;overflow:auto}
+      .eo{font:inherit;font-size:.82rem;font-weight:600;text-align:left;padding:9px 12px;border-radius:9px;border:1px solid #30363d;background:#0d1117;color:#c9d1d9;cursor:pointer}
+      .eo small{font-size:.66rem;color:#8b949e;margin-left:6px;font-weight:500}
+      .eo.on{border-color:#3fb950;background:rgba(63,185,80,.12);color:#e6edf3}
+      .emsb .emsh{transform-box:fill-box;transform-origin:left center;transform:scaleX(0);transition:transform .1s}
+      .emsb.holding .emsh{transform:scaleX(1);transition:transform .8s linear}
       .gtitle{font-size:.74rem;letter-spacing:1.5px;text-transform:uppercase;color:#8b949e;margin:6px 0 4px}
       .gtext{font-size:.92rem;font-weight:600;color:#e6edf3;line-height:1.4}
       .gbtns{display:flex;gap:8px;margin-top:14px}
@@ -2693,7 +2939,7 @@ class FFlowCard extends HTMLElement {
       .vk .l{font-size:.6rem;color:#8b949e;letter-spacing:1px;text-transform:uppercase;margin-top:1px}
       .vfi{display:flex;align-items:center;justify-content:center;gap:3px;color:#8b949e}
     </style>
-    <div class="ffc" style="position:relative;background:#161b22;border:1px solid #21262d;border-radius:12px;padding:13px;box-shadow:0 4px 20px rgba(0,0,0,.4);width:100%;box-sizing:border-box;">
+    <div class="ffc" style="position:relative;background:${bgCss};${bgBlur}border:1px solid rgba(48,54,61,${Math.max(0.25, bgA).toFixed(2)});border-radius:12px;padding:13px;box-shadow:0 4px 20px rgba(0,0,0,${(0.4 * bgA).toFixed(2)});width:100%;box-sizing:border-box;">
       ${this._gridSwitchEnabled() ? `<div class="gmodal" id="gridModal">
         <div class="gbox">
           <svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -2706,8 +2952,12 @@ class FFlowCard extends HTMLElement {
       <div class="ct hdr">⚡ <span id="cardTitle">${cardTitle}</span>
         ${showGridStatus ? `<span id="gridStatusPill" class="pill"><span class="hold"></span><span class="dot"></span><span id="gridStatusText">--</span></span>` : ''}
         <span id="battStatusBadge" style="margin-left:auto;font-size:.64rem;font-weight:700;letter-spacing:1.5px;padding:1px 8px;border-radius:8px;background:#21262d;color:#8b949e;text-transform:uppercase">RIPOSO</span></div>
-      ${showEms ? `<div class="ems"><div class="ems-ico">☆</div><div><div class="ems-l">Modalità EMS</div><div class="ems-v" id="emsModeVal">--</div></div></div>` : ''}
-      <div style="width:100%;max-width:520px;margin:0 auto"><svg id="flowSvg" viewBox="-16 0 536 508" style="width:100%;display:block">
+      ${showEms ? `<div class="gmodal" id="emsModal"><div class="gbox ems-box">
+          <div class="gtitle">Modalità EMS</div>
+          <div class="ems-opts" id="emsOpts"></div>
+          <div class="gbtns"><button id="emsNo">Annulla</button><button id="emsOk" class="ok">Applica</button></div>
+        </div></div>` : ''}
+      <div style="width:100%;max-width:520px;margin:0 auto"><svg id="flowSvg" viewBox="-16 ${showEms ? -26 : 0} 536 ${showEms ? 534 : 508}" style="width:100%;display:block">
       <defs>
         <filter id="arcSunF" x="-150%" y="-150%" width="400%" height="400%"><feGaussianBlur stdDeviation="7"/></filter>
         <filter id="arcSunF2" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="3"/></filter>
@@ -2729,7 +2979,7 @@ class FFlowCard extends HTMLElement {
         <linearGradient id="mbCapGrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#2d333b"/><stop offset="50%" stop-color="#8b949e"/><stop offset="100%" stop-color="#2d333b"/></linearGradient>
         <linearGradient id="mbSheenGrad" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="rgba(255,255,255,0)"/><stop offset="50%" stop-color="rgba(255,255,255,.35)"/><stop offset="100%" stop-color="rgba(255,255,255,0)"/></linearGradient>
         <clipPath id="mbClip"><rect x="11" y="132" width="46" height="107" rx="10"/></clipPath>
-        <clipPath id="skyClip"><rect x="-16" y="0" width="536" height="100"/></clipPath>
+        <clipPath id="skyClip"><rect x="-16" y="-26" width="536" height="126"/></clipPath>
         <linearGradient id="shootGrad" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#fff"/></linearGradient>
         <linearGradient id="cloudGrad" x1="0" y1="0" x2="0" y2="1"><stop id="cloudGradTop" offset="0" stop-color="#e6edf3"/><stop id="cloudGradBot" offset="1" stop-color="#9aa7b8"/></linearGradient>
  <filter id="flowGlow" filterUnits="userSpaceOnUse" x="-20" y="0" width="560" height="520"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
@@ -2742,6 +2992,13 @@ class FFlowCard extends HTMLElement {
       </defs>
       <ellipse id="skyAura" cx="260" cy="84" rx="230" ry="110" fill="url(#dynAuraG)"/>
       ${this._buildSkySVG()}
+      ${showEms ? `<g id="emsBadge" class="emsb" style="cursor:pointer">
+        <rect id="emsRect" x="-12" y="-22" width="120" height="19" rx="9.5" fill="rgba(13,17,23,.75)" stroke="#3fb950" stroke-opacity=".55" stroke-width="1"/>
+        <rect id="emsHold" x="-12" y="-22" width="120" height="19" rx="9.5" fill="#3fb950" opacity=".25" class="emsh"/>
+        <text x="-3" y="-8.5" font-size="11" fill="#3fb950">☆</text>
+        <text id="emsLbl" x="10" y="-9" font-size="8.5" font-weight="700" letter-spacing="1" fill="#8b949e">EMS</text>
+        <text id="emsModeVal" x="34" y="-8.5" font-size="10.5" font-weight="700" fill="#3fb950">--</text>
+      </g>` : ''}
       <path d="M 35,78 Q 260,-45 485,78 Z" fill="rgba(30,100,200,.05)"/>
       <line x1="8" y1="78" x2="512" y2="78" stroke="rgba(255,255,255,.12)" stroke-width="1" stroke-dasharray="3,8"/>
       <circle cx="35" cy="78" r="3.5" fill="rgba(255,200,80,.7)"/>
@@ -2868,7 +3125,9 @@ class FFlowCard extends HTMLElement {
     </div>`;
     this._bindExtraSections();
     this._bindGridSwitch();
+    this._bindEms();
     this._bindSections();
+    this._bindTabs();
     this._bindChartHours();
     this._bindCamera();
   }
@@ -3211,7 +3470,10 @@ class FFlowCard extends HTMLElement {
     if (getEl('emsModeVal')) {
       const st = this._hass.states[this.config.ems_mode_entity];
       const v = st && st.state !== 'unavailable' && st.state !== 'unknown' ? String(st.state) : '--';
-      setText('emsModeVal', v.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()));
+      setText('emsModeVal', this._emsLabel(v));
+      // size the badge to its text
+      const t = getEl('emsModeVal'), r = getEl('emsRect'), h = getEl('emsHold');
+      try { const w = 46 + t.getComputedTextLength(); if (r) r.setAttribute('width', w.toFixed(1)); if (h) h.setAttribute('width', w.toFixed(1)); } catch (e) { /* not rendered yet */ }
     }
 
     // ── v1.2.0: energy supply bar — share of current power by source/sink ──
