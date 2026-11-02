@@ -63,8 +63,24 @@ const MDI = JSON.parse(fs.readFileSync(path.join(__dirname, 'icons.json'), 'utf8
   await shot('grid-switch.png', '.hdr', '.gbox');
   await page.evaluate(() => { window._card.shadowRoot.getElementById('gridModal').style.display = 'none'; });
 
+  // wallbox + car (horizontal band around the EV drawing)
+  await shot('wallbox.png', '#evPowerVal', '#evSocBar');
+
+  // collapsed sections with their one-line summary
+  await page.evaluate(() => {
+    const r = window._card.shadowRoot;
+    ['inv', 'cons', 'vent'].forEach(k => r.querySelector(`.sec[data-sec=${k}] .sec-t`).click());
+    r.querySelector('.sec[data-sec=cons] .pin input').click(); // show both pinned and unpinned looks
+  });
+  await page.waitForTimeout(150);
+  await shot('sections-closed.png', '.sec[data-sec=inv]', '.sec[data-sec=vent]');
+
   await open('bms');
   await shot('card-bms.png');
+
+  // same card in a phone-sized column (container query: 3 tile columns, bigger labels)
+  await open('phone');
+  await shot('phone.png', '.hdr', '.pvf');
 
   await browser.close();
   if (errors.length) { console.error('Page errors:', errors); process.exit(1); }
