@@ -1,7 +1,7 @@
 # f-flow-card
 
 **Card personalizzata per Home Assistant con i flussi energetici in tempo reale** — fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), con licenza MIT.
-`f-flow-card.js` · Unified Edition · grafico dei consumi, utilizzatori, ventilazione inverter, interfaccia in italiano **V1.4.0**
+`f-flow-card.js` · Unified Edition · commutazione ON/OFF GRID, casa a due falde, grafico dei consumi, utilizzatori, ventilazione inverter **V1.5.0**
 
 <img width="1708" height="2520" alt="IMG_20260513_114249" src="https://github.com/user-attachments/assets/e4c54570-5b9e-43c4-9326-b44d4105a5d1" />
 <img width="1108" height="1688" alt="IMG_20260516_011350" src="https://github.com/user-attachments/assets/6914d4ab-daa6-432a-983d-6abac15a1cac" />
@@ -33,7 +33,9 @@ La card unisce un'area SVG con i flussi (arco del sole, percorsi animati, invert
 - Sezione **Utilizzatori**: quanti elettrodomestici vuoi, con icona, colore e un disco stile contatore Ferraris che gira più o meno veloce in base al consumo
 - **Grafico dei consumi** delle ultime 24 ore: un'area colorata per ogni utilizzatore, dallo storico di Home Assistant
 - Sezione **Ventilazione inverter** compatta, con i livelli termici (idle → critical), temperature, PWM, giri medi e ventole animate
-- Traliccio della rete luminoso disegnato in SVG: rosso quando prelevi, verde quando immetti
+- Traliccio della rete luminoso disegnato in SVG: rosso quando prelevi, verde quando immetti, barrato quando sei fuori rete
+- **Commutazione IN RETE / FUORI RETE** dalla card: tieni premuto, conferma, fatto
+- **Casa a due falde**: FV1 sulla falda sinistra e FV2 sulla destra, ognuna si illumina con la propria produzione
 - Batteria a segmenti moderna (oppure quella classica)
 - Editor visuale completo, diviso in sezioni: non serve scrivere YAML
 - Etichette ed entità personalizzabili per i 6 riquadri statistici
@@ -96,6 +98,7 @@ Tutte queste opzioni sono facoltative: se non le attivi, la card ha l'aspetto cl
 | `_show_battery_stats` | booleano | Imposta `false` per nascondere i riquadri JK BMS (predefinito `true`) |
 | `battery_style` | testo | `modern` (batteria a segmenti, predefinita) oppure `classic` |
 | `grid_icon_style` | testo | `modern` (traliccio luminoso, predefinito) oppure `classic` (immagine PNG) |
+| `home_icon_style` | testo | `modern` (casa a due falde con FV1/FV2, predefinita) oppure `classic` (immagine PNG) |
 
 Le righe FV1 / FV2 spariscono da sole se `pv1_power` / `pv2_power` sono vuoti.
 
@@ -119,6 +122,33 @@ battery_full_wh: 48
 ```
 
 > I nomi delle entità nell'esempio sono indicativi: scegli quelli del tuo impianto con l'editor visuale.
+
+---
+
+## Commutazione IN RETE / FUORI RETE (v1.5.0)
+
+Se il tuo impianto può staccarsi e riattaccarsi alla rete (per esempio con un modulo di sgancio e riaggancio), puoi comandarlo dalla card. Nell'editor, sezione **🎨 Layout e intestazione**:
+
+| Chiave | Descrizione |
+|---|---|
+| `grid_status_entity` | Stato della rete (es. `binary_sensor.deye_grid`: `on` = in rete, `off` = fuori rete) |
+| `grid_switch_to_off` | Entità da attivare per passare **fuori rete** (es. `switch.studio_off_grid`) |
+| `grid_switch_to_on` | Entità da attivare per tornare **in rete** (es. `switch.studio_on_grid`) |
+| `grid_switch_confirm` | Chiede conferma prima di commutare (predefinito `true`) |
+
+**Come si usa:** tieni premuto per circa un secondo l'indicatore **IN RETE / FUORI RETE** in alto, oppure il traliccio. Una barra si riempie mentre tieni premuto; poi compare la richiesta di conferma. Con **Procedi** la card attiva l'entità giusta: `switch.turn_on` per gli switch, `button.press` per i pulsanti, `script.turn_on` per gli script. Un tocco breve non fa nulla, così non si commuta per sbaglio. Finché lo stato non cambia, l'indicatore mostra **COMMUTAZIONE…**. Quando sei fuori rete il traliccio diventa grigio e barrato.
+
+```yaml
+grid_status_entity: binary_sensor.deye_grid
+grid_switch_to_off: switch.studio_off_grid
+grid_switch_to_on: switch.studio_on_grid
+```
+
+---
+
+## Casa a due falde (v1.5.0)
+
+La casa è disegnata con due falde di pannelli: **FV1 a sinistra** e **FV2 a destra**. Ogni falda si illumina in base alla produzione della propria stringa, e il valore è scritto accanto alla falda. Il consumo della casa è sotto la casa, e la casa prende il colore della fonte che la sta alimentando (giallo fotovoltaico, arancione batteria, rosso rete). Se preferisci la vecchia immagine: **Icona casa classica** (`home_icon_style: classic`).
 
 ---
 
@@ -349,6 +379,10 @@ Tutte le opzioni si impostano dall'editor visuale. Qui sotto trovi le chiavi YAM
 
 ## Registro delle modifiche
 
+### v1.5.0
+- **Commutazione IN RETE / FUORI RETE** dalla card: tieni premuto l'indicatore o il traliccio, conferma, e la card attiva lo switch giusto. Indicatore "COMMUTAZIONE…" in attesa del cambio di stato; traliccio barrato fuori rete.
+- Nuova **casa a due falde**: FV1 sulla falda sinistra, FV2 sulla destra, ognuna illuminata dalla propria produzione.
+
 ### v1.4.0
 - Nuovo **grafico dei consumi** delle ultime 24 ore (regolabile fino a 72), ad aree colorate per utilizzatore, con linea del totale casa, dettaglio al tocco e kWh per utilizzatore.
 - Nuovo **traliccio della rete** luminoso in SVG che cambia colore con prelievo e immissione; l'immagine vecchia resta disponibile.
@@ -533,4 +567,4 @@ Apri una issue su [GitHub](https://github.com/fabiustek/f-flow-card/issues) e in
 
 ---
 
-*f-flow-card · fork di k-flow-card (Khan Automation) · Ultimo aggiornamento: v1.4.0*
+*f-flow-card · fork di k-flow-card (Khan Automation) · Ultimo aggiornamento: v1.5.0*
