@@ -85,6 +85,17 @@ const MDI = JSON.parse(fs.readFileSync(path.join(__dirname, 'icons.json'), 'utf8
   await page.waitForTimeout(150);
   await shot('sections-closed.png', '.sec[data-sec=inv]', '.sec[data-sec=vent]');
 
+  // camera section with the PTZ pad
+  await shot('camera.png', '#camBox');
+
+  // night sky with stars, and a thunderstorm by day
+  await open('night');
+  await page.waitForTimeout(1200);
+  await shot('sky-night.png', '.hdr', '#arcSetLabel');
+  await open('storm');
+  await page.waitForTimeout(1800);
+  await shot('sky-storm.png', '.hdr', '#arcSetLabel');
+
   await open('bms');
   await shot('card-bms.png');
 

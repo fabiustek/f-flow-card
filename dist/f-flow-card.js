@@ -1,5 +1,16 @@
-// f-flow-card.js – Unified Edition v1.8.0
-const FFC_VERSION = '1.8.0';
+// f-flow-card.js – Unified Edition v1.9.0
+const FFC_VERSION = '1.9.0';
+// Changes v1.9.0:
+//   NEW  – Night sky: twinkling stars and a shooting star between sunset and sunrise.
+//   NEW  – weather_entity: animated clouds, rain, downpour, snow, fog, wind and lightning in the
+//           sky; stars fade and the sun dims behind clouds.
+//   NEW  – Camera section (collapsible): live view through HA's ha-camera-stream (MJPEG proxy or
+//           10 s snapshot fallback) with an on-video PTZ pad (up/down/left/right/home entities;
+//           tap = one step, hold = repeat).
+//   NEW  – Inverter→house flow, house, ring and load value coloured by a weighted mix of the sources
+//           feeding the house (solar yellow, battery blue, grid red), e.g. 70 % solar + 30 % grid.
+//   CHG  – Roof slopes turn PV-yellow while their strings produce; FV1/FV2 labels moved up, next to
+//           their slopes.
 // Changes v1.8.0:
 //   NEW  – Statistics section (collapsible): today's PV as hourly stacked bars per string with an
 //           optional forecast curve (Solcast/Forecast.Solar attributes or the sensor's history),
@@ -185,12 +196,13 @@ class FFlowCardEditor extends HTMLElement {
     if (key === 'battery_style_classic') { key = 'battery_style'; value = value ? 'classic' : 'modern'; }
     if (key === 'grid_icon_classic') { key = 'grid_icon_style'; value = value ? 'classic' : 'modern'; }
     if (key === 'home_icon_classic') { key = 'home_icon_style'; value = value ? 'classic' : 'modern'; }
+    if (key === 'camera_snapshot') { key = 'camera_mode'; value = value ? 'snapshot' : 'live'; }
     if (this._config[key] === value) return;
     this._config = { ...this._config, [key]: value };
     this._fireChanged();
     if (key === '_show_battery' || key === '_show_battery2' || key === '_show_pv_extra' ||
         key === '_show_ev'      || key === 'battery_cap_unit' ||
-        key === '_show_consumers' || key === '_show_ventilation' || key === '_show_stats' || key === '_labels_custom_entities' ||
+        key === '_show_consumers' || key === '_show_ventilation' || key === '_show_stats' || key === '_show_camera' || key === '_labels_custom_entities' ||
         key === 'label_cell_temp_minmax' || key === 'label_bms_temp'         ||
         key === 'label_min_cell'         || key === 'label_max_cell'         ||
         key === 'label_batt_dis'         || key === 'label_total_pv_gen'     ||
@@ -493,6 +505,7 @@ class FFlowCardEditor extends HTMLElement {
       cb.checked = key === 'battery_style_classic' ? cfg.battery_style === 'classic'
         : key === 'grid_icon_classic' ? cfg.grid_icon_style === 'classic'
         : key === 'home_icon_classic' ? cfg.home_icon_style === 'classic'
+        : key === 'camera_snapshot' ? cfg.camera_mode === 'snapshot'
         : cfg[key] === undefined ? defaultOn : !!cfg[key];
       cb.style.cssText = 'opacity:0;width:0;height:0;position:absolute;';
       const track = document.createElement('span');
@@ -577,6 +590,7 @@ class FFlowCardEditor extends HTMLElement {
       picker('grid_switch_to_on',  'Comando per tornare IN RETE (es. switch.studio_on_grid)', true),
       switchRow('grid_switch_confirm', 'Chiedi conferma prima di commutare', 'Tieni premuto l’indicatore o il traliccio per commutare', true),
       picker('ems_mode_entity',    'Modalità EMS / di lavoro (sotto il titolo)', true),
+      picker('weather_entity',     'Meteo (animazioni nel cielo: nuvole, pioggia, neve, temporale…)', true),
       textField('inverter_image', 'URL immagine inverter (sostituisce il riquadro INV)', '/local/sigenergy-inverter.png'),
       divider(),
       switchRow('_show_energy_supply',   'Barra fonti energia', 'Barra Solare / Carica / Scarica / Rete a destra'),
@@ -693,6 +707,19 @@ class FFlowCardEditor extends HTMLElement {
         { key: 'chart', label: 'Grafico', type: 'bool', text: 'Mostra nel grafico dei consumi (togli la spunta per il totale casa)' },
       ], (n) => ({ name: '', entity: '', icon: 'mdi:power-plug', color: FFlowCard.PALETTE[n % FFlowCard.PALETTE.length] }), '＋ Aggiungi utilizzatore'),
     ], { toggleKey: '_show_consumers', toggleOn: showConsumers, hidden: !showConsumers }));
+
+    const showCam = !!cfg._show_camera;
+    shell.appendChild(makeSection('camera', '📹', 'Videocamera', [
+      textField('camera_title', 'Titolo sezione', 'Videocamera'),
+      picker('camera_entity', 'Videocamera (camera.*)'),
+      switchRow('camera_snapshot', 'Solo immagine (aggiornata ogni 10 s)', 'Usala se il video in diretta non parte o per consumare meno dati'),
+      divider(),
+      picker('ptz_up',    'Freccia ▲ su (pulsante, script o switch ONVIF)', true),
+      picker('ptz_down',  'Freccia ▼ giù', true),
+      picker('ptz_left',  'Freccia ◀ sinistra', true),
+      picker('ptz_right', 'Freccia ▶ destra', true),
+      picker('ptz_home',  'Posizione iniziale (pulsante centrale)', true),
+    ], { toggleKey: '_show_camera', toggleOn: showCam, hidden: !showCam }));
 
     const showStats = !!cfg._show_stats;
     shell.appendChild(makeSection('stats', '📈', 'Statistiche', [
@@ -834,16 +861,16 @@ class FFlowCardEditor extends HTMLElement {
 
     shell.appendChild(makeSection('solar', '☀️', 'Fotovoltaico', [
       picker('pv1_power', 'Potenza FV1'),
-      textField('pv1_name', 'Nome stringa FV1 (es. Sud-Est)', 'FV1'),
+      textField('pv1_name', 'Nome della falda sinistra / stringa FV1 (facoltativo: se vuoto resta "FV1")', 'FV1'),
       picker('pv2_power', 'Potenza FV2'),
-      textField('pv2_name', 'Nome stringa FV2 (es. Nord-Ovest)', 'FV2'),
+      textField('pv2_name', 'Nome della falda destra / stringa FV2 (facoltativo: se vuoto resta "FV2")', 'FV2'),
     ]));
 
     shell.appendChild(makeSection('solar_extra', '☀️', 'Stringhe FV aggiuntive', [
       picker('pv3_power', 'Potenza FV3', true),
-      textField('pv3_name', 'Nome stringa FV3', 'FV3'),
+      textField('pv3_name', 'Nome stringa FV3 (facoltativo)', 'FV3'),
       picker('pv4_power', 'Potenza FV4', true),
-      textField('pv4_name', 'Nome stringa FV4', 'FV4'),
+      textField('pv4_name', 'Nome stringa FV4 (facoltativo)', 'FV4'),
     ], { toggleKey: '_show_pv_extra', toggleOn: showPVExtra, hidden: !showPVExtra }));
 
     shell.appendChild(makeSection('solar_extras', '☀️', 'Altri dati fotovoltaico', [
@@ -1026,6 +1053,12 @@ class FFlowCard extends HTMLElement {
       stats_pv: true,
       stats_load: true,
       stats_battery: true,
+      weather_entity: '',
+      _show_camera: false,
+      camera_title: 'Videocamera',
+      camera_entity: '',
+      camera_mode: 'live',
+      ptz_up: '', ptz_down: '', ptz_left: '', ptz_right: '', ptz_home: '',
       _show_ventilation: false,
       vent_title: 'Ventilazione inverter',
       vent_state_entity: '',
@@ -1039,7 +1072,7 @@ class FFlowCard extends HTMLElement {
     };
   }
 
-  getCardSize() { return 8 + (this.config._show_consumers ? 2 : 0) + (this.config._show_ventilation ? 3 : 0) + (this.config._show_stats ? 6 : 0); }
+  getCardSize() { return 8 + (this.config._show_consumers ? 2 : 0) + (this.config._show_ventilation ? 3 : 0) + (this.config._show_stats ? 6 : 0) + (this.config._show_camera ? 4 : 0); }
   static getConfigElement() { return document.createElement('f-flow-card-editor'); }
 
   setConfig(config) {
@@ -1774,6 +1807,204 @@ class FFlowCard extends HTMLElement {
     }
   }
 
+
+
+  // ── v1.9.0: camera section with ONVIF/PTZ arrows ─────────────────────
+  _cameraEnabled() { return !!(this.config._show_camera && this.config.camera_entity); }
+  _buildCameraHTML(esc) {
+    if (!this.config._show_camera) return '';
+    const c = this.config;
+    if (!c.camera_entity) return '<div class="dv"></div>' + this._secHTML('cam', '📹 ' + esc(c.camera_title || 'Videocamera'), '<div class="st-info">Scegli la videocamera nell’editor (sezione Videocamera).</div>');
+    const arrow = (dir, key, path) => c[key] ? `<button class="pz ${dir}" data-ptz="${key}" title="${{ ptz_up: 'Su', ptz_down: 'Giù', ptz_left: 'Sinistra', ptz_right: 'Destra', ptz_home: 'Posizione iniziale' }[key]}">
+        <svg viewBox="0 0 24 24" width="18" height="18"><path d="${path}" fill="currentColor"/></svg></button>` : '';
+    const pad = (c.ptz_up || c.ptz_down || c.ptz_left || c.ptz_right || c.ptz_home) ? `<div class="ptz">
+        ${arrow('up', 'ptz_up', 'M7.4 15.4 12 10.8l4.6 4.6L18 14l-6-6-6 6z')}
+        ${arrow('down', 'ptz_down', 'M7.4 8.6 12 13.2l4.6-4.6L18 10l-6 6-6-6z')}
+        ${arrow('left', 'ptz_left', 'M15.4 16.6 10.8 12l4.6-4.6L14 6l-6 6 6 6z')}
+        ${arrow('right', 'ptz_right', 'M8.6 16.6 13.2 12 8.6 7.4 10 6l6 6-6 6z')}
+        ${c.ptz_home ? arrow('home', 'ptz_home', 'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z') : '<span class="pz home dot"></span>'}
+      </div>` : '';
+    return '<div class="dv"></div>' + this._secHTML('cam', '📹 ' + esc(c.camera_title || 'Videocamera'), `
+      <div class="cam" id="camBox">
+        <div class="cam-v" id="camView"></div>
+        <div class="cam-off" id="camOff">Videocamera non disponibile</div>
+        ${pad}
+      </div>`);
+  }
+
+  _bindCamera() {
+    if (!this._cameraEnabled()) return;
+    const root = this.shadowRoot;
+    root.querySelectorAll('.pz[data-ptz]').forEach(btn => {
+      let timer = null;
+      const fire = () => this._ptz(btn.dataset.ptz);
+      const stop = () => { if (timer) { clearInterval(timer); timer = null; } btn.classList.remove('on'); };
+      btn.addEventListener('pointerdown', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        btn.classList.add('on'); fire();
+        if (btn.dataset.ptz !== 'ptz_home') timer = setInterval(fire, 450);   // hold = keep moving
+      });
+      ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => btn.addEventListener(ev, stop));
+      btn.addEventListener('contextmenu', e => e.preventDefault());
+    });
+    this._camEl = null; this._camToken = null;
+    this._updateCamera();
+  }
+
+  _ptz(key) {
+    const eid = this.config[key];
+    if (!eid || !this._hass) return;
+    const domain = eid.split('.')[0];
+    const service = (domain === 'button' || domain === 'input_button') ? 'press' : domain === 'automation' ? 'trigger' : 'turn_on';
+    this._hass.callService(domain, service, { entity_id: eid });
+  }
+
+  _updateCamera() {
+    if (!this._cameraEnabled() || !this._hass) return;
+    const root = this.shadowRoot;
+    const view = root.getElementById('camView'), off = root.getElementById('camOff');
+    if (!view) return;
+    const eid = this.config.camera_entity;
+    const st = this._hass.states[eid];
+    const ok = st && st.state !== 'unavailable';
+    if (off) off.style.display = ok ? 'none' : 'flex';
+    if (!ok) return;
+    const snapshot = this.config.camera_mode === 'snapshot';
+    if (!snapshot && customElements.get('ha-camera-stream')) {
+      // Home Assistant's own player (HLS / WebRTC / MJPEG, whatever the camera supports)
+      if (!this._camEl || this._camEl.tagName !== 'HA-CAMERA-STREAM') {
+        view.innerHTML = '';
+        this._camEl = document.createElement('ha-camera-stream');
+        this._camEl.muted = true;
+        this._camEl.controls = false;
+        this._camEl.allowExoPlayer = true;
+        view.appendChild(this._camEl);
+      }
+      this._camEl.hass = this._hass;
+      if (this._camEl.stateObj !== st) this._camEl.stateObj = st;
+      return;
+    }
+    // fallback: MJPEG proxy stream, or a snapshot refreshed every 10 s
+    const token = st.attributes && st.attributes.access_token;
+    if (!this._camEl || this._camEl.tagName !== 'IMG') {
+      view.innerHTML = '';
+      this._camEl = document.createElement('img');
+      this._camEl.alt = '';
+      this._camEl.addEventListener('error', () => { this._camToken = null; setTimeout(() => this._updateCamera(), 3000); });
+      view.appendChild(this._camEl);
+    }
+    const now = Date.now();
+    if (snapshot) {
+      if (!this._camSnapAt || now - this._camSnapAt > 10000 || token !== this._camToken) {
+        this._camSnapAt = now; this._camToken = token;
+        this._camEl.src = `/api/camera_proxy/${eid}?token=${token}&t=${now}`;
+      }
+    } else if (token !== this._camToken && (!this._camEl.complete || this._camEl.naturalWidth === 0 || !this._camToken)) {
+      this._camToken = token;
+      this._camEl.src = `/api/camera_proxy_stream/${eid}?token=${token}`;
+    }
+  }
+
+  // ── v1.9.0: night sky + weather animations (sky area y < 100) ─────────
+  _buildSkySVG() {
+    let seed = 7;
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+    const f = (v) => v.toFixed(1);
+    // stars: twinkling dots, a few brighter four-point stars, one shooting star
+    let stars = '';
+    for (let i = 0; i < 46; i++) {
+      const x = -10 + rnd() * 525, y = 4 + rnd() * 84, r = 0.5 + rnd() * 1.1;
+      const d = (1.6 + rnd() * 3.4).toFixed(2), b = (rnd() * 4).toFixed(2), lo = (0.15 + rnd() * 0.3).toFixed(2);
+      stars += `<circle cx="${f(x)}" cy="${f(y)}" r="${r.toFixed(2)}" fill="#fff"><animate attributeName="opacity" values="${lo};1;${lo}" dur="${d}s" begin="-${b}s" repeatCount="indefinite"/></circle>`;
+    }
+    for (let i = 0; i < 5; i++) {
+      const x = 10 + rnd() * 490, y = 8 + rnd() * 60, k = 2.6 + rnd() * 1.6;
+      stars += `<path d="M${f(x)},${f(y - k)} L${f(x + k * .25)},${f(y - k * .25)} L${f(x + k)},${f(y)} L${f(x + k * .25)},${f(y + k * .25)} L${f(x)},${f(y + k)} L${f(x - k * .25)},${f(y + k * .25)} L${f(x - k)},${f(y)} L${f(x - k * .25)},${f(y - k * .25)} Z" fill="#dbe7ff">
+        <animate attributeName="opacity" values=".35;1;.35" dur="${(2.5 + rnd() * 2).toFixed(2)}s" begin="-${(rnd() * 3).toFixed(2)}s" repeatCount="indefinite"/></path>`;
+    }
+    stars += `<line x1="0" y1="0" x2="34" y2="12" stroke="url(#shootGrad)" stroke-width="1.6" stroke-linecap="round" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;0;0" keyTimes="0;.86;.88;.94;1" dur="11s" repeatCount="indefinite"/>
+      <animateTransform attributeName="transform" type="translate" values="40,6;40,6;150,46;150,46" keyTimes="0;.86;.94;1" dur="11s" repeatCount="indefinite"/></line>`;
+    // clouds
+    const cloud = (cls, x, y, sc, dur, begin, fill) => `<g class="${cls}" opacity="0"><g>
+      <animateTransform attributeName="transform" type="translate" from="-170 0" to="560 0" dur="${dur}s" begin="-${begin}s" repeatCount="indefinite"/>
+      <path transform="translate(${x},${y}) scale(${sc})" d="M10,30 a14,14 0 0 1 4,-27 a19,19 0 0 1 34,-2 a15,15 0 0 1 20,15 a11,11 0 0 1 -2,22 H12 a10,10 0 0 1 -2,-8 Z" fill="${fill}"/></g></g>`;
+    let clouds = '';
+    [[0, 8, 1.1, 70, 5], [0, 32, .8, 55, 30], [0, 0, 1.35, 90, 60], [0, 24, 1, 62, 45]].forEach(([x, y, sc, d, b], i) => {
+      clouds += cloud('wxCloud c' + i, x, y, sc, d, b, 'url(#cloudGrad)');
+    });
+    // rain, snow, fog, wind, lightning
+    let rain = '';
+    for (let i = 0; i < 42; i++) {
+      const x = -10 + rnd() * 530, d = (0.55 + rnd() * 0.35).toFixed(2), b = (rnd() * 1).toFixed(2);
+      rain += `<line class="${i < 22 ? 'rl' : 'rh'}" x1="${f(x)}" y1="0" x2="${f(x - 3)}" y2="10" stroke="#8ec5ff" stroke-width="1.1" stroke-linecap="round" opacity=".7">
+        <animateTransform attributeName="transform" type="translate" from="0 20" to="-14 104" dur="${d}s" begin="-${b}s" repeatCount="indefinite"/></line>`;
+    }
+    let snow = '';
+    for (let i = 0; i < 34; i++) {
+      const x = -10 + rnd() * 530, d = (3 + rnd() * 3).toFixed(2), b = (rnd() * 5).toFixed(2), r = (1 + rnd() * 1.3).toFixed(2);
+      snow += `<circle cx="${f(x)}" cy="0" r="${r}" fill="#fff" opacity=".85">
+        <animateTransform attributeName="transform" type="translate" values="0 10;6 40;-4 70;3 104" dur="${d}s" begin="-${b}s" repeatCount="indefinite"/></circle>`;
+    }
+    let fog = '';
+    [[22, 26, 0], [48, 38, 9], [72, 30, 4]].forEach(([y, d, b]) => {
+      fog += `<rect x="-200" y="${y}" width="520" height="10" rx="5" fill="#c9d1d9" opacity=".16">
+        <animateTransform attributeName="transform" type="translate" values="0 0;220 0;0 0" dur="${d}s" begin="-${b}s" repeatCount="indefinite"/></rect>`;
+    });
+    let wind = '';
+    for (let i = 0; i < 9; i++) {
+      const y = 10 + rnd() * 75, d = (1.6 + rnd() * 1.4).toFixed(2), b = (rnd() * 2).toFixed(2), w = 30 + rnd() * 50;
+      wind += `<path d="M0,${f(y)} q${f(w / 2)},-5 ${f(w)},0" fill="none" stroke="#c9d1d9" stroke-width="1" stroke-linecap="round" opacity=".45">
+        <animateTransform attributeName="transform" type="translate" from="-90 0" to="560 0" dur="${d}s" begin="-${b}s" repeatCount="indefinite"/></path>`;
+    }
+    const bolt = `<path d="M300,6 L286,40 L298,40 L284,78 L312,32 L300,32 L312,6 Z" fill="#fff6c2" opacity="0">
+        <animate attributeName="opacity" values="0;0;1;0;1;0;0" keyTimes="0;.7;.72;.74;.76;.8;1" dur="5s" repeatCount="indefinite"/></path>
+      <rect x="-16" y="0" width="536" height="100" fill="#fff" opacity="0">
+        <animate attributeName="opacity" values="0;0;.22;0;.15;0;0" keyTimes="0;.7;.72;.74;.76;.8;1" dur="5s" repeatCount="indefinite"/></rect>`;
+    return `<g clip-path="url(#skyClip)">
+      <g id="skyStars" opacity="0" style="transition:opacity 2s">${stars}</g>
+      <g id="wxFog" style="display:none">${fog}</g>
+      <g id="wxClouds">${clouds}</g>
+      <g id="wxRain" style="display:none">${rain}</g>
+      <g id="wxSnow" style="display:none">${snow}</g>
+      <g id="wxWind" style="display:none">${wind}</g>
+      <g id="wxBolt" style="display:none">${bolt}</g>
+    </g>`;
+  }
+
+  // Map the weather entity state to the sky layers
+  _updateSky(sun) {
+    const root = this.shadowRoot;
+    const g = (id) => root.getElementById(id);
+    if (!g('skyStars')) return;
+    const wxRaw = this._strVal(this.config.weather_entity);
+    const wx = wxRaw && wxRaw !== 'unavailable' && wxRaw !== 'unknown' ? wxRaw : '';
+    const cloudy = { 'partlycloudy': 2, 'cloudy': 4, 'rainy': 4, 'pouring': 4, 'snowy': 3, 'snowy-rainy': 4, 'lightning': 4, 'lightning-rainy': 4, 'hail': 4, 'fog': 2, 'windy': 1, 'windy-variant': 3, 'exceptional': 3 };
+    const nClouds = cloudy[wx] || 0;
+    const dark = /rain|pouring|lightning|hail|snowy-rainy/.test(wx);
+    const show = (id, on) => { const e = g(id); if (e) e.style.display = on ? '' : 'none'; };
+    // stars: at night, hidden (or faint) when the sky is overcast
+    const starOp = !sun.night ? 0 : nClouds >= 4 ? 0.12 : nClouds >= 2 ? 0.55 : 1;
+    g('skyStars').setAttribute('opacity', String(starOp));
+    root.querySelectorAll('.wxCloud').forEach((c, i) => {
+      c.setAttribute('opacity', i < nClouds ? (dark ? '.95' : sun.night ? '.55' : '.8') : '0');
+    });
+    const cg = g('cloudGradTop'), cb = g('cloudGradBot');
+    if (cg && cb) {
+      cg.setAttribute('stop-color', dark ? '#5b6573' : sun.night ? '#3a4352' : '#e6edf3');
+      cb.setAttribute('stop-color', dark ? '#2d333b' : sun.night ? '#1f2630' : '#9aa7b8');
+    }
+    show('wxRain', /rain|pouring|hail/.test(wx) || wx === 'lightning-rainy');
+    root.querySelectorAll('#wxRain .rh').forEach(e => e.style.display = (wx === 'pouring' || wx === 'hail') ? '' : 'none');
+    show('wxSnow', /snow|hail/.test(wx));
+    show('wxFog', wx === 'fog');
+    show('wxWind', /windy/.test(wx));
+    show('wxBolt', /lightning/.test(wx));
+    // the sun is dimmed behind clouds
+    const sunG = g('arcSunGroup');
+    if (sunG && !sun.night) sunG.setAttribute('opacity', nClouds >= 4 ? '.45' : nClouds >= 2 ? '.75' : '1');
+  }
+
   // ── v1.3.0: inverter ventilation ─────────────────────────────────
   _fanSVG(id, size) {
     const blade = 'M0,-2.2 C2.6,-3.6 4.8,-8.6 1.2,-10.6 C-1.6,-9 -2.4,-5 0,-2.2Z';
@@ -1879,6 +2110,7 @@ class FFlowCard extends HTMLElement {
   }
 
   _updateExtraSections() {
+    this._updateCamera();
     const sp = this._spin; if (!sp) return;
     this._maybeLoadHistory();
     this._maybeLoadStats();
@@ -2066,14 +2298,14 @@ class FFlowCard extends HTMLElement {
       <path d="M227,425 V443 M215,434 H239 M293,425 V443 M281,434 H305" stroke="currentColor" stroke-width=".8" stroke-opacity=".6"/>
       <rect x="250" y="442" width="20" height="28" rx="2" fill="#161b22" stroke="currentColor" stroke-width="1.4"/>
       <circle cx="265" cy="457" r="1.3" fill="currentColor"/>
-      <polygon points="${quad(Lq)}" fill="#1b2230" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
-      <polygon points="${quad(Rq)}" fill="#1b2230" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+      <polygon id="roofL" points="${quad(Lq)}" fill="#1b2230" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" style="transition:stroke .5s,fill .5s"/>
+      <polygon id="roofR" points="${quad(Rq)}" fill="#1b2230" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" style="transition:stroke .5s,fill .5s"/>
       ${cells(Lq, 'L')}${cells(Rq, 'R')}
     </g>
-    ${pv1Show ? `<text class="sm" id="pv1label" x="180" y="389" text-anchor="end" font-size="10.5" fill="#8b949e" letter-spacing="1">${this._pvName(1)}</text>
-    <text id="pv1FlowVal" x="180" y="406" text-anchor="end" font-size="14.5" font-weight="700" fill="#ffe83c">-- W</text>` : ''}
-    ${pv2Show ? `<text class="sm" id="pv2label" x="340" y="389" font-size="10.5" fill="#8b949e" letter-spacing="1">${this._pvName(2)}</text>
-    <text id="pv2FlowVal" x="340" y="406" font-size="14.5" font-weight="700" fill="#ffe83c">-- W</text>` : ''}
+    ${pv1Show ? `<text class="sm" id="pv1label" x="210" y="362" text-anchor="end" font-size="10.5" fill="#8b949e" letter-spacing="1">${this._pvName(1)}</text>
+    <text id="pv1FlowVal" x="210" y="378" text-anchor="end" font-size="14.5" font-weight="700" fill="#ffe83c">-- W</text>` : ''}
+    ${pv2Show ? `<text class="sm" id="pv2label" x="310" y="362" font-size="10.5" fill="#8b949e" letter-spacing="1">${this._pvName(2)}</text>
+    <text id="pv2FlowVal" x="310" y="378" font-size="14.5" font-weight="700" fill="#ffe83c">-- W</text>` : ''}
     <text id="fcLoadVal" x="${cx}" y="497" text-anchor="middle" font-size="15.5" font-weight="700" fill="#F7F6D3">-- W</text>`;
   }
 
@@ -2275,6 +2507,15 @@ class FFlowCard extends HTMLElement {
       .cch-h .hsel{display:inline-flex;gap:3px}
       .hb{font:inherit;font-size:.68rem;font-weight:700;letter-spacing:0;padding:2px 7px;border-radius:8px;border:1px solid #30363d;background:#161b22;color:#8b949e;cursor:pointer}
       .hb.on{color:#0d1117;background:#58a6ff;border-color:#58a6ff}
+      .cam{position:relative;border-radius:10px;overflow:hidden;background:#000;aspect-ratio:16/9;border:1px solid #21262d}
+      .cam-v,.cam-v img,.cam-v ha-camera-stream{width:100%;height:100%;display:block}
+      .cam-v img{object-fit:cover}
+      .cam-off{display:none;position:absolute;inset:0;align-items:center;justify-content:center;color:#8b949e;font-size:.8rem}
+      .ptz{position:absolute;right:10px;bottom:10px;width:108px;height:108px;border-radius:50%;background:rgba(13,17,23,.45);backdrop-filter:blur(3px);border:1px solid rgba(255,255,255,.12)}
+      .pz{position:absolute;width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,.18);background:rgba(22,27,34,.75);color:#e6edf3;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;touch-action:none;user-select:none;-webkit-user-select:none;transition:background .15s,transform .1s}
+      .pz.on,.pz:active{background:#1f6feb;transform:scale(.92)}
+      .pz.up{left:36px;top:2px}.pz.down{left:36px;bottom:2px}.pz.left{left:2px;top:36px}.pz.right{right:2px;top:36px}
+      .pz.home{left:36px;top:36px}.pz.dot{width:12px;height:12px;left:48px;top:48px;background:rgba(255,255,255,.25);border:none;cursor:default}
       .stc{background:#0d1117;border:1px solid #21262d;border-radius:10px;padding:8px 8px 6px;margin-bottom:8px}
       .st-info{text-transform:none;letter-spacing:0;color:#c9d1d9;font-weight:600}
       .cch-info{font-size:.7rem;color:#8b949e;text-align:right;margin-top:3px}
@@ -2398,6 +2639,9 @@ class FFlowCard extends HTMLElement {
         <linearGradient id="mbCapGrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#2d333b"/><stop offset="50%" stop-color="#8b949e"/><stop offset="100%" stop-color="#2d333b"/></linearGradient>
         <linearGradient id="mbSheenGrad" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="rgba(255,255,255,0)"/><stop offset="50%" stop-color="rgba(255,255,255,.35)"/><stop offset="100%" stop-color="rgba(255,255,255,0)"/></linearGradient>
         <clipPath id="mbClip"><rect x="11" y="132" width="46" height="107" rx="10"/></clipPath>
+        <clipPath id="skyClip"><rect x="-16" y="0" width="536" height="100"/></clipPath>
+        <linearGradient id="shootGrad" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#fff"/></linearGradient>
+        <linearGradient id="cloudGrad" x1="0" y1="0" x2="0" y2="1"><stop id="cloudGradTop" offset="0" stop-color="#e6edf3"/><stop id="cloudGradBot" offset="1" stop-color="#9aa7b8"/></linearGradient>
  <filter id="flowGlow" filterUnits="userSpaceOnUse" x="-20" y="0" width="560" height="520"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
         <filter id="gridNeon" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="1.6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
         <filter id="battGlowBolt"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
@@ -2407,6 +2651,7 @@ class FFlowCard extends HTMLElement {
         <filter id="iconGlowYellow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="10" result="b"/><feFlood flood-color="rgba(255,230,0,0.7)" result="c"/><feComposite in="c" in2="b" operator="in" result="d"/><feMerge><feMergeNode in="d"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
       </defs>
       <ellipse id="skyAura" cx="260" cy="84" rx="230" ry="110" fill="url(#dynAuraG)"/>
+      ${this._buildSkySVG()}
       <path d="M 35,78 Q 260,-45 485,78 Z" fill="rgba(30,100,200,.05)"/>
       <line x1="8" y1="78" x2="512" y2="78" stroke="rgba(255,255,255,.12)" stroke-width="1" stroke-dasharray="3,8"/>
       <circle cx="35" cy="78" r="3.5" fill="rgba(255,200,80,.7)"/>
@@ -2533,11 +2778,13 @@ class FFlowCard extends HTMLElement {
       ${this._buildConsumersHTML(esc)}
       ${this._buildVentHTML(esc)}
       ${this._buildStatsHTML(esc)}
+      ${this._buildCameraHTML(esc)}
     </div>`;
     this._bindExtraSections();
     this._bindGridSwitch();
     this._bindSections();
     this._bindChartHours();
+    this._bindCamera();
   }
 
   _updateDynamic() {
@@ -2623,6 +2870,7 @@ class FFlowCard extends HTMLElement {
     if (auraEl) auraEl.setAttribute('cy', (94 - Math.round((sun.bell || 0.5) * 22)).toString());
     ['arcSunDot', 'arcSunGlow1', 'arcSunGlow2'].forEach(id => { const e = getEl(id); if (e) { e.setAttribute('cx', sun.bx); e.setAttribute('cy', sun.by); } });
     getEl('arcSunGroup')?.setAttribute('opacity', sun.night ? '0' : '1');
+    this._updateSky(sun);
     const moonGroup = getEl('moonGroup');
     if (sun.night) {
       ['moonGlow', 'moonDot'].forEach(id => { const e = getEl(id); if (e) { e.setAttribute('cx', sun.mx || 260); e.setAttribute('cy', sun.my || 72); } });
@@ -2672,14 +2920,23 @@ class FFlowCard extends HTMLElement {
     const absGrid = Math.abs(gridActive > 10 ? gridActive : 0);  // only count grid import
     const absBattOut = battPwr1 < -10 ? Math.abs(battPwr1) : 0;  // only count discharge
     const absPvLoad = pvTotal > 10 ? pvTotal : 0;
-    let loadFlowColor = '#ffe83c'; // default PV yellow
-    if (absGrid >= absPvLoad && absGrid >= absBattOut && absGrid > 10) {
-      loadFlowColor = '#FF2929'; // grid dominant
-    } else if (absBattOut >= absPvLoad && absBattOut >= absGrid && absBattOut > 10) {
-      // battery dominant — mirror battLineColor scale
-      loadFlowColor = absBattOut < 1000 ? '#f39c4b' : absBattOut < 2500 ? '#e67e22' : '#f85149';
-    } else {
-      loadFlowColor = '#ffe83c'; // PV dominant
+    // v1.9.0: house colour = mix of its sources, weighted by how much each one supplies:
+    //   solar  = PV left after charging the battery and exporting  → yellow
+    //   battery = discharge power                                  → battery blue
+    //   grid    = import power                                     → red
+    const pvToLoad = Math.max(0, absPvLoad - Math.max(0, battPwr1 + battPwr2) - (gridActive < -10 ? -gridActive : 0));
+    const battToLoad = Math.max(0, -(battPwr1 + battPwr2));
+    const srcSum = pvToLoad + battToLoad + absGrid;
+    const SRC = { pv: [255, 232, 60], batt: [0, 200, 255], grid: [255, 41, 41] };
+    let loadFlowColor = '#ffe83c';
+    this._loadMix = { pv: 1, batt: 0, grid: 0 };
+    if (srcSum > 10) {
+      const w = { pv: pvToLoad / srcSum, batt: battToLoad / srcSum, grid: absGrid / srcSum };
+      const rgb = [0, 1, 2].map(k => Math.round(w.pv * SRC.pv[k] + w.batt * SRC.batt[k] + w.grid * SRC.grid[k]));
+      // keep mixes bright: scale up so the strongest channel reaches at least 230
+      const mx = Math.max(...rgb), f = mx > 0 && mx < 230 ? 230 / mx : 1;
+      loadFlowColor = '#' + rgb.map(v => Math.min(255, Math.round(v * f)).toString(16).padStart(2, '0')).join('');
+      this._loadMix = w;
     }
     setFlow('flowInvLoad', load > 10, load, flowDur(load), loadFlowColor);
 
@@ -2715,6 +2972,14 @@ class FFlowCard extends HTMLElement {
       const glow = (w) => w > 10 ? (0.25 + 0.65 * Math.min(1, w / half)).toFixed(2) : '0';
       if (gl) gl.setAttribute('opacity', glow(pv1 + pv3));   // left slope: FV1 (+ FV3)
       if (gr) gr.setAttribute('opacity', glow(pv2 + pv4));   // right slope: FV2 (+ FV4)
+      // v1.9.0: a producing slope turns PV-yellow, like the sun → inverter flow
+      [['roofL', pv1 + pv3], ['roofR', pv2 + pv4]].forEach(([id, w]) => {
+        const r = getEl(id); if (!r) return;
+        const on = w > 10;
+        r.setAttribute('stroke', on ? '#ffe83c' : 'currentColor');
+        r.setAttribute('fill', on ? 'rgba(255,232,60,.18)' : '#1b2230');
+        r.setAttribute('filter', on ? 'url(#gridNeon)' : '');
+      });
     } else if (homeImg) { homeImg.style.opacity = load > 10 ? '1' : '0.7'; homeImg.setAttribute('filter', load > 10 ? 'url(#iconGlowOrange)' : ''); }
 
     // Battery fill & stats

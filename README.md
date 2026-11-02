@@ -5,7 +5,7 @@
 [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
 [![Release](https://img.shields.io/github/v/release/fabiustek/f-flow-card)](https://github.com/fabiustek/f-flow-card/releases)
 
-Versione attuale: **v1.8.0** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
+Versione attuale: **v1.9.0** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
 
 <p align="center">
   <img src="docs/images/card-overview.png" alt="F-Flow Card con tutte le sezioni attive" width="480">
@@ -29,6 +29,8 @@ Versione attuale: **v1.8.0** · Fork di [k-flow-card](https://github.com/thekhan
   - [Grafico dei consumi](#grafico-dei-consumi)
   - [Ventilazione inverter](#ventilazione-inverter)
   - [Statistiche](#statistiche)
+  - [Videocamera](#videocamera)
+  - [Cielo di notte e meteo](#cielo-di-notte-e-meteo)
   - [Statistiche batteria (JK BMS)](#statistiche-batteria-jk-bms)
   - [Auto elettrica / Wallbox](#auto-elettrica--wallbox)
   - [Da telefono](#da-telefono)
@@ -46,7 +48,8 @@ Versione attuale: **v1.8.0** · Fork di [k-flow-card](https://github.com/thekhan
 ## Cosa fa
 
 - **Flussi animati** a curve morbide con linee tratteggiate sottili e luminose: fotovoltaico → inverter → batteria / rete / casa / auto, con velocità e colori che seguono la potenza
-- **Sole e luna** che si muovono su un arco in base all'ora reale (`sun.sun`), con alba e tramonto
+- **Sole e luna** che si muovono su un arco in base all'ora reale (`sun.sun`), con alba e tramonto; di notte **cielo stellato** con stelle cadenti
+- **Meteo animato** nel cielo: nuvole, pioggia, temporale, neve, nebbia e vento dalla tua entità `weather.*`
 - **Batteria a segmenti** colorata in base al SOC, con scia che sale in carica e scende in scarica
 - **Traliccio luminoso**: rosso quando prelevi, verde quando immetti, barrato quando sei fuori rete
 - **Casa a due falde** con FV1 a sinistra e FV2 a destra, ognuna illuminata dalla propria produzione
@@ -54,6 +57,7 @@ Versione attuale: **v1.8.0** · Fork di [k-flow-card](https://github.com/thekhan
 - **Utilizzatori** con icona, colore e un disco stile contatore Ferraris che gira in base al consumo
 - **Grafico dei consumi** delle ultime 24 ore: chi ha consumato e quando
 - **Statistiche**: produzione FV di oggi per stringa con la stima, consumi della casa con i picchi, batteria nelle 24 ore
+- **Videocamera** in diretta con le frecce per muovere una telecamera ONVIF
 - **Ventilazione inverter** con livelli termici, temperature, PWM e ventole animate
 - **Autonomia** fino a un SOC minimo a scelta (es. 20%) e **tempo alla ricarica**, energia residua, barra delle fonti di energia, modalità EMS
 - **Wallbox e auto** disegnate accanto alla casa, con stato, potenza, SOC dell'auto e tempo alla carica completa
@@ -134,11 +138,11 @@ Esempio: SOC 45%, soglia 20%, batteria da 16 kWh, scarica a 1533 W → 25% di 16
 
 ### Casa a due falde
 
-La casa ha due falde di pannelli: **FV1 sulla sinistra** e **FV2 sulla destra**. Ogni falda si illumina di giallo in base alla produzione della propria stringa, e il valore è scritto accanto alla falda. Sotto la casa c'è il consumo istantaneo, e l'**anello alla base gira più veloce quanto più la casa consuma** (fermo sotto i 10 W). La casa prende il colore della fonte che la alimenta: giallo fotovoltaico, arancione batteria, rosso rete. Le finestre si accendono quando c'è consumo.
+La casa ha due falde di pannelli: **FV1 sulla sinistra** e **FV2 sulla destra**. Quando una stringa produce, la sua **falda diventa gialla** (come il flusso dal sole all'inverter) e i pannelli si illuminano tanto più quanto più produce; nome e potenza sono scritti in alto, accanto alla falda. Sotto la casa c'è il consumo istantaneo, e l'**anello alla base gira più veloce quanto più la casa consuma** (fermo sotto i 10 W). La casa (con il flusso che arriva dall'inverter, l'anello e il valore del consumo) prende il **colore delle fonti che la alimentano, mescolate in proporzione**: **giallo** per il solare, **blu** per la batteria, **rosso** per la rete. Per esempio, se la casa prende il 60% dal solare e il 40% dalla rete diventa arancione; metà solare e metà batteria dà un verde chiaro. La quota solare è la produzione FV che resta dopo la carica della batteria e l'immissione in rete. Le finestre si accendono quando c'è consumo.
 
 **Stringhe aggiuntive FV3 e FV4**: attivale nella sezione **☀️ Stringhe FV aggiuntive** (＋ Attiva). **FV3** compare sotto FV1, sul lato della falda sinistra; **FV4** sotto FV2, sul lato della falda destra. Ogni falda si illumina con la somma delle sue stringhe (sinistra FV1 + FV3, destra FV2 + FV4). Con l'icona casa classica, FV3 e FV4 restano nella colonna di sinistra.
 
-Se nel tuo impianto le stringhe sono al contrario, basta scambiare i sensori FV1 e FV2 nella sezione **☀️ Fotovoltaico**. Lì puoi anche dare un **nome** a ogni stringa (es. "Sud-Est", "Nord-Ovest"): compare accanto alla casa e nelle statistiche. Per tornare all'immagine vecchia: **Icona casa classica** (`home_icon_style: classic`).
+Se nel tuo impianto le stringhe sono al contrario, basta scambiare i sensori FV1 e FV2 nella sezione **☀️ Fotovoltaico**. Lì puoi anche dare il **nome che vuoi** a ogni falda/stringa, in base al tuo impianto (per esempio l'orientamento o "Garage"): compare accanto alla casa e nelle statistiche. Se lasci il campo vuoto resta **FV1**, **FV2**… Per tornare all'immagine vecchia: **Icona casa classica** (`home_icon_style: classic`).
 
 ### Commutazione IN RETE / FUORI RETE
 
@@ -252,6 +256,35 @@ Sezione **📈 Statistiche** → **＋ Attiva**. Ci sono tre grafici, ognuno att
 **3. Batteria · ultime 24 ore**
 - Area **blu** sopra lo zero quando la batteria si carica, **arancione** sotto lo zero quando si scarica; la linea bianca è il **SOC** (scala in % a destra).
 - In alto: SOC minimo e massimo; sotto: kWh caricati e scaricati.
+
+### Videocamera
+
+<p align="center"><img src="docs/images/camera.png" alt="Sezione videocamera con le frecce di movimento" width="480"></p>
+
+Sezione **📹 Videocamera** → **＋ Attiva**:
+1. **Videocamera**: scegli la tua entità `camera.*`. Il video in diretta usa il lettore di Home Assistant (lo stesso delle card ufficiali: HLS, WebRTC o MJPEG, in base a cosa supporta la videocamera).
+2. Se il video non parte, o per consumare meno dati, attiva **Solo immagine**: la card mostra un'immagine aggiornata ogni 10 secondi.
+3. **Frecce ▲ ▼ ◀ ▶**: per ognuna scegli l'entità che muove la telecamera in quella direzione (pulsanti, script o switch dell'integrazione ONVIF). Facoltativo: **Posizione iniziale** per il pulsante centrale.
+
+Nella card le frecce compaiono sopra il video, in basso a destra. **Un tocco** manda un comando (un passo di movimento); **tenendo premuto** il comando si ripete ogni mezzo secondo finché non lasci. La card usa `button.press` per i pulsanti, `script.turn_on` / `switch.turn_on` per script e switch. Compaiono solo le frecce configurate.
+
+### Cielo di notte e meteo
+
+<p align="center"><img src="docs/images/sky-night.png" alt="Cielo stellato di notte" width="480"><br><img src="docs/images/sky-storm.png" alt="Temporale con pioggia e nuvole" width="480"></p>
+
+- **Di notte** (dal tramonto all'alba, da `sun.sun`) il cielo si riempie di **stelle** che brillano, con una **stella cadente** ogni tanto. Non serve configurare nulla.
+- **Meteo**: in **🎨 Layout e intestazione** scegli la tua entità **Meteo** (`weather.*`, per esempio quella di Met.no o di OpenWeatherMap). Il cielo si anima in base alle condizioni:
+
+| Condizione | Animazione |
+|---|---|
+| sereno (`sunny`, `clear-night`) | cielo libero (stelle di notte) |
+| poco nuvoloso (`partlycloudy`) | due nuvole che passano; stelle un po' velate |
+| nuvoloso (`cloudy`) | più nuvole; il sole si attenua, le stelle quasi spariscono |
+| pioggia (`rainy`) / acquazzone (`pouring`) | nuvole scure e gocce (più fitte con l'acquazzone) |
+| temporale (`lightning`, `lightning-rainy`) | nuvole scure, lampi e fulmini (con pioggia se `lightning-rainy`) |
+| neve (`snowy`), neve e pioggia, grandine | fiocchi che scendono ondeggiando |
+| nebbia (`fog`) | banchi di nebbia che scorrono |
+| vento (`windy`) | folate che attraversano il cielo |
 
 ### Statistiche batteria (JK BMS)
 
@@ -405,6 +438,7 @@ Tutte le opzioni si impostano dall'editor visuale; qui trovi le chiavi YAML corr
 | `inverter_name` | `''` | Nome nel riquadro dell'inverter e nel titolo dei riquadri giornalieri |
 | `inverter_image` | `''` | URL di un'immagine al posto del riquadro INV (es. `/local/inverter.png`) |
 | `ems_mode_entity` | `''` | Modalità EMS mostrata sotto il titolo |
+| `weather_entity` | `''` | Entità meteo per le animazioni del cielo |
 | `battery_cap_unit` | `ah` | Unità della capacità batteria: `ah` o `kwh` |
 | `battery_full_ah` | `0` | Capacità in Ah (se `ah`) |
 | `battery_full_wh` | `0` | Capacità **in kWh** (se `kwh`) |
@@ -426,7 +460,7 @@ Tutte le opzioni si impostano dall'editor visuale; qui trovi le chiavi YAML corr
 | Chiave | Predefinito | Descrizione |
 |---|---|---|
 | `pv1_power` / `pv2_power` | sensori GoodWe | Potenza delle stringhe FV1 (falda sinistra) e FV2 (falda destra) |
-| `pv1_name` … `pv4_name` | `''` | Nome delle stringhe (es. `Sud-Est`); se vuoto `FV1`… |
+| `pv1_name` … `pv4_name` | `''` | Nome libero delle falde/stringhe; se vuoto `FV1`, `FV2`… |
 | `_show_pv_extra` | `false` | Mostra le stringhe FV3 e FV4 |
 | `pv3_power` / `pv4_power` | `''` | Potenza delle stringhe FV3 (sotto FV1, falda sinistra) e FV4 (sotto FV2, falda destra) |
 | `pv_total_power` | `sensor.goodwe_pv_power` | Potenza FV totale (se vuota: somma delle stringhe) |
@@ -493,6 +527,17 @@ Tutte le opzioni si impostano dall'editor visuale; qui trovi le chiavi YAML corr
 | `stats_load` | `true` | Grafico consumi casa ultime 24 ore (sensore `consump`) |
 | `stats_battery` | `true` | Grafico batteria ultime 24 ore (`battery_power`, `battery_soc`) |
 
+### Videocamera
+
+| Chiave | Predefinito | Descrizione |
+|---|---|---|
+| `_show_camera` | `false` | Mostra la sezione |
+| `camera_title` | `Videocamera` | Titolo della sezione |
+| `camera_entity` | `''` | Entità `camera.*` |
+| `camera_mode` | `live` | `live` (video in diretta) o `snapshot` (immagine ogni 10 s) |
+| `ptz_up` / `ptz_down` / `ptz_left` / `ptz_right` | `''` | Entità da attivare per ogni freccia |
+| `ptz_home` | `''` | Entità per la posizione iniziale (pulsante centrale) |
+
 ### Ventilazione inverter
 
 | Chiave | Descrizione |
@@ -543,7 +588,7 @@ Nella sezione Etichette la scelta di un'entità alternativa si sblocca solo dopo
 |---|---|
 | **Batteria (SOC)** | ≤20% rosso · ≤40% arancione · ≤75% verde · >75% azzurro |
 | **Rete** | rosso prelievo · verde immissione · grigio a riposo · barrato fuori rete |
-| **Casa** | colore della fonte principale: giallo FV · arancione batteria · rosso rete |
+| **Casa e flusso verso la casa** | miscela in proporzione delle fonti: giallo solare · blu batteria · rosso rete (es. solare + rete = arancione) |
 | **Temperatura celle** | ≤15°C blu · ≤35°C verde · ≤45°C arancione · >45°C rosso |
 | **Tensione celle** | <3,0 V rosso · <3,1 V arancione · <3,4 V giallo · ≤3,65 V verde · >3,65 V rosso |
 | **Ventilazione** | da grigio (idle) ad azzurro, blu, indaco, viola, fino a magenta (critical) |
@@ -557,7 +602,7 @@ Nella sezione Etichette la scelta di un'entità alternativa si sblocca solo dopo
 
 A ogni nuova versione viene creata automaticamente una **release** su GitHub e HACS ti propone l'aggiornamento in Home Assistant. Dopo l'aggiornamento ricarica il browser con `Ctrl + Shift + R`.
 
-Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.8.0**.
+Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.9.0**.
 
 ---
 
@@ -596,6 +641,15 @@ Per sapere quale versione stai usando, apri la console del browser (`F12`): comp
 **L'autonomia mostra `--`**
 - Serve la capacità della batteria nella sezione **⚙️ Generale** e un sensore di potenza della batteria valido. Se la batteria è a riposo non c'è una stima ("batteria a riposo").
 
+**La videocamera resta nera o dice "Videocamera non disponibile"**
+- Controlla che l'entità `camera.*` funzioni in una card "Immagine" di Home Assistant. Se il video in diretta non parte, attiva **Solo immagine** nella sezione Videocamera.
+
+**Le frecce della videocamera non muovono nulla**
+- Ogni freccia deve essere collegata a un'entità che si può "premere" o accendere (pulsante, script, switch). Prova l'entità da **Strumenti per sviluppatori → Azioni**: se lì la telecamera si muove, funziona anche dalla card.
+
+**Il meteo non si anima**
+- Serve un'entità `weather.*` in **🎨 Layout e intestazione**. Lo stato deve essere uno di quelli standard di Home Assistant (es. `rainy`, `cloudy`); con stati diversi il cielo resta sereno.
+
 **Le statistiche dicono "Storico non disponibile" o la stima non compare**
 - I grafici usano lo storico di Home Assistant: i sensori non devono essere esclusi dal `recorder`.
 - Per la curva della stima su tutta la giornata serve un sensore con la previsione negli attributi (es. Solcast "Forecast Today"). Con un sensore di energia (kWh) la card mostra solo il totale stimato.
@@ -613,9 +667,16 @@ Per sapere quale versione stai usando, apri la console del browser (`F12`): comp
 
 ## Registro delle modifiche
 
+### v1.9.0
+- **Cielo di notte** con stelle che brillano e stelle cadenti.
+- **Meteo animato** nel cielo (nuvole, pioggia, acquazzone, temporale con fulmini, neve, nebbia, vento) dall'entità `weather.*`.
+- Nuova sezione **📹 Videocamera**: video in diretta (o immagine ogni 10 s) con le frecce per muovere una telecamera ONVIF; tocco = un passo, tenere premuto = movimento continuo.
+- Le **falde** diventano gialle quando le loro stringhe producono; nomi e potenze di FV1/FV2 più in alto e vicini alle falde.
+- **Colore della casa in base alle fonti**: flusso inverter → casa, casa, anello e consumo prendono una miscela di giallo (solare), blu (batteria) e rosso (rete) nella proporzione in cui ciascuna fonte alimenta la casa.
+
 ### v1.8.0
 - Nuova sezione **📈 Statistiche** con tre grafici: produzione FV di oggi a barre orarie per stringa con la curva della stima, consumi della casa nelle 24 ore colorati per intensità con il picco evidenziato, batteria nelle 24 ore (carica, scarica e SOC).
-- **Nomi delle stringhe** (es. Sud-Est, Nord-Ovest) accanto alla casa e nelle statistiche.
+- **Nomi delle stringhe a scelta** (se vuoti restano FV1, FV2…) accanto alla casa e nelle statistiche.
 - **Linee dei flussi più sottili**, come quella dal sole all'inverter; il flusso della batteria è sempre **blu**.
 
 ### v1.7.1
@@ -678,4 +739,4 @@ Per sapere quale versione stai usando, apri la console del browser (`F12`): comp
 
 ---
 
-*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.8.0*
+*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.9.0*
