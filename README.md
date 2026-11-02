@@ -1,7 +1,7 @@
 # f-flow-card
 
 **Card personalizzata per Home Assistant con i flussi energetici in tempo reale** — fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), con licenza MIT.
-`f-flow-card.js` · Unified Edition · layout in stile Sigenergy e interfaccia in italiano **V1.2.0**
+`f-flow-card.js` · Unified Edition · utilizzatori, ventilazione inverter e interfaccia in italiano **V1.3.0**
 
 <img width="1708" height="2520" alt="IMG_20260513_114249" src="https://github.com/user-attachments/assets/e4c54570-5b9e-43c4-9326-b44d4105a5d1" />
 <img width="1108" height="1688" alt="IMG_20260516_011350" src="https://github.com/user-attachments/assets/6914d4ab-daa6-432a-983d-6abac15a1cac" />
@@ -30,6 +30,9 @@ La card unisce un'area SVG con i flussi (arco del sole, percorsi animati, invert
 - Riquadri batteria: temperatura celle, temperatura BMS, tensione cella min/max, scarica, produzione FV totale
 - Riquadro autonomia: tempo residuo in scarica o tempo alla carica completa
 - Layout in stile Sigenergy (facoltativo): indicatore IN RETE / FUORI RETE, modalità EMS, immagine dell'inverter, barra fonti energia, pannello autonomia, 6 riquadri giornalieri
+- Sezione **Utilizzatori**: quanti elettrodomestici vuoi, con icona, colore e un disco stile contatore Ferraris che gira più o meno veloce in base al consumo
+- Sezione **Ventilazione inverter**: stato, temperature, PWM, giri medi e singole ventole che girano in base agli rpm
+- Batteria a segmenti moderna (oppure quella classica)
 - Editor visuale completo, diviso in sezioni: non serve scrivere YAML
 - Etichette ed entità personalizzabili per i 6 riquadri statistici
 - Tema scuro, adatto anche al telefono
@@ -89,6 +92,7 @@ Tutte queste opzioni sono facoltative: se non le attivi, la card ha l'aspetto cl
 | `_show_backup_panel` | booleano | Pannello con autonomia e kWh residui |
 | `_daily_tiles_extended` | booleano | 6 riquadri giornalieri (FV, carica, scarica, prelievo, immissione, consumo) |
 | `_show_battery_stats` | booleano | Imposta `false` per nascondere i riquadri JK BMS (predefinito `true`) |
+| `battery_style` | testo | `modern` (batteria a segmenti, predefinita) oppure `classic` |
 
 Le righe FV1 / FV2 spariscono da sole se `pv1_power` / `pv2_power` sono vuoti.
 
@@ -112,6 +116,61 @@ battery_full_wh: 48
 ```
 
 > I nomi delle entità nell'esempio sono indicativi: scegli quelli del tuo impianto con l'editor visuale.
+
+---
+
+## Utilizzatori (v1.3.0)
+
+Mostra un riquadro per ogni elettrodomestico. Nell'editor: sezione **🔌 Utilizzatori** → **＋ Attiva** → **＋ Aggiungi utilizzatore**. Per ogni utilizzatore scegli nome, sensore di potenza (W o kW), icona (qualsiasi icona `mdi:`), colore e la soglia oltre la quale il riquadro si illumina. Con ▲ ▼ cambi l'ordine, con ✕ lo togli. Toccando un riquadro nella card si apre la scheda dell'entità.
+
+Sotto ogni riquadro c'è un piccolo **disco contatore** (come i vecchi contatori Ferraris): la tacca colorata gira più veloce quando il consumo sale e si ferma a 0 W. Con `consumers_meter_speed` regoli la velocità di tutti i dischi.
+
+| Chiave | Predefinito | Descrizione |
+|---|---|---|
+| `_show_consumers` | `false` | Mostra la sezione |
+| `consumers_title` | `Utilizzatori` | Titolo della sezione |
+| `consumers_meter_speed` | `1` | Velocità dei dischi (0.1–5) |
+| `consumers` | `[]` | Elenco: `name`, `entity`, `icon`, `color`, `threshold` (W, predefinita 50) |
+
+```yaml
+_show_consumers: true
+consumers:
+  - name: Lavatrice
+    entity: sensor.lavatrice_power
+    icon: mdi:washing-machine
+    color: "#a78bfa"
+  - name: Cucina
+    entity: sensor.cucina_power
+    icon: mdi:chef-hat
+    threshold: 200
+```
+
+---
+
+## Ventilazione inverter (v1.3.0)
+
+Per chi ha una ventilazione ausiliaria dell'inverter. Nell'editor: sezione **🌀 Ventilazione inverter** → **＋ Attiva**. Tutti i sensori sono facoltativi: la sezione mostra solo quello che configuri.
+
+| Chiave | Descrizione |
+|---|---|
+| `_show_ventilation` | Mostra la sezione |
+| `vent_title` | Titolo (predefinito `Ventilazione inverter`) |
+| `vent_state_entity` | Stato (es. `idle`, `on`): diventa il badge in alto a destra |
+| `vent_status_entity` | Descrizione dello stato (es. "Sistema in attesa") |
+| `vent_ambient_temp` | Temperatura ambiente |
+| `vent_pwm` | PWM delle ventole (%) |
+| `vent_rpm_avg` | RPM medio; se vuoto è la media delle ventole |
+| `vent_inv_temp` | Temperatura inverter; se vuota usa `inv_temp` |
+| `vent_dc_temp` | Temperatura DC |
+| `vent_fans` | Elenco ventole: `name`, `entity` (rpm) |
+
+Le icone delle ventole girano in proporzione ai giri reali (circa 1,5 giri al secondo sullo schermo a 1000 rpm). Se non c'è un sensore di stato, la ventilazione è considerata accesa quando gli rpm sono sopra zero e il PWM non è a zero.
+
+---
+
+## Aggiornamenti automatici con HACS
+
+Ogni volta che su `main` cambia la versione nel file `dist/f-flow-card.js` (costante `FFC_VERSION`), un'azione di GitHub crea da sola la release corrispondente (es. `v1.3.0`). HACS controlla le release e ti propone l'aggiornamento in Home Assistant. Puoi vedere la versione installata nella console del browser: compare la scritta `F-FLOW-CARD v1.3.0`.
 
 ---
 
@@ -249,6 +308,13 @@ Tutte le opzioni si impostano dall'editor visuale. Qui sotto trovi le chiavi YAM
 ---
 
 ## Registro delle modifiche
+
+### v1.3.0
+- Nuova sezione **Utilizzatori** con icone, colori e dischi stile contatore Ferraris.
+- Nuova sezione **Ventilazione inverter** con stato, temperature, PWM, rpm e ventole animate.
+- Nuova batteria a segmenti; quella classica resta disponibile (`battery_style: classic`).
+- La casa non è più tagliata dalla barra FV/POT; badge e alone della batteria non sono più tagliati a sinistra.
+- Versione mostrata nella console del browser; release GitHub create automaticamente per gli aggiornamenti HACS.
 
 ### v1.2.0 (f-flow-card)
 - Progetto rinominato in **f-flow-card** (`type: custom:f-flow-card`).
@@ -422,4 +488,4 @@ Apri una issue su [GitHub](https://github.com/fabiustek/f-flow-card/issues) e in
 
 ---
 
-*f-flow-card · fork di k-flow-card (Khan Automation) · Ultimo aggiornamento: v1.2.0*
+*f-flow-card · fork di k-flow-card (Khan Automation) · Ultimo aggiornamento: v1.3.0*

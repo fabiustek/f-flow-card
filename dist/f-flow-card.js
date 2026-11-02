@@ -1,4 +1,14 @@
-// f-flow-card.js – Unified Edition v1.2.0
+// f-flow-card.js – Unified Edition v1.3.0
+const FFC_VERSION = '1.3.0';
+// Changes v1.3.0:
+//   NEW  – Consumers section (Utilizzatori): any number of appliances with mdi icon, colour and
+//           a Ferraris-style meter disc whose speed follows the measured power.
+//   NEW  – Inverter ventilation section: state, status text, ambient/INV/DC temps, PWM,
+//           average RPM and any number of fans; fan icons spin with their RPM.
+//   NEW  – Modern segmented battery icon (single battery); classic one via battery_style: classic.
+//   FIX  – House icon no longer clipped by the FV/POT bar (taller viewBox).
+//   FIX  – Battery badge and battery glow no longer clipped on the left (left margin in viewBox).
+//   NEW  – Version banner in the browser console; GitHub release created automatically per version.
 // Changes v1.2.0 (Sigenergy-style layout options — all opt-in, default look unchanged):
 //   NEW  – card_title: custom header title (default 'Energy Flow').
 //   NEW  – grid_status_entity: ON GRID / OFF GRID pill in the header.
@@ -126,11 +136,13 @@ class FFlowCardEditor extends HTMLElement {
   }
 
   _set(key, value) {
+    if (key === 'battery_style_classic') { key = 'battery_style'; value = value ? 'classic' : 'modern'; }
     if (this._config[key] === value) return;
     this._config = { ...this._config, [key]: value };
     this._fireChanged();
     if (key === '_show_battery' || key === '_show_battery2' || key === '_show_pv_extra' ||
-        key === '_show_ev'      || key === 'battery_cap_unit' || key === '_labels_custom_entities' ||
+        key === '_show_ev'      || key === 'battery_cap_unit' ||
+        key === '_show_consumers' || key === '_show_ventilation' || key === '_labels_custom_entities' ||
         key === 'label_cell_temp_minmax' || key === 'label_bms_temp'         ||
         key === 'label_min_cell'         || key === 'label_max_cell'         ||
         key === 'label_batt_dis'         || key === 'label_total_pv_gen'     ||
@@ -429,7 +441,8 @@ class FFlowCardEditor extends HTMLElement {
       pillLabel.style.cssText = 'position:relative;display:inline-block;width:40px;height:22px;flex-shrink:0;cursor:pointer;';
       const cb = document.createElement('input');
       cb.type = 'checkbox';
-      cb.checked = cfg[key] === undefined ? defaultOn : !!cfg[key];
+      cb.checked = key === 'battery_style_classic' ? cfg.battery_style === 'classic'
+        : cfg[key] === undefined ? defaultOn : !!cfg[key];
       cb.style.cssText = 'opacity:0;width:0;height:0;position:absolute;';
       const track = document.createElement('span');
       const knob  = document.createElement('span');
@@ -513,8 +526,117 @@ class FFlowCardEditor extends HTMLElement {
       switchRow('_show_energy_supply',   'Barra fonti energia', 'Barra Solare / Carica / Scarica / Rete a destra'),
       switchRow('_show_backup_panel',    'Pannello autonomia', 'Autonomia e kWh residui nell’area del flusso'),
       switchRow('_daily_tiles_extended', '6 riquadri giornalieri', 'FV, carica, scarica, prelievo, immissione, consumo'),
+      switchRow('battery_style_classic', 'Batteria stile classico', 'Usa la vecchia icona della batteria invece di quella a segmenti'),
       switchRow('_show_battery_stats',   'Riquadri statistiche batteria', 'Temp. celle, temp. BMS, celle min/max, autonomia (JK BMS)', true),
     ]));
+
+    // ── v1.3.0: generic list editor (consumers, fans) ──
+    const listEditor = (listKey, fields, newItem, addLabel) => {
+      const outer = document.createElement('div');
+      const items = Array.isArray(cfg[listKey]) ? cfg[listKey] : [];
+      const commit = (arr, rerender) => { this._set(listKey, arr); if (rerender) this._render(); };
+      const cur = () => (Array.isArray(this._config[listKey]) ? this._config[listKey] : []);
+      items.forEach((item, idx) => {
+        const box = document.createElement('div');
+        box.style.cssText = 'border:1px solid var(--divider-color,rgba(0,0,0,.12));border-radius:8px;padding:8px 10px ' + (this._openItems && this._openItems[listKey] === idx ? '0' : '8px') + ';margin-bottom:8px;';
+        const head = document.createElement('div');
+        head.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:.78rem;font-weight:700;color:var(--primary-text-color);';
+        if (!this._openItems) this._openItems = {};
+        const isOpen = this._openItems[listKey] === idx;
+        const t = document.createElement('span'); t.style.cssText = 'flex:1;cursor:pointer;user-select:none;';
+        t.textContent = `${isOpen ? '▾' : '▸'} ${idx + 1}. ${item.name || item.entity || 'Nuovo'}`;
+        t.title = isOpen ? 'Chiudi' : 'Modifica';
+        t.addEventListener('click', () => { this._openItems[listKey] = isOpen ? -1 : idx; this._render(); });
+        head.appendChild(t);
+        const btn = (label, title, fn, disabled) => {
+          const b = document.createElement('button');
+          b.textContent = label; b.title = title; b.disabled = !!disabled;
+          b.style.cssText = 'border:1px solid var(--divider-color,rgba(0,0,0,.2));background:var(--card-background-color,#fff);color:var(--primary-text-color);border-radius:6px;padding:2px 8px;cursor:pointer;font-size:.8rem;opacity:' + (disabled ? '.35' : '1');
+          b.addEventListener('click', (e) => { e.stopPropagation(); fn(); });
+          head.appendChild(b);
+        };
+        btn('▲', 'Sposta su', () => { const a = [...cur()]; [a[idx - 1], a[idx]] = [a[idx], a[idx - 1]]; commit(a, true); }, idx === 0);
+        btn('▼', 'Sposta giù', () => { const a = [...cur()]; [a[idx + 1], a[idx]] = [a[idx], a[idx + 1]]; commit(a, true); }, idx === items.length - 1);
+        btn('✕', 'Rimuovi', () => { commit(cur().filter((_, j) => j !== idx), true); });
+        box.appendChild(head);
+        if (this._openItems[listKey] !== idx) { head.style.marginBottom = '0'; outer.appendChild(box); return; }
+        const upd = (field, v) => { const a = cur().map((x, j) => j === idx ? { ...x, [field]: v } : x); commit(a, false); };
+        fields.forEach(f => {
+          const row = document.createElement('div');
+          row.style.cssText = 'margin-bottom:10px;';
+          const lbl = document.createElement('div');
+          lbl.className = 'row-label'; lbl.textContent = f.label;
+          row.appendChild(lbl);
+          if (f.type === 'entity' || f.type === 'icon') {
+            const sel = document.createElement('ha-selector');
+            sel.hass = this._hass;
+            sel.selector = f.type === 'entity' ? { entity: {} } : { icon: {} };
+            sel.value = item[f.key] || '';
+            sel.addEventListener('value-changed', (ev) => { ev.stopPropagation(); upd(f.key, ev.detail.value || ''); });
+            row.appendChild(sel);
+          } else if (f.type === 'color') {
+            const inp = document.createElement('input');
+            inp.type = 'color'; inp.value = item[f.key] || FFlowCard.PALETTE[idx % FFlowCard.PALETTE.length];
+            inp.style.cssText = 'width:60px;height:30px;border:none;background:none;cursor:pointer;padding:0;';
+            inp.addEventListener('change', () => upd(f.key, inp.value));
+            row.appendChild(inp);
+          } else {
+            const inp = document.createElement('input');
+            inp.type = f.type === 'number' ? 'number' : 'text';
+            inp.placeholder = f.placeholder || '';
+            inp.value = item[f.key] !== undefined ? String(item[f.key]) : '';
+            inp.style.cssText = 'display:block;width:100%;box-sizing:border-box;padding:7px 10px;border-radius:4px;border:1px solid var(--divider-color,rgba(0,0,0,.42));background:var(--input-fill-color,var(--secondary-background-color,rgba(0,0,0,.04)));color:var(--primary-text-color);font-size:.9rem;font-family:inherit;';
+            inp.addEventListener('change', () => upd(f.key, f.type === 'number' ? (inp.value === '' ? '' : Number(inp.value)) : inp.value));
+            inp.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') inp.blur(); });
+            row.appendChild(inp);
+          }
+          box.appendChild(row);
+        });
+        outer.appendChild(box);
+      });
+      const add = document.createElement('button');
+      add.textContent = addLabel;
+      add.style.cssText = 'width:100%;padding:8px;margin-bottom:14px;border-radius:8px;border:1px dashed var(--primary-color,#03a9f4);background:transparent;color:var(--primary-color,#03a9f4);font-weight:600;cursor:pointer;';
+      add.addEventListener('click', () => {
+        const a = cur();
+        if (!this._openItems) this._openItems = {};
+        this._openItems[listKey] = a.length;
+        commit([...a, newItem(a.length)], true);
+      });
+      outer.appendChild(add);
+      return outer;
+    };
+
+    const showConsumers = !!cfg._show_consumers;
+    shell.appendChild(makeSection('consumers', '🔌', 'Utilizzatori', [
+      textField('consumers_title', 'Titolo sezione', 'Utilizzatori'),
+      numberField('consumers_meter_speed', 'Velocità dischi contatore (1 = normale)', 0.1, 5, 0.1),
+      divider(),
+      listEditor('consumers', [
+        { key: 'name', label: 'Nome', type: 'text', placeholder: 'es. Lavatrice' },
+        { key: 'entity', label: 'Sensore di potenza (W o kW)', type: 'entity' },
+        { key: 'icon', label: 'Icona', type: 'icon' },
+        { key: 'color', label: 'Colore', type: 'color' },
+        { key: 'threshold', label: 'Soglia "acceso" in W (predefinita 50)', type: 'number', placeholder: '50' },
+      ], (n) => ({ name: '', entity: '', icon: 'mdi:power-plug', color: FFlowCard.PALETTE[n % FFlowCard.PALETTE.length] }), '＋ Aggiungi utilizzatore'),
+    ], { toggleKey: '_show_consumers', toggleOn: showConsumers, hidden: !showConsumers }));
+
+    const showVent = !!cfg._show_ventilation;
+    shell.appendChild(makeSection('ventilation', '🌀', 'Ventilazione inverter', [
+      textField('vent_title', 'Titolo', 'Ventilazione inverter'),
+      picker('vent_state_entity',  'Stato ventilazione (es. Idle / On)', true),
+      picker('vent_status_entity', 'Descrizione stato (es. "Sistema in attesa")', true),
+      picker('vent_ambient_temp',  'Temperatura ambiente', true),
+      picker('vent_pwm',           'PWM ventole (%)', true),
+      picker('vent_rpm_avg',       'RPM medio (se vuoto: media delle ventole)', true),
+      picker('vent_inv_temp',      'Temperatura inverter (se vuoto: quella della sezione FV)', true),
+      picker('vent_dc_temp',       'Temperatura DC', true),
+      divider(),
+      listEditor('vent_fans', [
+        { key: 'name', label: 'Nome', type: 'text', placeholder: 'es. FAN1' },
+        { key: 'entity', label: 'Sensore giri (rpm)', type: 'entity' },
+      ], (n) => ({ name: 'FAN' + (n + 1), entity: '' }), '＋ Aggiungi ventola'),
+    ], { toggleKey: '_show_ventilation', toggleOn: showVent, hidden: !showVent }));
 
     // ── Labels: global gate + per-row activation ──
     // Gate: section chip toggles _labels_custom_entities (body hidden when off).
@@ -718,6 +840,8 @@ class FFlowCard extends HTMLElement {
     this.attachShadow({ mode: 'open' });
   }
 
+  static get PALETTE() { return ['#f97316', '#29c4f6', '#f85149', '#22d3ee', '#a78bfa', '#84cc16', '#14b8a6', '#facc15', '#ec4899', '#3fb950']; }
+
   static getStubConfig() {
     return {
       pv1_power: 'sensor.goodwe_pv1_power',
@@ -794,10 +918,25 @@ class FFlowCard extends HTMLElement {
       _show_backup_panel: false,
       _show_battery_stats: true,
       _daily_tiles_extended: false,
+      battery_style: 'modern',
+      _show_consumers: false,
+      consumers_title: 'Utilizzatori',
+      consumers_meter_speed: 1,
+      consumers: [],
+      _show_ventilation: false,
+      vent_title: 'Ventilazione inverter',
+      vent_state_entity: '',
+      vent_status_entity: '',
+      vent_ambient_temp: '',
+      vent_pwm: '',
+      vent_rpm_avg: '',
+      vent_inv_temp: '',
+      vent_dc_temp: '',
+      vent_fans: [],
     };
   }
 
-  getCardSize() { return 8; }
+  getCardSize() { return 8 + (this.config._show_consumers ? 2 : 0) + (this.config._show_ventilation ? 3 : 0); }
   static getConfigElement() { return document.createElement('f-flow-card-editor'); }
 
   setConfig(config) {
@@ -805,7 +944,7 @@ class FFlowCard extends HTMLElement {
     this._buildStaticSVG();
   }
 
-  set hass(hass) { this._hass = hass; this._updateDynamic(); }
+  set hass(hass) { this._hass = hass; this._updateDynamic(); this._updateExtraSections(); }
 
   _val(eid, toWatts = false) {
     if (!eid) return null;
@@ -945,6 +1084,188 @@ class FFlowCard extends HTMLElement {
     if(pvT<=10)return'';const fl=this._flowLevel(pvT,'solar');const sY=by+7;const pD='M '+bx.toFixed(1)+','+sY.toFixed(1)+' C '+bx.toFixed(1)+',85 260,5 260,155';const col='rgba(255,232,60,.95)',gc='rgba(255,190,20,.55)';const dD=(fl.dur*.8).toFixed(2),dL=(8+fl.size*1.5).toFixed(1),gL=(6+fl.size*1.2).toFixed(1),dT=(parseFloat(dL)+parseFloat(gL)).toFixed(1);let h='';h+='<path d="'+pD+'" fill="none" stroke="'+gc+'" stroke-width="6" stroke-dasharray="'+dL+' '+gL+'" stroke-linecap="round" opacity="0.25" filter="url(#arcSunF2)"><animate attributeName="stroke-dashoffset" from="'+dT+'" to="0" dur="'+dD+'s" repeatCount="indefinite" calcMode="linear"/></path>';h+='<path d="'+pD+'" fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="1.8" stroke-dasharray="'+dL+' '+gL+'" stroke-linecap="round"><animate attributeName="stroke-dashoffset" from="'+dT+'" to="0" dur="'+dD+'s" repeatCount="indefinite" calcMode="linear"/></path>';h+='<path d="'+pD+'" fill="none" stroke="'+col+'" stroke-width="1.0" stroke-dasharray="'+dL+' '+gL+'" stroke-linecap="round" opacity="0.85"><animate attributeName="stroke-dashoffset" from="'+dT+'" to="0" dur="'+dD+'s" repeatCount="indefinite" calcMode="linear"/></path>';const wD=[{amp:6,dur:fl.dur*.9,ox:0,op:.9,sc:'rgba(255,255,255,0.92)',dLen:'3.0',dGap:'40.0'},{amp:10,dur:fl.dur*1.1,ox:3,op:.6,sc:col,dLen:'4.5',dGap:'50.0'}];const wc=Math.min(2,Math.max(1,Math.round(fl.count/5)));for(let wi=0;wi<wc;wi++){const w=wD[wi];const sC=Math.round(fl.count*.5),sD=w.dur.toFixed(2),sCy=(parseFloat(w.dLen)+parseFloat(w.dGap)).toFixed(1);for(let si=0;si<sC;si++){const fr=si/sC,ph=fr*Math.PI*2,sY2=(w.amp*Math.sin(ph+wi*1.1)).toFixed(1),sX=(w.ox+w.amp*.3*Math.cos(ph*.5)).toFixed(1),sDe=(fr*w.dur%w.dur).toFixed(3),sO=(w.op*(.5+.5*Math.abs(Math.sin(ph)))*.6).toFixed(2);h+='<g transform="translate('+sX+','+sY2+')"><path d="'+pD+'" fill="none" stroke="'+w.sc+'" stroke-width="1.2" stroke-dasharray="'+w.dLen+' '+w.dGap+'" stroke-linecap="round" opacity="'+sO+'"><animate attributeName="stroke-dashoffset" from="'+sCy+'" to="0" dur="'+sD+'s" begin="-'+sDe+'s" repeatCount="indefinite" calcMode="linear"/></path></g>';}}return h;
   }
 
+  // ── v1.3.0: consumers (Utilizzatori) ─────────────────────────────
+  _consumers() {
+    const list = Array.isArray(this.config.consumers) ? this.config.consumers : [];
+    return list.filter(c => c && c.entity);
+  }
+
+  _buildConsumersHTML(esc) {
+    if (!this.config._show_consumers) return '';
+    const list = this._consumers();
+    const title = esc(this.config.consumers_title || 'Utilizzatori');
+    const pal = FFlowCard.PALETTE;
+    let h = `<div class="dv"></div><div class="ct">🔌 ${title}</div><div class="cons">`;
+    if (!list.length) h += `<div style="grid-column:1/-1;font-size:.62rem;color:#8b949e;padding:6px 2px">Nessun utilizzatore: aggiungili dall'editor (sezione Utilizzatori).</div>`;
+    list.forEach((c, i) => {
+      const col = esc(c.color || pal[i % pal.length]);
+      h += `<div class="cn" id="cn${i}" data-entity="${esc(c.entity)}" style="--c:${col}">
+        <ha-icon icon="${esc(c.icon || 'mdi:power-plug')}"></ha-icon>
+        <div class="nm">${esc(c.name || c.entity)}</div>
+        <div class="pw" id="cnPw${i}">-- W</div>
+        <div class="meter"><div class="mk" id="cnMk${i}"></div></div>
+      </div>`;
+    });
+    return h + '</div>';
+  }
+
+  // ── v1.3.0: inverter ventilation ─────────────────────────────────
+  _fanSVG(id, size) {
+    const blade = 'M0,-2.2 C2.6,-3.6 4.8,-8.6 1.2,-10.6 C-1.6,-9 -2.4,-5 0,-2.2Z';
+    return `<svg width="${size}" height="${size}" viewBox="-12 -12 24 24"><g id="${id}">` +
+      [0, 90, 180, 270].map(a => `<path d="${blade}" transform="rotate(${a})" fill="currentColor"/>`).join('') +
+      `</g><circle r="2.2" fill="currentColor"/><circle r="1" fill="#0d1117"/></svg>`;
+  }
+
+  _ventFans() {
+    const list = Array.isArray(this.config.vent_fans) ? this.config.vent_fans : [];
+    return list.filter(f => f && f.entity);
+  }
+
+  _buildVentHTML(esc) {
+    if (!this.config._show_ventilation) return '';
+    const fans = this._ventFans();
+    let fh = '';
+    fans.forEach((f, i) => {
+      fh += `<div class="fan"><div id="vfIco${i}" style="color:#58a6ff;display:flex;justify-content:center">${this._fanSVG('vfRot' + i, 22)}</div>
+        <div class="l">${esc(f.name || 'Ventola ' + (i + 1))}</div><div class="v" id="vfVal${i}">--</div></div>`;
+    });
+    return `<div class="dv"></div>
+      <div class="vent">
+        <div class="top">
+          <div class="ico" id="ventMainIco" style="color:#8b949e">${this._fanSVG('ventMainRot', 30)}</div>
+          <div style="min-width:0">
+            <div class="ttl">${esc(this.config.vent_title || 'Ventilazione inverter')}</div>
+            <div class="sub" id="ventStatus">--</div>
+            <div class="tmp" id="ventTemps"></div>
+          </div>
+          <div class="st" id="ventState">--</div>
+        </div>
+        <div class="kpi">
+          <div><div class="v" id="ventAmb">--<small>°C</small></div><div class="l">Ambiente</div></div>
+          <div><div class="v" id="ventPwm">--<small>%</small></div><div class="l">PWM</div></div>
+          <div><div class="v" id="ventRpm">--<small>rpm</small></div><div class="l">RPM medio</div></div>
+        </div>
+        ${fans.length ? `<div class="fans">${fh}</div>` : ''}
+      </div>`;
+  }
+
+  _bindExtraSections() {
+    this.shadowRoot.querySelectorAll('.cn[data-entity]').forEach(el => {
+      el.addEventListener('click', () => this.dispatchEvent(new CustomEvent('hass-more-info', {
+        detail: { entityId: el.dataset.entity }, bubbles: true, composed: true })));
+    });
+    // animation state: meters and fans keep their own angle so speed changes are smooth
+    this._spin = { meters: {}, fans: {} };
+    this._startAnim();
+  }
+
+  connectedCallback() { this._connected = true; this._startAnim(); }
+  disconnectedCallback() { this._connected = false; if (this._raf) cancelAnimationFrame(this._raf); this._raf = null; }
+
+  _startAnim() {
+    if (this._raf || this._connected === false) return;
+    if (!this.config._show_consumers && !this.config._show_ventilation) return;
+    let last = performance.now();
+    const tick = (now) => {
+      const dt = Math.min(0.1, (now - last) / 1000); last = now;
+      const sp = this._spin || { meters: {}, fans: {} };
+      const root = this.shadowRoot;
+      for (const id in sp.meters) {
+        const m = sp.meters[id];
+        m.a = (m.a + m.rps * dt * Math.PI * 2) % (Math.PI * 2);
+        const el = root.getElementById(id);
+        if (!el) continue;
+        // Ferraris disc seen edge-on: the mark crosses the window on the front half, hidden on the back
+        const front = Math.cos(m.a);
+        el.style.left = (50 + 46 * Math.sin(m.a)).toFixed(2) + '%';
+        el.style.opacity = front > 0 ? (0.25 + 0.75 * front).toFixed(2) : '0';
+        el.style.transform = 'scaleX(' + Math.max(0.3, front).toFixed(2) + ')';
+      }
+      for (const id in sp.fans) {
+        const f = sp.fans[id];
+        f.a = (f.a + f.rps * dt * 360) % 360;
+        const el = root.getElementById(id);
+        if (el) el.setAttribute('transform', 'rotate(' + f.a.toFixed(1) + ')');
+      }
+      this._raf = requestAnimationFrame(tick);
+    };
+    this._raf = requestAnimationFrame(tick);
+  }
+
+  _updateExtraSections() {
+    const sp = this._spin; if (!sp) return;
+    const root = this.shadowRoot;
+    const fmtW = (w) => Math.abs(w) >= 1000 ? (w / 1000).toFixed(2) + ' kW' : Math.round(w) + ' W';
+    // consumers
+    if (this.config._show_consumers) {
+      const k = Number(this.config.consumers_meter_speed) || 1;
+      this._consumers().forEach((c, i) => {
+        const w = this._val(c.entity, true);
+        const pw = root.getElementById('cnPw' + i);
+        if (pw) pw.textContent = w === null ? '--' : fmtW(w);
+        const tile = root.getElementById('cn' + i);
+        const thr = Number(c.threshold) >= 0 && c.threshold !== '' && c.threshold !== undefined ? Number(c.threshold) : 50;
+        if (tile) tile.classList.toggle('on', w !== null && w >= thr);
+        // 1 kW ≈ 0.6 giri/s; a few watts still turn slowly; capped so it stays readable
+        const rps = w === null || w < 1 ? 0 : Math.min(3, Math.max(0.05, (w / 1000) * 0.6 * k));
+        const id = 'cnMk' + i;
+        if (!sp.meters[id]) sp.meters[id] = { a: Math.random() * Math.PI, rps: 0 };
+        sp.meters[id].rps = rps;
+      });
+    }
+    // ventilation
+    if (this.config._show_ventilation) {
+      const st = (eid) => { const s = eid && this._hass.states[eid]; return s && s.state !== 'unavailable' && s.state !== 'unknown' ? String(s.state) : null; };
+      const setHTML = (id, v) => { const el = root.getElementById(id); if (el) el.innerHTML = v; };
+      const fans = this._ventFans();
+      const rpms = fans.map(f => this._val(f.entity));
+      const valid = rpms.filter(v => v !== null);
+      let avg = this._val(this.config.vent_rpm_avg);
+      if (avg === null && valid.length) avg = valid.reduce((a, b) => a + b, 0) / valid.length;
+      const pwm = this._val(this.config.vent_pwm);
+      const amb = this._val(this.config.vent_ambient_temp);
+      const invT = this._val(this.config.vent_inv_temp || this.config.inv_temp);
+      const dcT = this._val(this.config.vent_dc_temp);
+      const rawState = st(this.config.vent_state_entity);
+      const running = rawState !== null
+        ? /on|run|attiv|active|cool|high|low|medium|auto/i.test(rawState) && !/off|idle|stop|spent/i.test(rawState)
+        : (avg !== null && avg > 0 && (pwm === null || pwm > 0));
+      const map = { idle: 'Inattiva', on: 'Accesa', off: 'Spenta', running: 'In funzione', auto: 'Auto', unavailable: 'Non disp.' };
+      const stateTxt = rawState !== null ? (map[rawState.toLowerCase()] || rawState) : (running ? 'In funzione' : 'Inattiva');
+      const stEl = root.getElementById('ventState');
+      if (stEl) {
+        stEl.textContent = stateTxt;
+        stEl.style.color = running ? '#3fb950' : '#8b949e';
+        stEl.style.borderColor = running ? 'rgba(63,185,80,.6)' : '#30363d';
+      }
+      const statusTxt = st(this.config.vent_status_entity);
+      const sEl = root.getElementById('ventStatus');
+      if (sEl) sEl.textContent = statusTxt !== null ? statusTxt : (running ? 'Raffreddamento attivo' : 'Sistema in attesa');
+      const temps = [];
+      if (invT !== null) temps.push('INV ' + invT.toFixed(1) + '°');
+      if (dcT !== null) temps.push('DC ' + dcT.toFixed(1) + '°');
+      const tEl = root.getElementById('ventTemps'); if (tEl) tEl.textContent = temps.join(' • ');
+      setHTML('ventAmb', (amb === null ? '--' : amb.toFixed(0)) + '<small>°C</small>');
+      setHTML('ventPwm', (pwm === null ? '--' : pwm.toFixed(0)) + '<small>%</small>');
+      setHTML('ventRpm', (avg === null ? '--' : Math.round(avg)) + '<small>rpm</small>');
+      const main = root.getElementById('ventMainIco');
+      if (main) main.style.color = running ? '#58a6ff' : '#8b949e';
+      // visual speed: 1000 rpm ≈ 1.5 giri/s on screen
+      const vis = (r) => r === null || r <= 0 ? 0 : Math.min(4, r / 650);
+      if (!sp.fans.ventMainRot) sp.fans.ventMainRot = { a: 0, rps: 0 };
+      sp.fans.ventMainRot.rps = running ? vis(avg) : 0;
+      fans.forEach((f, i) => {
+        const r = rpms[i];
+        const v = root.getElementById('vfVal' + i); if (v) v.textContent = r === null ? '--' : Math.round(r);
+        const ico = root.getElementById('vfIco' + i); if (ico) ico.style.color = r !== null && r > 0 ? '#58a6ff' : '#8b949e';
+        const id = 'vfRot' + i;
+        if (!sp.fans[id]) sp.fans[id] = { a: i * 30, rps: 0 };
+        sp.fans[id].rps = vis(r);
+      });
+    }
+  }
+
   _buildStaticSVG() {
     const dual = !!(this.config._show_battery2);
     const showBatt1 = !!(this.config._show_battery !== false);
@@ -964,9 +1285,9 @@ class FFlowCard extends HTMLElement {
 
     // Battery status badge under the battery icon (battery centre x ≈ 31 after transform)
     const battBadge = showBatt1 ? `<g id="battBadgeGroup">
-      <rect id="battBadgeRect" x="-1" y="262" width="66" height="16" rx="8" fill="rgba(139,148,158,.10)" stroke="#8b949e" stroke-width="1.2"/>
-      <circle id="battBadgeDot" cx="8" cy="270" r="3" fill="#8b949e"/>
-      <text id="battBadgeText" x="37" y="274" text-anchor="middle" font-size="8.5" font-weight="800" letter-spacing="1.2" fill="#8b949e">RIPOSO</text>
+      <rect id="battBadgeRect" x="2" y="262" width="64" height="16" rx="8" fill="rgba(139,148,158,.10)" stroke="#8b949e" stroke-width="1.2"/>
+      <circle id="battBadgeDot" cx="11" cy="270" r="3" fill="#8b949e"/>
+      <text id="battBadgeText" x="38" y="274" text-anchor="middle" font-size="8.5" font-weight="800" letter-spacing="1.2" fill="#8b949e">RIPOSO</text>
     </g>` : '';
 
     // Inverter: drawn box (default) or user-supplied picture
@@ -1043,7 +1364,25 @@ class FFlowCard extends HTMLElement {
     const battFlowPaths = showBatt1 ? `
       <path id="flowBattIn"  d="M 59,175 H 132 V 205 H 205" fill="none" stroke="#8b949e" stroke-width="3" stroke-linecap="round" stroke-dasharray="14 10" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="-24" to="0"   dur="4.0s" repeatCount="indefinite"/></path>
       <path id="flowBattOut" d="M 59,175 H 132 V 205 H 205" fill="none" stroke="#8b949e" stroke-width="3" stroke-linecap="round" stroke-dasharray="14 10" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="0"   to="-24" dur="4.0s" repeatCount="indefinite"/></path>` : '';
-    const battIconSection = !showBatt1 ? '' : (
+    const modernBatt = showBatt1 && !dual && this.config.battery_style !== 'classic';
+    let mbSegs = '';
+    for (let i = 0; i < 10; i++) {
+      const y = (236 - (i + 1) * 8.6 - i * 1.6).toFixed(1);
+      mbSegs += `<rect id="mbSeg${i}" x="14" y="${y}" width="40" height="8.6" rx="2.6" fill="#1c2128"/>`;
+    }
+    const battIconSection = !showBatt1 ? '' : modernBatt ? `
+      <g id="battIconWrap">
+        <rect x="24" y="123" width="20" height="8" rx="3" fill="url(#mbCapGrad)"/>
+        <rect x="8" y="129" width="52" height="113" rx="13" fill="url(#mbShellGrad)" stroke="#3a424d" stroke-width="1.5"/>
+        <rect x="11" y="132" width="46" height="107" rx="10" fill="#0b0f14"/>
+        ${mbSegs}
+        <g clip-path="url(#mbClip)"><rect id="mbSheen" x="11" y="240" width="46" height="26" fill="url(#mbSheenGrad)" opacity="0">
+          <animate id="mbSheenAnim" attributeName="y" from="240" to="106" dur="1.8s" repeatCount="indefinite"/></rect></g>
+        <rect x="13" y="134" width="8" height="103" rx="4" fill="rgba(255,255,255,.07)" style="pointer-events:none"/>
+        <text id="fcBattVal" x="34" y="188" text-anchor="middle" font-size="14.5" font-weight="900" fill="#fff" stroke="rgba(0,0,0,.65)" stroke-width="3" paint-order="stroke">--%</text>
+        <g id="battBoltGroup" opacity="0"><polygon points="37,196 29,210 34,210 31,222 40,207 35,207 39,196" fill="#fff" stroke="rgba(0,0,0,.5)" stroke-width="0.8"><animate attributeName="opacity" values="0.55;1;0.55" dur="1.2s" repeatCount="indefinite"/></polygon></g>
+      </g>
+      <text id="battVoltageFlow" x="34" y="256" text-anchor="middle" font-size="10" font-weight="700" fill="#c9d1d9">-- V</text>` : (
       `<g transform="translate(-36.6, 25.4) scale(0.8)">
         <g id="battIconWrap">
           <rect x="49" y="135" width="70" height="132" rx="10" fill="url(#battShellGrad)"/>
@@ -1097,13 +1436,39 @@ class FFlowCard extends HTMLElement {
       .ems-ico{width:26px;height:26px;border-radius:7px;background:rgba(63,185,80,.12);color:#3fb950;display:flex;align-items:center;justify-content:center;font-size:.9rem}
       .ems-l{font-size:.42rem;color:#8b949e;letter-spacing:1.5px;text-transform:uppercase}
       .ems-v{font-size:.68rem;font-weight:700;color:#3fb950}
+      .cons{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
+      .cn{--c:#58a6ff;position:relative;cursor:pointer;border-radius:16px;padding:12px 8px 10px;text-align:center;
+          background:linear-gradient(160deg,color-mix(in srgb,var(--c) 14%,#161b22),#0d1117 75%);
+          border:1px solid color-mix(in srgb,var(--c) 22%,#21262d);transition:border-color .4s,box-shadow .4s}
+      .cn.on{border-color:color-mix(in srgb,var(--c) 70%,transparent);box-shadow:0 0 14px color-mix(in srgb,var(--c) 30%,transparent)}
+      .cn ha-icon{--mdc-icon-size:24px;color:var(--c);display:block;margin:0 auto 6px;height:24px}
+      .cn .nm{font-size:.7rem;font-weight:700;color:#e6edf3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .cn .pw{font-size:.66rem;color:#c9d1d9;margin-top:2px;font-variant-numeric:tabular-nums}
+      .meter{position:relative;height:8px;margin:9px auto 0;width:78%;border-radius:4px;overflow:hidden;
+             background:linear-gradient(180deg,#05070a,#1b2027 45%,#2e353e 50%,#1b2027 55%,#05070a);border:1px solid #2a313a}
+      .meter .mk{position:absolute;top:1px;bottom:1px;width:4px;margin-left:-2px;left:50%;border-radius:1px;background:var(--c);box-shadow:0 0 6px var(--c)}
+      .vent{background:#0d1117;border:1px solid #21262d;border-radius:16px;padding:12px}
+      .vent .top{display:flex;align-items:center;gap:12px}
+      .vent .ico{width:52px;height:52px;border-radius:14px;background:#161b22;border:1px solid #21262d;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+      .vent .ttl{font-size:.82rem;font-weight:700;color:#e6edf3}
+      .vent .sub{font-size:.62rem;color:#c9d1d9;margin-top:2px}
+      .vent .tmp{font-size:.56rem;color:#8b949e;margin-top:2px}
+      .vent .st{margin-left:auto;align-self:flex-start;font-size:.56rem;font-weight:700;padding:3px 10px;border-radius:10px;border:1px solid #30363d;color:#8b949e;background:#161b22}
+      .vent .kpi{display:grid;grid-template-columns:repeat(3,1fr);margin:12px 0 10px;text-align:center}
+      .vent .kpi .v{font-size:1rem;font-weight:800;color:#e6edf3}
+      .vent .kpi .v small{font-size:.55rem;color:#8b949e;font-weight:600;margin-left:2px}
+      .vent .kpi .l{font-size:.46rem;color:#8b949e;letter-spacing:1px;text-transform:uppercase;margin-top:1px}
+      .vent .fans{display:grid;grid-template-columns:repeat(auto-fit,minmax(70px,1fr));gap:8px}
+      .vent .fan{background:#161b22;border:1px solid #21262d;border-radius:12px;padding:8px 4px;text-align:center}
+      .vent .fan .l{font-size:.48rem;color:#8b949e;letter-spacing:1px;text-transform:uppercase;margin:3px 0 1px}
+      .vent .fan .v{font-size:.8rem;font-weight:800;color:#e6edf3;font-variant-numeric:tabular-nums}
     </style>
     <div style="background:#161b22;border:1px solid #21262d;border-radius:12px;padding:13px;box-shadow:0 4px 20px rgba(0,0,0,.4);width:100%;box-sizing:border-box;">
       <div class="ct hdr">⚡ <span id="cardTitle">${cardTitle}</span>
         ${showGridStatus ? `<span id="gridStatusPill" class="pill"><span class="dot"></span><span id="gridStatusText">--</span></span>` : ''}
         <span id="battStatusBadge" style="margin-left:auto;font-size:.5rem;font-weight:700;letter-spacing:1.5px;padding:1px 8px;border-radius:8px;background:#21262d;color:#8b949e;text-transform:uppercase">RIPOSO</span></div>
       ${showEms ? `<div class="ems"><div class="ems-ico">☆</div><div><div class="ems-l">Modalità EMS</div><div class="ems-v" id="emsModeVal">--</div></div></div>` : ''}
-      <div style="width:100%;max-width:520px;margin:0 auto"><svg id="flowSvg" viewBox="0 0 520 470" style="width:100%;display:block">
+      <div style="width:100%;max-width:520px;margin:0 auto"><svg id="flowSvg" viewBox="-16 0 536 508" style="width:100%;display:block">
       <defs>
         <filter id="arcSunF" x="-150%" y="-150%" width="400%" height="400%"><feGaussianBlur stdDeviation="7"/></filter>
         <filter id="arcSunF2" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="3"/></filter>
@@ -1121,6 +1486,10 @@ class FFlowCard extends HTMLElement {
         <filter id="battGlowOrange"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
         <filter id="battGlowGreen"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
         <filter id="battGlowCyan"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <linearGradient id="mbShellGrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#1b2027"/><stop offset="45%" stop-color="#2a313a"/><stop offset="100%" stop-color="#14181d"/></linearGradient>
+        <linearGradient id="mbCapGrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#2d333b"/><stop offset="50%" stop-color="#8b949e"/><stop offset="100%" stop-color="#2d333b"/></linearGradient>
+        <linearGradient id="mbSheenGrad" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="rgba(255,255,255,0)"/><stop offset="50%" stop-color="rgba(255,255,255,.35)"/><stop offset="100%" stop-color="rgba(255,255,255,0)"/></linearGradient>
+        <clipPath id="mbClip"><rect x="11" y="132" width="46" height="107" rx="10"/></clipPath>
         <filter id="battGlowBolt"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
         <filter id="iconGlowOrange" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="10" result="b"/><feFlood flood-color="rgba(255,140,0,0.6)" result="c"/><feComposite in="c" in2="b" operator="in" result="d"/><feMerge><feMergeNode in="d"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
         <filter id="iconGlowBlue" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="10" result="b"/><feFlood flood-color="rgba(30,144,255,0.6)" result="c"/><feComposite in="c" in2="b" operator="in" result="d"/><feMerge><feMergeNode in="d"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
@@ -1230,7 +1599,10 @@ class FFlowCard extends HTMLElement {
         <div class="pvi"><div class="ico">⚡</div><div class="lbl">Residua</div><div class="val" id="invRemCap">-- Ah</div><div class="val" id="invRemKwh" style="font-size:.62rem;color:#8b949e;margin-top:1px">-- kWh</div></div>
         <div class="pvi"><div class="ico">🏡</div><div class="lbl">Consumo Oggi</div><div class="val" id="invTodayLoad">-- kWh</div></div>
       </div>`}
+      ${this._buildConsumersHTML(esc)}
+      ${this._buildVentHTML(esc)}
     </div>`;
+    this._bindExtraSections();
   }
 
   _updateDynamic() {
@@ -1416,6 +1788,25 @@ class FFlowCard extends HTMLElement {
       setText('battPwrFlow', absPwr1.toFixed(0) + ' W');
       setText('battCurrFlow', battCurr1.toFixed(1) + ' A');
       const bolt = getEl('battBoltGroup'); if (bolt) bolt.setAttribute('opacity', battPwr1 > 10 ? '1' : '0');
+      if (getEl('mbSeg0')) {
+        const soc = Math.max(0, Math.min(100, battSoc1));
+        const col = soc <= 20 ? '#f85149' : soc <= 40 ? '#f39c4b' : soc <= 75 ? '#3fb950' : '#00c8ff';
+        for (let i = 0; i < 10; i++) {
+          const frac = Math.max(0, Math.min(1, soc / 10 - i));
+          const seg = getEl('mbSeg' + i);
+          if (!seg) continue;
+          seg.setAttribute('fill', frac > 0 ? col : '#1c2128');
+          seg.setAttribute('opacity', frac > 0 ? (0.35 + 0.65 * frac).toFixed(2) : '1');
+        }
+        setAttr('fcBattVal', 'fill', '#fff');
+        const sheen = getEl('mbSheen'), sAnim = getEl('mbSheenAnim');
+        const moving = Math.abs(battPwr1) >= 50;
+        if (sheen) sheen.setAttribute('opacity', moving ? '1' : '0');
+        if (sAnim && moving) {
+          const up = battPwr1 > 0;
+          if (sAnim.getAttribute('from') !== (up ? '240' : '106')) { sAnim.setAttribute('from', up ? '240' : '106'); sAnim.setAttribute('to', up ? '106' : '240'); }
+        }
+      }
       // Fix #16: bTemp1/bTemp2 written once below in the label override block — skip early write
       // bMinCell, bMaxCell, bBattDis handled by label override block below
     }
@@ -1836,12 +2227,13 @@ class FFlowCard extends HTMLElement {
     }
   }
 }
+console.info('%c F-FLOW-CARD %c v' + FFC_VERSION + ' ', 'color:#0d1117;background:#f4d03f;font-weight:700', 'color:#f4d03f;background:#161b22;font-weight:700');
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: 'f-flow-card',
   name: 'F-Flow Card',
   description: 'Card dei flussi energetici in tempo reale (fotovoltaico, batteria, rete) con percorsi animati, doppia batteria, wallbox per auto elettrica ed etichette personalizzabili.',
   preview: true,
-  version: '1.2.0',
+  version: FFC_VERSION,
 });
 customElements.define('f-flow-card', FFlowCard);

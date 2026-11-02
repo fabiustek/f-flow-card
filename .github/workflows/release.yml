@@ -1,0 +1,38 @@
+name: Rilascio automatico
+
+# Crea una release GitHub (es. v1.3.0) ogni volta che su main cambia la versione
+# in dist/f-flow-card.js (costante FFC_VERSION). HACS usa le release per
+# proporre gli aggiornamenti in Home Assistant.
+
+on:
+  push:
+    branches: [main]
+    paths: ['dist/**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Leggi la versione
+        id: v
+        run: |
+          v=$(grep -oP "const FFC_VERSION = '\K[0-9]+\.[0-9]+\.[0-9]+" dist/f-flow-card.js)
+          if [ -z "$v" ]; then echo "FFC_VERSION non trovata"; exit 1; fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - name: Crea la release se non esiste
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V: ${{ steps.v.outputs.version }}
+        run: |
+          if gh release view "v$V" >/dev/null 2>&1; then
+            echo "La release v$V esiste già: niente da fare."
+            exit 0
+          fi
+          gh release create "v$V" --title "v$V" --generate-notes --target "$GITHUB_SHA"
