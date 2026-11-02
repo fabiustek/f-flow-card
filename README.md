@@ -266,7 +266,18 @@ Sezione **📈 Statistiche** → **＋ Attiva**. Ci sono tre grafici, ognuno att
 Sezione **📹 Videocamera** → **＋ Attiva**:
 1. **Videocamera**: scegli la tua entità `camera.*`. Il video in diretta usa il lettore di Home Assistant (lo stesso delle card ufficiali: HLS, WebRTC o MJPEG, in base a cosa supporta la videocamera).
 2. Se il video non parte, o per consumare meno dati, attiva **Solo immagine**: la card mostra un'immagine aggiornata ogni 10 secondi.
-3. **Frecce ▲ ▼ ◀ ▶**: per ognuna scegli l'entità che muove la telecamera in quella direzione (pulsanti, script o switch dell'integrazione ONVIF). Facoltativo: **Posizione iniziale** per il pulsante centrale.
+3. **Frecce ▲ ▼ ◀ ▶**, due modi:
+   - **ONVIF diretto (consigliato)**: in **Telecamera ONVIF da muovere** scegli l'entità `camera.*` dell'integrazione ONVIF che si muove (può essere diversa da quella del video). Le frecce chiamano il servizio `onvif.ptz` con `pan: LEFT/RIGHT` o `tilt: UP/DOWN`, `move_mode: ContinuousMove`, con **Velocità** (predefinita 1) e **Durata/ampiezza di ogni passo** (predefinita 0.3). Non servono altre entità. Facoltativo: un **preset** per il pulsante centrale (es. `1`).
+   - **Entità**: in alternativa, per ogni freccia scegli un pulsante, script o switch che muove la telecamera, e per il pulsante centrale **Posizione iniziale**.
+
+Esempio con l'integrazione ONVIF (video da un NVR, movimento sulla telecamera):
+```yaml
+_show_camera: true
+camera_entity: camera.nvr_camera_tetto_sub
+ptz_camera: camera.camera_tetto_profile000
+ptz_speed: 1
+ptz_distance: 0.3
+```
 
 Nella card le frecce compaiono sopra il video, in basso a destra. **Un tocco** manda un comando (un passo di movimento); **tenendo premuto** il comando si ripete ogni mezzo secondo finché non lasci. La card usa `button.press` per i pulsanti, `script.turn_on` / `switch.turn_on` per script e switch. Compaiono solo le frecce configurate.
 
@@ -542,6 +553,11 @@ Tutte le opzioni si impostano dall'editor visuale; qui trovi le chiavi YAML corr
 | `camera_mode` | `live` | `live` (video in diretta) o `snapshot` (immagine ogni 10 s) |
 | `ptz_up` / `ptz_down` / `ptz_left` / `ptz_right` | `''` | Entità da attivare per ogni freccia |
 | `ptz_home` | `''` | Entità per la posizione iniziale (pulsante centrale) |
+| `ptz_camera` | `''` | Telecamera ONVIF da muovere con `onvif.ptz` (se impostata, le frecce non hanno bisogno di entità) |
+| `ptz_speed` | `1` | Velocità del movimento ONVIF (0.1–1) |
+| `ptz_distance` | `0.3` | Durata/ampiezza di ogni passo ONVIF (0.1–1) |
+| `ptz_move_mode` | `ContinuousMove` | Modalità di movimento ONVIF |
+| `ptz_home_preset` | `''` | Preset ONVIF per il pulsante centrale |
 
 ### Ventilazione inverter
 
@@ -666,7 +682,8 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 - Controlla che l'entità `camera.*` funzioni in una card "Immagine" di Home Assistant. Se il video in diretta non parte, attiva **Solo immagine** nella sezione Videocamera.
 
 **Le frecce della videocamera non muovono nulla**
-- Ogni freccia deve essere collegata a un'entità che si può "premere" o accendere (pulsante, script, switch). Prova l'entità da **Strumenti per sviluppatori → Azioni**: se lì la telecamera si muove, funziona anche dalla card.
+- In modalità ONVIF diretta, **Telecamera ONVIF da muovere** deve essere l'entità `camera.*` dell'integrazione ONVIF (quella che usi con `onvif.ptz`), non quella dell'NVR. Prova il servizio `onvif.ptz` da **Strumenti per sviluppatori → Azioni** con la stessa entità.
+- In modalità entità, ogni freccia deve essere collegata a un'entità che si può "premere" o accendere (pulsante, script, switch). Prova l'entità da **Strumenti per sviluppatori → Azioni**: se lì la telecamera si muove, funziona anche dalla card.
 
 **Il meteo non si anima**
 - Serve un'entità `weather.*` in **🎨 Layout e intestazione**. Lo stato deve essere uno di quelli standard di Home Assistant (es. `rainy`, `cloudy`); con stati diversi il cielo resta sereno.
@@ -690,6 +707,7 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 
 ### v1.10.0
 - **Ordine delle sezioni a scelta**: in **🎨 Layout e intestazione** sposti con ▲ ▼ statistiche batteria, Inverter, Utilizzatori, Ventilazione, Statistiche e Videocamera.
+- **Videocamera con ONVIF diretto**: scegli solo la telecamera ONVIF e le frecce chiamano `onvif.ptz` (pan/tilt, velocità, passo, ContinuousMove), senza creare entità per ogni freccia; preset facoltativo per il pulsante centrale.
 - Nuova **icona della card** (`icon.png`, installata da HACS) da usare nella notifica di aggiornamento di HACS; istruzioni nella sezione [Aggiornamenti](#aggiornamenti).
 
 ### v1.9.0

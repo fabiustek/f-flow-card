@@ -3,6 +3,8 @@ const FFC_VERSION = '1.10.0';
 // Changes v1.10.0:
 //   NEW  – sections_order: the sections below the flow (JK BMS stats, Inverter, Consumers,
 //           Ventilation, Statistics, Camera) can be reordered from the editor with ▲ ▼.
+//   NEW  – ptz_camera: native ONVIF control — the arrows call onvif.ptz (pan/tilt, speed, distance,
+//           ContinuousMove) on that camera, no per-arrow entities needed; optional home preset.
 // Changes v1.9.1:
 //   NEW  – dist/icon.png: card icon installed by HACS (/local/community/f-flow-card/icon.png), usable as
 //           entity_picture of the HACS update entity (HACS only shows brand icons for integrations).
@@ -759,7 +761,12 @@ class FFlowCardEditor extends HTMLElement {
       picker('camera_entity', 'Videocamera (camera.*)'),
       switchRow('camera_snapshot', 'Solo immagine (aggiornata ogni 10 s)', 'Usala se il video in diretta non parte o per consumare meno dati'),
       divider(),
-      picker('ptz_up',    'Freccia ▲ su (pulsante, script o switch ONVIF)', true),
+      picker('ptz_camera', 'Telecamera ONVIF da muovere (usa il servizio onvif.ptz: non servono entità per le frecce)', true),
+      numberField('ptz_speed', 'Velocità movimento ONVIF', 0.1, 1, 0.1),
+      numberField('ptz_distance', 'Durata/ampiezza di ogni passo ONVIF', 0.1, 1, 0.1),
+      textField('ptz_home_preset', 'Preset ONVIF per il pulsante centrale (es. 1, facoltativo)', ''),
+      divider(),
+      picker('ptz_up',    'In alternativa: freccia ▲ su (pulsante, script o switch)', true),
       picker('ptz_down',  'Freccia ▼ giù', true),
       picker('ptz_left',  'Freccia ◀ sinistra', true),
       picker('ptz_right', 'Freccia ▶ destra', true),
@@ -1105,6 +1112,7 @@ class FFlowCard extends HTMLElement {
       camera_entity: '',
       camera_mode: 'live',
       ptz_up: '', ptz_down: '', ptz_left: '', ptz_right: '', ptz_home: '',
+      ptz_camera: '', ptz_speed: 1, ptz_distance: 0.3, ptz_move_mode: 'ContinuousMove', ptz_home_preset: '',
       _show_ventilation: false,
       vent_title: 'Ventilazione inverter',
       vent_state_entity: '',
@@ -1876,14 +1884,15 @@ class FFlowCard extends HTMLElement {
     if (!this.config._show_camera) return '';
     const c = this.config;
     if (!c.camera_entity) return '<div class="dv"></div>' + this._secHTML('cam', '📹 ' + esc(c.camera_title || 'Videocamera'), '<div class="st-info">Scegli la videocamera nell’editor (sezione Videocamera).</div>');
-    const arrow = (dir, key, path) => c[key] ? `<button class="pz ${dir}" data-ptz="${key}" title="${{ ptz_up: 'Su', ptz_down: 'Giù', ptz_left: 'Sinistra', ptz_right: 'Destra', ptz_home: 'Posizione iniziale' }[key]}">
+    const onvif = !!c.ptz_camera;   // native onvif.ptz: no per-arrow entities needed
+    const arrow = (dir, key, path) => (c[key] || (onvif && key !== 'ptz_home') || (onvif && key === 'ptz_home' && c.ptz_home_preset)) ? `<button class="pz ${dir}" data-ptz="${key}" title="${{ ptz_up: 'Su', ptz_down: 'Giù', ptz_left: 'Sinistra', ptz_right: 'Destra', ptz_home: 'Posizione iniziale' }[key]}">
         <svg viewBox="0 0 24 24" width="18" height="18"><path d="${path}" fill="currentColor"/></svg></button>` : '';
-    const pad = (c.ptz_up || c.ptz_down || c.ptz_left || c.ptz_right || c.ptz_home) ? `<div class="ptz">
+    const pad = (onvif || c.ptz_up || c.ptz_down || c.ptz_left || c.ptz_right || c.ptz_home) ? `<div class="ptz">
         ${arrow('up', 'ptz_up', 'M7.4 15.4 12 10.8l4.6 4.6L18 14l-6-6-6 6z')}
         ${arrow('down', 'ptz_down', 'M7.4 8.6 12 13.2l4.6-4.6L18 10l-6 6-6-6z')}
         ${arrow('left', 'ptz_left', 'M15.4 16.6 10.8 12l4.6-4.6L14 6l-6 6 6 6z')}
         ${arrow('right', 'ptz_right', 'M8.6 16.6 13.2 12 8.6 7.4 10 6l6 6-6 6z')}
-        ${c.ptz_home ? arrow('home', 'ptz_home', 'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z') : '<span class="pz home dot"></span>'}
+        ${c.ptz_home || (onvif && c.ptz_home_preset) ? arrow('home', 'ptz_home', 'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z') : '<span class="pz home dot"></span>'}
       </div>` : '';
     return '<div class="dv"></div>' + this._secHTML('cam', '📹 ' + esc(c.camera_title || 'Videocamera'), `
       <div class="cam" id="camBox">
@@ -1913,8 +1922,23 @@ class FFlowCard extends HTMLElement {
   }
 
   _ptz(key) {
-    const eid = this.config[key];
-    if (!eid || !this._hass) return;
+    if (!this._hass) return;
+    const c = this.config;
+    if (c.ptz_camera && !(key === 'ptz_home' && c.ptz_home && !c.ptz_home_preset)) {
+      // ONVIF integration: onvif.ptz on the PTZ camera entity (same as a picture-glance call-service)
+      const data = { entity_id: c.ptz_camera };
+      if (key === 'ptz_home') { data.move_mode = 'GotoPreset'; data.preset = String(c.ptz_home_preset); }
+      else {
+        Object.assign(data, { ptz_left: { pan: 'LEFT' }, ptz_right: { pan: 'RIGHT' }, ptz_up: { tilt: 'UP' }, ptz_down: { tilt: 'DOWN' } }[key]);
+        data.speed = Number(c.ptz_speed) || 1;
+        data.distance = Number(c.ptz_distance) || 0.3;
+        data.move_mode = c.ptz_move_mode || 'ContinuousMove';
+      }
+      this._hass.callService('onvif', 'ptz', data);
+      return;
+    }
+    const eid = c[key];
+    if (!eid) return;
     const domain = eid.split('.')[0];
     const service = (domain === 'button' || domain === 'input_button') ? 'press' : domain === 'automation' ? 'trigger' : 'turn_on';
     this._hass.callService(domain, service, { entity_id: eid });
