@@ -1,7 +1,7 @@
 # f-flow-card
 
 **Card personalizzata per Home Assistant con i flussi energetici in tempo reale** — fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), con licenza MIT.
-`f-flow-card.js` · Unified Edition · utilizzatori, ventilazione inverter e interfaccia in italiano **V1.3.0**
+`f-flow-card.js` · Unified Edition · grafico dei consumi, utilizzatori, ventilazione inverter, interfaccia in italiano **V1.4.0**
 
 <img width="1708" height="2520" alt="IMG_20260513_114249" src="https://github.com/user-attachments/assets/e4c54570-5b9e-43c4-9326-b44d4105a5d1" />
 <img width="1108" height="1688" alt="IMG_20260516_011350" src="https://github.com/user-attachments/assets/6914d4ab-daa6-432a-983d-6abac15a1cac" />
@@ -31,7 +31,9 @@ La card unisce un'area SVG con i flussi (arco del sole, percorsi animati, invert
 - Riquadro autonomia: tempo residuo in scarica o tempo alla carica completa
 - Layout in stile Sigenergy (facoltativo): indicatore IN RETE / FUORI RETE, modalità EMS, immagine dell'inverter, barra fonti energia, pannello autonomia, 6 riquadri giornalieri
 - Sezione **Utilizzatori**: quanti elettrodomestici vuoi, con icona, colore e un disco stile contatore Ferraris che gira più o meno veloce in base al consumo
-- Sezione **Ventilazione inverter**: stato, temperature, PWM, giri medi e singole ventole che girano in base agli rpm
+- **Grafico dei consumi** delle ultime 24 ore: un'area colorata per ogni utilizzatore, dallo storico di Home Assistant
+- Sezione **Ventilazione inverter** compatta, con i livelli termici (idle → critical), temperature, PWM, giri medi e ventole animate
+- Traliccio della rete luminoso disegnato in SVG: rosso quando prelevi, verde quando immetti
 - Batteria a segmenti moderna (oppure quella classica)
 - Editor visuale completo, diviso in sezioni: non serve scrivere YAML
 - Etichette ed entità personalizzabili per i 6 riquadri statistici
@@ -93,6 +95,7 @@ Tutte queste opzioni sono facoltative: se non le attivi, la card ha l'aspetto cl
 | `_daily_tiles_extended` | booleano | 6 riquadri giornalieri (FV, carica, scarica, prelievo, immissione, consumo) |
 | `_show_battery_stats` | booleano | Imposta `false` per nascondere i riquadri JK BMS (predefinito `true`) |
 | `battery_style` | testo | `modern` (batteria a segmenti, predefinita) oppure `classic` |
+| `grid_icon_style` | testo | `modern` (traliccio luminoso, predefinito) oppure `classic` (immagine PNG) |
 
 Le righe FV1 / FV2 spariscono da sole se `pv1_power` / `pv2_power` sono vuoti.
 
@@ -130,7 +133,16 @@ Sotto ogni riquadro c'è un piccolo **disco contatore** (come i vecchi contatori
 | `_show_consumers` | `false` | Mostra la sezione |
 | `consumers_title` | `Utilizzatori` | Titolo della sezione |
 | `consumers_meter_speed` | `1` | Velocità dei dischi (0.1–5) |
-| `consumers` | `[]` | Elenco: `name`, `entity`, `icon`, `color`, `threshold` (W, predefinita 50) |
+| `consumers` | `[]` | Elenco: `name`, `entity`, `icon`, `color`, `threshold` (W, predefinita 50), `chart` (`false` per escluderlo dal grafico) |
+| `consumers_chart` | `true` | Mostra il grafico dei consumi |
+| `consumers_chart_hours` | `24` | Ore mostrate (1–72) |
+| `consumers_chart_total` | `true` | Linea tratteggiata con il consumo totale (sensore `consump`) |
+
+### Grafico dei consumi (v1.4.0)
+
+Sotto i riquadri c'è un grafico ad aree sovrapposte: ogni utilizzatore ha il suo colore, così vedi subito **cosa ha consumato e quando**. I dati arrivano dallo storico di Home Assistant (recorder), con una media ogni 5 minuti, e si aggiornano ogni 5 minuti. La linea tratteggiata è il consumo totale della casa: lo spazio tra le aree e la linea è il consumo non misurato. Passando il dito o il mouse sul grafico vedi i valori di ogni utilizzatore in quell'orario. Sotto il grafico ci sono i kWh consumati da ciascuno nel periodo.
+
+> Se tra gli utilizzatori hai anche il totale della casa (es. "Casa"), togli la spunta **Mostra nel grafico**: altrimenti verrebbe contato due volte.
 
 ```yaml
 _show_consumers: true
@@ -155,7 +167,7 @@ Per chi ha una ventilazione ausiliaria dell'inverter. Nell'editor: sezione **�
 |---|---|
 | `_show_ventilation` | Mostra la sezione |
 | `vent_title` | Titolo (predefinito `Ventilazione inverter`) |
-| `vent_state_entity` | Stato (es. `idle`, `on`): diventa il badge in alto a destra |
+| `vent_state_entity` | Stato termico del controller: `idle`, `cool`, `low`, `medium`, `high`, `very high`, `critical` |
 | `vent_status_entity` | Descrizione dello stato (es. "Sistema in attesa") |
 | `vent_ambient_temp` | Temperatura ambiente |
 | `vent_pwm` | PWM delle ventole (%) |
@@ -164,7 +176,35 @@ Per chi ha una ventilazione ausiliaria dell'inverter. Nell'editor: sezione **�
 | `vent_dc_temp` | Temperatura DC |
 | `vent_fans` | Elenco ventole: `name`, `entity` (rpm) |
 
-Le icone delle ventole girano in proporzione ai giri reali (circa 1,5 giri al secondo sullo schermo a 1000 rpm). Se non c'è un sensore di stato, la ventilazione è considerata accesa quando gli rpm sono sopra zero e il PWM non è a zero.
+Ogni livello termico ha colore, testo e velocità della ventola principale:
+
+| Stato | Badge | Testo | Effetto |
+|---|---|---|---|
+| `idle` | Inattiva | Sistema in attesa | ventola barrata, ferma |
+| `cool` | Minima | Ventilazione minima attiva | azzurro, pulsazione lenta |
+| `low` | Bassa | Raffreddamento leggero | blu, pulsazione lenta |
+| `medium` | Media | Raffreddamento bilanciato | indaco |
+| `high` | Alta | Ventilazione sostenuta | viola |
+| `very high` | Molto alta | Ventilazione intensa | viola acceso, pulsazione veloce |
+| `critical` | Critica | Temperatura critica, massima ventilazione | magenta, triangolo di avviso |
+
+Le piccole ventole girano in proporzione ai loro giri reali. Se lo stato ha un valore diverso da quelli dell'elenco, la card lo mostra così com'è. Se non c'è un sensore di stato, la ventilazione è considerata accesa quando gli rpm sono sopra zero.
+
+```yaml
+_show_ventilation: true
+vent_state_entity: sensor.controller_fan_inverter_controller_fan_inverter_thermal_state
+vent_ambient_temp: sensor.clima_studio_room_temperature
+vent_pwm: sensor.controller_fan_inverter_controller_fan_inverter_pwm_percentage
+vent_inv_temp: sensor.deye_temperature
+vent_dc_temp: sensor.deye_dc_temperature
+vent_fans:
+  - name: FAN1
+    entity: sensor.controller_fan_inverter_controller_fan_inverter_fan_1_rpm
+  - name: FAN2
+    entity: sensor.controller_fan_inverter_controller_fan_inverter_fan_2_rpm
+  - name: FAN3
+    entity: sensor.controller_fan_inverter_controller_fan_inverter_fan_3_rpm
+```
 
 ---
 
@@ -308,6 +348,11 @@ Tutte le opzioni si impostano dall'editor visuale. Qui sotto trovi le chiavi YAM
 ---
 
 ## Registro delle modifiche
+
+### v1.4.0
+- Nuovo **grafico dei consumi** delle ultime 24 ore (regolabile fino a 72), ad aree colorate per utilizzatore, con linea del totale casa, dettaglio al tocco e kWh per utilizzatore.
+- Nuovo **traliccio della rete** luminoso in SVG che cambia colore con prelievo e immissione; l'immagine vecchia resta disponibile.
+- **Ventilazione inverter** ridisegnata: più compatta, nello stile della card, con i livelli termici idle → critical.
 
 ### v1.3.0
 - Nuova sezione **Utilizzatori** con icone, colori e dischi stile contatore Ferraris.
@@ -488,4 +533,4 @@ Apri una issue su [GitHub](https://github.com/fabiustek/f-flow-card/issues) e in
 
 ---
 
-*f-flow-card · fork di k-flow-card (Khan Automation) · Ultimo aggiornamento: v1.3.0*
+*f-flow-card · fork di k-flow-card (Khan Automation) · Ultimo aggiornamento: v1.4.0*
