@@ -1,5 +1,12 @@
-// f-flow-card.js – Unified Edition v1.11.0
-const FFC_VERSION = '1.11.0';
+// f-flow-card.js – Unified Edition v1.11.1
+const FFC_VERSION = '1.11.1';
+// Changes v1.11.1:
+//   FIX  – EMS badge: right padding so the border no longer touches the text.
+//   FIX  – House → wallbox line: grey track always visible (blue dashes only while charging).
+//   CHG  – Tab bubble closer to the reference: liquid glass look (silver rim, violet glow, glass fill),
+//           pearlescent sheen travelling around the rim at rest, liquid transition (leader bulb squashed
+//           by its speed, thinning tail and neck) with motion-trail echoes and a jelly bounce on arrival.
+//   CHG  – Line icons (battery, inverter, plug, fan, chart, camera) instead of emoji in tabs and titles.
 // Changes v1.11.0:
 //   NEW  – Tab menu for the sections below the flow (default): one section open at a time, closed on
 //           load (or last used / fixed via tabs_start). The active-tab indicator is a gooey SVG droplet
@@ -1338,26 +1345,59 @@ class FFlowCard extends HTMLElement {
     if (!this._tabsMode()) return keys.map(k => strip(chunks[k])).join('<div class="dv"></div>');
     // v1.11.0: tab menu with a gooey, spring-driven indicator; one panel open at a time
     if (!keys.length) return '';
-    const L = { bms: ['🔋', 'Batteria'], inv: ['☀️', 'Inverter'], cons: ['🔌', 'Utilizzatori'], vent: ['🌀', 'Ventilazione'], stats: ['📈', 'Statistiche'], cam: ['📹', 'Video'] };
-    const tabs = keys.map(k => `<button class="tab" data-k="${k}"><span class="ti">${L[k][0]}</span><span>${L[k][1]}</span></button>`).join('');
+    const L = { bms: 'Batteria', inv: 'Inverter', cons: 'Utilizzatori', vent: 'Ventilazione', stats: 'Statistiche', cam: 'Video' };
+    const tabs = keys.map(k => `<button class="tab" data-k="${k}"><span class="ti">${this._secIcon(k)}</span><span>${L[k]}</span></button>`).join('');
     const panels = keys.map(k => `<div class="tpanel" data-k="${k}" hidden>${strip(chunks[k])}</div>`).join('');
     return `<div class="tabs" id="tScroll"><div class="ttrack" id="tTrack">
         <svg class="tgoo" id="tGoo" width="10" height="10"><defs>
-          <filter id="gooF" x="-20%" y="-60%" width="140%" height="220%" color-interpolation-filters="sRGB">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="b"/>
-            <feColorMatrix in="b" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -9" result="goo"/>
-            <feMorphology in="goo" operator="erode" radius="1.6" result="inner"/>
+          <!-- liquid glass: blur + alpha threshold merges the shapes, then a silver rim, violet glow and dark-blue glass fill -->
+          <filter id="gooF" x="-25%" y="-80%" width="150%" height="260%" color-interpolation-filters="sRGB">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="4.5" result="b"/>
+            <feColorMatrix in="b" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 24 -10" result="goo"/>
+            <feMorphology in="goo" operator="erode" radius="1.4" result="inner"/>
             <feComposite in="goo" in2="inner" operator="out" result="ring"/>
-            <feFlood flood-color="#8fb4ff" result="c1"/><feComposite in="c1" in2="ring" operator="in" result="ringC"/>
-            <feGaussianBlur in="ringC" stdDeviation="3.2" result="glow"/>
-            <feFlood flood-color="#7c6cff" flood-opacity=".22" result="c2"/><feComposite in="c2" in2="goo" operator="in" result="fillC"/>
-            <feMerge><feMergeNode in="glow"/><feMergeNode in="glow"/><feMergeNode in="fillC"/><feMergeNode in="ringC"/></feMerge>
-          </filter></defs>
-          <g id="tBlobs" filter="url(#gooF)" opacity="0"><rect id="tBlobB" fill="#fff"/><rect id="tBlobA" fill="#fff"/></g>
+            <feFlood flood-color="#dfe6ff" result="c1"/><feComposite in="c1" in2="ring" operator="in" result="ringC"/>
+            <feFlood flood-color="#9b87ff" result="c3"/><feComposite in="c3" in2="ring" operator="in" result="ringV"/>
+            <feGaussianBlur in="ringV" stdDeviation="3" result="glow"/>
+            <feFlood flood-color="#4c62d9" flood-opacity=".26" result="c2"/><feComposite in="c2" in2="goo" operator="in" result="fillC"/>
+            <feMerge><feMergeNode in="glow"/><feMergeNode in="fillC"/><feMergeNode in="ringC"/></feMerge>
+          </filter>
+          <!-- pearlescent sheen that travels around the rim -->
+          <linearGradient id="iriG" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#ff8ad8"/><stop offset=".3" stop-color="#c4a7ff"/><stop offset=".55" stop-color="#7cc4ff"/>
+            <stop offset=".8" stop-color="#9ff5ff"/><stop offset="1" stop-color="#ffffff"/>
+            <animateTransform attributeName="gradientTransform" type="rotate" values="0 .5 .5;360 .5 .5" dur="6s" repeatCount="indefinite"/>
+          </linearGradient>
+          <filter id="iriF" x="-30%" y="-80%" width="160%" height="260%"><feGaussianBlur stdDeviation="1.6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        </defs>
+          <g id="tTrail2" filter="url(#gooF)" opacity="0"><rect id="tT2B" fill="#fff"/><rect id="tT2N" fill="#fff"/><rect id="tT2A" fill="#fff"/></g>
+          <g id="tTrail1" filter="url(#gooF)" opacity="0"><rect id="tT1B" fill="#fff"/><rect id="tT1N" fill="#fff"/><rect id="tT1A" fill="#fff"/></g>
+          <g id="tBlobs" filter="url(#gooF)" opacity="0"><rect id="tBlobB" fill="#fff"/><rect id="tBlobN" fill="#fff"/><rect id="tBlobA" fill="#fff"/></g>
+          <g id="tIri" opacity="0" filter="url(#iriF)" style="pointer-events:none">
+            <rect id="tIri1" fill="none" stroke="url(#iriG)" stroke-width="2.2" stroke-linecap="round" pathLength="100" stroke-dasharray="34 66">
+              <animate attributeName="stroke-dashoffset" values="0;-100" dur="3.4s" repeatCount="indefinite"/></rect>
+            <rect id="tIri2" fill="none" stroke="#ffffff" stroke-opacity=".85" stroke-width="1.3" stroke-linecap="round" pathLength="100" stroke-dasharray="10 90">
+              <animate attributeName="stroke-dashoffset" values="-50;-150" dur="3.4s" repeatCount="indefinite"/></rect>
+          </g>
         </svg>${tabs}</div></div>
       <div class="tpanels" id="tPanels">${panels}</div>`;
   }
   _tabsMode() { return this.config.sections_layout !== 'stack'; }
+
+  // Line icons (24×24, stroke = currentColor) used in the tab menu and in the section titles
+  static get SEC_ICONS() {
+    return {
+      bms: '<rect x="6.5" y="4" width="11" height="17" rx="2.5"/><path d="M10 2h4"/><path d="M12.8 8.5 10.5 12.5h3l-2.3 4"/>',
+      inv: '<rect x="3" y="4" width="18" height="16" rx="3.5"/><path d="M7 12c1.4-3 2.8-3 4.2 0s2.8 3 4.2 0"/><path d="M7 17h3"/>',
+      cons: '<path d="M9 2.5v4.5M15 2.5v4.5"/><path d="M6.5 7h11v3.5a5.5 5.5 0 0 1-11 0z"/><path d="M12 16v5.5"/>',
+      vent: '<circle cx="12" cy="12" r="1.6"/><path d="M12 10.4c-.6-3.4.8-6.4 3.2-6.4 2.6 0 2.9 3.6-1.2 6.2"/><path d="M13.4 12.8c3.2 1.3 4.9 4.1 3.7 6.2-1.3 2.2-4.6.7-4.9-4.1"/><path d="M10.6 12.8c-2.6 2.1-5.9 2.4-7.1.3-1.3-2.2 1.7-4.3 5.9-2.1"/>',
+      stats: '<path d="M3.5 20.5h17"/><path d="M6.5 17v-4M11 17V8M15.5 17v-6M20 17V5"/>',
+      cam: '<rect x="2.5" y="6.5" width="13" height="11" rx="2.5"/><path d="m15.5 10.5 5.5-3.3v9.6l-5.5-3.3z"/><circle cx="9" cy="12" r="2.2"/>',
+    };
+  }
+  _secIcon(k) {
+    return `<svg class="sico" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${FFlowCard.SEC_ICONS[k] || ''}</svg>`;
+  }
 
   _bindTabs() {
     const root = this.shadowRoot;
@@ -1433,7 +1473,7 @@ class FFlowCard extends HTMLElement {
         else if (r > sc.scrollLeft + sc.clientWidth) sc.scrollTo({ left: r - sc.clientWidth, behavior: 'smooth' });
       }
     } else g.top = 0;
-    if (instant) { g.op = g.top; this._gooDraw(); return; }
+    if (instant) { g.op = g.top; g.hist = []; this._gooDraw(); return; }
     if (this._gooRaf) return;
     let last = performance.now();
     const step = (now) => {
@@ -1442,26 +1482,62 @@ class FFlowCard extends HTMLElement {
         o.vx = (o.vx + (g.tx - o.x) * kx * f) * Math.pow(dx, f); o.x += o.vx * f;
         o.vw = (o.vw + (g.tw - o.w) * kx * f) * Math.pow(dx, f); o.w += o.vw * f;
       };
-      spring(g.a, 0.16, 0.66);   // leader: stiff, little overshoot
-      spring(g.b, 0.045, 0.8);   // follower: soft → the droplet stretches between them
+      spring(g.a, 0.15, 0.64);   // leader bulb: fast, small overshoot → jelly bounce on arrival
+      spring(g.b, 0.042, 0.8);   // trailing bulb: slow → the liquid stretches into a neck between them
       g.op += (g.top - g.op) * Math.min(1, 0.18 * f);
+      // short position history for the motion-trail echoes
+      (g.hist || (g.hist = [])).push({ a: { ...g.a }, b: { ...g.b } });
+      if (g.hist.length > 10) g.hist.shift();
       this._gooDraw();
       const still = ['a', 'b'].every(n => Math.abs(g[n].x - g.tx) < 0.3 && Math.abs(g[n].vx) < 0.05 && Math.abs(g[n].w - g.tw) < 0.3) && Math.abs(g.op - g.top) < 0.01;
-      if (still) { g.op = g.top; this._gooDraw(); this._gooRaf = null; return; }
+      if (still) { g.op = g.top; g.hist = []; this._gooDraw(); this._gooRaf = null; return; }
       this._gooRaf = requestAnimationFrame(step);
     };
     this._gooRaf = requestAnimationFrame(step);
   }
+  // Draw one liquid shape: leader bulb (squashed/stretched by its speed), trailing bulb (thinner the
+  // further it lags) and a thin neck joining them; the gooey filter melts the three into a droplet.
+  _gooShape(prefix, a, b, h, y) {
+    const root = this.shadowRoot;
+    const cA = a.x + a.w / 2, cB = b.x + b.w / 2, dist = Math.abs(cA - cB);
+    const squash = Math.min(0.24, Math.abs(a.vx || 0) * 0.02);
+    const hA = h * (1 - squash), wA = a.w + Math.min(18, Math.abs(a.vx || 0) * 0.6);
+    const hB = h * Math.max(0.5, 1 - dist / 380);
+    const hN = h * Math.max(0.2, 0.5 - dist / 700);
+    const put = (id, x, w, hh) => {
+      const r = root.getElementById(id); if (!r) return;
+      r.setAttribute('x', x.toFixed(1)); r.setAttribute('y', (y + (h - hh) / 2).toFixed(1));
+      r.setAttribute('width', Math.max(0, w).toFixed(1)); r.setAttribute('height', Math.max(0, hh).toFixed(1)); r.setAttribute('rx', (hh / 2).toFixed(1));
+    };
+    put(prefix + 'A', cA - wA / 2, wA, hA);
+    put(prefix + 'B', cB - (b.w * (hB / h)) / 2, b.w * (hB / h), hB);
+    put(prefix + 'N', Math.min(cA, cB), dist, dist > 4 ? hN : 0);
+  }
   _gooDraw() {
     const root = this.shadowRoot, g = this._goo;
     if (!g) return;
-    const set = (id, o) => {
-      const r = root.getElementById(id); if (!r) return;
-      r.setAttribute('x', o.x.toFixed(1)); r.setAttribute('y', g.y.toFixed(1));
-      r.setAttribute('width', Math.max(0, o.w).toFixed(1)); r.setAttribute('height', g.h.toFixed(1)); r.setAttribute('rx', (g.h / 2).toFixed(1));
-    };
-    set('tBlobA', g.a); set('tBlobB', g.b);
+    this._gooShape('tBlob', g.a, g.b, g.h, g.y);
     const grp = root.getElementById('tBlobs'); if (grp) grp.setAttribute('opacity', g.op.toFixed(3));
+    // motion-trail echoes (only while moving)
+    const speed = Math.abs(g.a.vx) + Math.abs(g.b.vx);
+    const hist = g.hist || [];
+    [['tT1', 'tTrail1', 3, 0.32], ['tT2', 'tTrail2', 7, 0.16]].forEach(([pre, gid, back, op]) => {
+      const st = hist[hist.length - 1 - back];
+      const tg = root.getElementById(gid);
+      if (!tg) return;
+      if (st) this._gooShape(pre, st.a, st.b, g.h, g.y);
+      tg.setAttribute('opacity', st ? (g.op * op * Math.min(1, speed / 6)).toFixed(3) : '0');
+    });
+    // pearlescent sheen around the rim, visible when the bubble is at rest
+    const iri = root.getElementById('tIri');
+    if (iri) {
+      ['tIri1', 'tIri2'].forEach(id => {
+        const r = root.getElementById(id); if (!r) return;
+        r.setAttribute('x', (g.a.x + 1).toFixed(1)); r.setAttribute('y', (g.y + 1).toFixed(1));
+        r.setAttribute('width', Math.max(0, g.a.w - 2).toFixed(1)); r.setAttribute('height', Math.max(0, g.h - 2).toFixed(1)); r.setAttribute('rx', ((g.h - 2) / 2).toFixed(1));
+      });
+      iri.setAttribute('opacity', (g.op * Math.max(0, 1 - speed / 3)).toFixed(3));
+    }
   }
 
   // ── v1.6.0: collapsible sections (Inverter / Utilizzatori / Ventilazione) ──
@@ -1542,7 +1618,7 @@ class FFlowCard extends HTMLElement {
         <div class="cch-info" id="cChartInfo"></div>
       </div>`;
     }
-    return '<div class="dv"></div>' + this._secHTML('cons', '🔌 ' + title, h);
+    return '<div class="dv"></div>' + this._secHTML('cons', this._secIcon('cons') + title, h);
   }
 
   // ── v1.4.0: 24 h consumption chart (HA recorder history) ─────────
@@ -1785,7 +1861,7 @@ class FFlowCard extends HTMLElement {
     if (this.config.stats_pv !== false) body += box('pv', 'Produzione FV oggi');
     if (this.config.stats_load !== false) body += box('load', 'Consumi casa · ultime 24 ore');
     if (this.config.stats_battery !== false) body += box('batt', 'Batteria · ultime 24 ore');
-    return '<div class="dv"></div>' + this._secHTML('stats', '📈 Statistiche', body || '<div class="st-info">Nessun grafico attivo: attivali dall’editor.</div>');
+    return '<div class="dv"></div>' + this._secHTML('stats', this._secIcon('stats') + 'Statistiche', body || '<div class="st-info">Nessun grafico attivo: attivali dall’editor.</div>');
   }
 
   _maybeLoadStats() {
@@ -2053,7 +2129,7 @@ class FFlowCard extends HTMLElement {
   _buildCameraHTML(esc) {
     if (!this.config._show_camera) return '';
     const c = this.config;
-    if (!c.camera_entity) return '<div class="dv"></div>' + this._secHTML('cam', '📹 ' + esc(c.camera_title || 'Videocamera'), '<div class="st-info">Scegli la videocamera nell’editor (sezione Videocamera).</div>');
+    if (!c.camera_entity) return '<div class="dv"></div>' + this._secHTML('cam', this._secIcon('cam') + esc(c.camera_title || 'Videocamera'), '<div class="st-info">Scegli la videocamera nell’editor (sezione Videocamera).</div>');
     const onvif = !!c.ptz_camera;   // native onvif.ptz: no per-arrow entities needed
     const arrow = (dir, key, path) => (c[key] || (onvif && key !== 'ptz_home') || (onvif && key === 'ptz_home' && c.ptz_home_preset)) ? `<button class="pz ${dir}" data-ptz="${key}" title="${{ ptz_up: 'Su', ptz_down: 'Giù', ptz_left: 'Sinistra', ptz_right: 'Destra', ptz_home: 'Posizione iniziale' }[key]}">
         <svg viewBox="0 0 24 24" width="18" height="18"><path d="${path}" fill="currentColor"/></svg></button>` : '';
@@ -2064,7 +2140,7 @@ class FFlowCard extends HTMLElement {
         ${arrow('right', 'ptz_right', 'M8.6 16.6 13.2 12 8.6 7.4 10 6l6 6-6 6z')}
         ${c.ptz_home || (onvif && c.ptz_home_preset) ? arrow('home', 'ptz_home', 'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z') : '<span class="pz home dot"></span>'}
       </div>` : '';
-    return '<div class="dv"></div>' + this._secHTML('cam', '📹 ' + esc(c.camera_title || 'Videocamera'), `
+    return '<div class="dv"></div>' + this._secHTML('cam', this._secIcon('cam') + esc(c.camera_title || 'Videocamera'), `
       <div class="cam" id="camBox">
         <div class="cam-v" id="camView"></div>
         <div class="cam-off" id="camOff">Videocamera non disponibile</div>
@@ -2296,7 +2372,7 @@ class FFlowCard extends HTMLElement {
       fh += `<div class="vk"><div class="vfi" id="vfIco${i}">${this._fanSVG('vfRot' + i, 14)}<span class="v" id="vfVal${i}">--</span></div>
         <div class="l">${esc(f.name || 'FAN' + (i + 1))}</div></div>`;
     });
-    return '<div class="dv"></div>' + this._secHTML('vent', '🌀 ' + esc(this.config.vent_title || 'Ventilazione inverter'), `
+    return '<div class="dv"></div>' + this._secHTML('vent', this._secIcon('vent') + esc(this.config.vent_title || 'Ventilazione inverter'), `
       <div class="vent" id="ventBox">
         <div class="vrow">
           <div class="vico" id="ventMainIco">${this._fanSVG('ventMainRot', 26)}
@@ -2698,6 +2774,7 @@ class FFlowCard extends HTMLElement {
     const carBody = 'M2,34 Q2,24 12,22 L30,20 Q42,6 62,5 L80,5 Q94,6 104,18 L114,22 Q120,24 120,32 L120,38 Q120,40 117,40 L106,40 A11,11 0 0 0 84,40 L36,40 A11,11 0 0 0 14,40 L5,40 Q2,40 2,37 Z';
     // EV drawing: wallbox at x≈398–417, car at x≈420–514 (scaled), info right above the car
     const evtxt = ev ? `<g id="evGroup" style="color:#6e7681;transition:color .5s">
+      <path d="M 316,452 C 350,452 370,452 398,452" fill="none" stroke="#6e7681" stroke-width="1.5" stroke-linecap="round" opacity="0.55"/>
       <path id="flowHomeEV" d="M 316,452 C 350,452 370,452 398,452" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="12 8" filter="url(#flowGlow)" opacity="0">
         <animate attributeName="stroke-dashoffset" from="20" to="0" dur="0.8s" repeatCount="indefinite"/>
       </path>
@@ -2815,7 +2892,11 @@ class FFlowCard extends HTMLElement {
       .tgoo{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
       .tab{position:relative;z-index:1;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;font:inherit;font-size:.72rem;font-weight:700;letter-spacing:.2px;color:#8b949e;
            background:rgba(22,27,34,.75);border:1px solid #30363d;border-radius:999px;padding:7px 10px;cursor:pointer;transition:color .3s,background .3s,border-color .3s;-webkit-tap-highlight-color:transparent}
-      .tab .ti{font-size:.86rem}
+      .tab .ti{display:inline-flex;line-height:0}
+      .tab .ti .sico{width:16px;height:16px}
+      .tab.on .ti{color:#a8c1ff;filter:drop-shadow(0 0 4px rgba(143,180,255,.7))}
+      .sec-t{display:inline-flex;align-items:center;gap:7px}
+      .sec-t .sico{width:15px;height:15px;color:#a8c1ff}
       .tab.on{color:#e6edf3;background:transparent;border-color:transparent;text-shadow:0 0 8px rgba(143,180,255,.6)}
       .tpanels{overflow:hidden;transition:height .38s cubic-bezier(.2,.8,.2,1)}
       .tpanel{padding-top:6px}
@@ -3108,7 +3189,7 @@ class FFlowCard extends HTMLElement {
         </div>
       </div>
       </div>`,
-      inv: this._secHTML('inv', '☀️ ' + invSection, tiles6 ? `<div class="pvf six">
+      inv: this._secHTML('inv', this._secIcon('inv') + invSection, tiles6 ? `<div class="pvf six">
         <div class="pvi"><div class="ico">☀️</div><div class="lbl">FV Oggi</div><div class="val yw" id="invTodayPv">-- kWh</div></div>
         <div class="pvi"><div class="ico">🔋</div><div class="lbl">Carica Batt</div><div class="val" id="invTodayBattChg">-- kWh</div></div>
         <div class="pvi"><div class="ico">⚡</div><div class="lbl">Scarica Batt</div><div class="val" id="invTodayBattDis">-- kWh</div></div>
@@ -3473,7 +3554,7 @@ class FFlowCard extends HTMLElement {
       setText('emsModeVal', this._emsLabel(v));
       // size the badge to its text
       const t = getEl('emsModeVal'), r = getEl('emsRect'), h = getEl('emsHold');
-      try { const w = 46 + t.getComputedTextLength(); if (r) r.setAttribute('width', w.toFixed(1)); if (h) h.setAttribute('width', w.toFixed(1)); } catch (e) { /* not rendered yet */ }
+      try { const w = 46 + t.getComputedTextLength() + 10; if (r) r.setAttribute('width', w.toFixed(1)); if (h) h.setAttribute('width', w.toFixed(1)); } catch (e) { /* not rendered yet */ }
     }
 
     // ── v1.2.0: energy supply bar — share of current power by source/sink ──
