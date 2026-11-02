@@ -1,5 +1,9 @@
-// f-flow-card.js – Unified Edition v1.10.0
-const FFC_VERSION = '1.10.0';
+// f-flow-card.js – Unified Edition v1.10.1
+const FFC_VERSION = '1.10.1';
+// Changes v1.10.1:
+//   FIX  – Section title no longer reads "Inverter Inverter" when the inverter name already says Inverter.
+//   FIX  – Classic house: FV1–FV4 labels moved below the autonomy panel (they overlapped "Energia residua").
+//   FIX  – JK BMS tiles show "--" instead of 0.0 °C / 0.000 V when their sensors are missing.
 // Changes v1.10.0:
 //   NEW  – sections_order: the sections below the flow (JK BMS stats, Inverter, Consumers,
 //           Ventilation, Statistics, Camera) can be reordered from the editor with ▲ ▼.
@@ -2411,7 +2415,8 @@ class FFlowCard extends HTMLElement {
     const tiles6      = !!(this.config._daily_tiles_extended);
     const showGridStatus = !!(this.config.grid_status_entity);
     const showEms     = !!(this.config.ems_mode_entity);
-    const invSection  = esc(this.config.inverter_name ? this.config.inverter_name + ' Inverter' : 'Inverter');
+    const invName = String(this.config.inverter_name || '').trim();
+    const invSection  = esc(!invName ? 'Inverter' : /inverter/i.test(invName) ? invName : invName + ' Inverter');
 
     // Battery status badge under the battery icon (battery centre x ≈ 31 after transform)
     const battBadge = showBatt1 ? `<g id="battBadgeGroup">
@@ -2459,9 +2464,9 @@ class FFlowCard extends HTMLElement {
 
     const modernHomeX = this.config.home_icon_style !== 'classic';
     const pv3txt = showPvExtra && modernHomeX ? `<text class="sm" id="pv3label" x="180" y="424" text-anchor="end" font-size="10.5" fill="#8b949e" letter-spacing="1">${this._pvName(3)}</text><text id="pv3FlowVal" x="180" y="440" text-anchor="end" font-size="14" font-weight="700" fill="#ffe83c">-- W</text>`
-      : showPvExtra ? `<text id="pv3label" x="8" y="424" font-size="11" fill="#8b949e" letter-spacing="1">FV3</text><text id="pv3FlowVal" x="8" y="438" font-size="13.5" font-weight="700" fill="#ffe83c">-- W</text>` : '';
+      : showPvExtra ? `<text id="pv3label" x="-1" y="450" font-size="11" fill="#8b949e" letter-spacing="1">FV3</text><text id="pv3FlowVal" x="-1" y="464" font-size="13.5" font-weight="700" fill="#ffe83c">-- W</text>` : '';
     const pv4txt = showPvExtra && modernHomeX ? `<text class="sm" id="pv4label" x="340" y="424" font-size="10.5" fill="#8b949e" letter-spacing="1">${this._pvName(4)}</text><text id="pv4FlowVal" x="340" y="440" font-size="14" font-weight="700" fill="#ffe83c">-- W</text>`
-      : showPvExtra ? `<text id="pv4label" x="8" y="456" font-size="11" fill="#8b949e" letter-spacing="1">FV4</text><text id="pv4FlowVal" x="8" y="470" font-size="13.5" font-weight="700" fill="#ffe83c">-- W</text>` : '';
+      : showPvExtra ? `<text id="pv4label" x="-1" y="480" font-size="11" fill="#8b949e" letter-spacing="1">FV4</text><text id="pv4FlowVal" x="-1" y="494" font-size="13.5" font-weight="700" fill="#ffe83c">-- W</text>` : '';
 
     // EV: SVG wallbox + car to the right of the house (x 344–514, y 330–480)
     const carBody = 'M2,34 Q2,24 12,22 L30,20 Q42,6 62,5 L80,5 Q94,6 104,18 L114,22 Q120,24 120,32 L120,38 Q120,40 117,40 L106,40 A11,11 0 0 0 84,40 L36,40 A11,11 0 0 0 14,40 L5,40 Q2,40 2,37 Z';
@@ -2805,10 +2810,10 @@ class FFlowCard extends HTMLElement {
 
       ${invBlock}
 
-      ${!modernHome && pv1Show ? `<text id="pv1label" x="8" y="372" font-size="11" fill="#8b949e" letter-spacing="1">FV1</text>
-      <text id="pv1FlowVal" x="8" y="386" font-size="13.5" font-weight="700" fill="#ffe83c">-- W</text>` : ''}
-      ${!modernHome && pv2Show ? `<text id="pv2label" x="8" y="400" font-size="11" fill="#8b949e" letter-spacing="1">FV2</text>
-      <text id="pv2FlowVal" x="8" y="414" font-size="13.5" font-weight="700" fill="#ffe83c">-- W</text>` : ''}
+      ${!modernHome && pv1Show ? `<text id="pv1label" x="-1" y="390" font-size="11" fill="#8b949e" letter-spacing="1">FV1</text>
+      <text id="pv1FlowVal" x="-1" y="404" font-size="13.5" font-weight="700" fill="#ffe83c">-- W</text>` : ''}
+      ${!modernHome && pv2Show ? `<text id="pv2label" x="-1" y="420" font-size="11" fill="#8b949e" letter-spacing="1">FV2</text>
+      <text id="pv2FlowVal" x="-1" y="434" font-size="13.5" font-weight="700" fill="#ffe83c">-- W</text>` : ''}
       ${battBadge}
       ${supplyBlock}
       ${backupBlock}
@@ -3408,8 +3413,10 @@ class FFlowCard extends HTMLElement {
         else if (_cellTempRaw.isText) { _bT1o.textContent = _cellTempRaw.text; _bT1o.style.color = '#c9d1d9'; }
         else { const fmt = _fmtCustom(_cellTempRaw.val, cellTempUnit); _bT1o.textContent = fmt.text; _bT1o.style.color = fmt.color; }
       } else {
-        _bT1o.textContent = temp1_1.toFixed(1) + ' / ' + temp2_1.toFixed(1) + ' °C';
-        _bT1o.style.color = this._cellTempColor(Math.max(temp1_1, temp2_1));
+        const t1 = this._val(this.config.battery_temp1), t2 = this._val(this.config.battery_temp2);
+        const okT = [t1, t2].filter(v => v !== null);
+        _bT1o.textContent = okT.length ? [t1, t2].map(v => v === null ? '--' : v.toFixed(1)).join(' / ') + ' °C' : '-- °C';
+        _bT1o.style.color = okT.length ? this._cellTempColor(Math.max(...okT)) : '#8b949e';
       }
     }
     const _bT2o = getEl('bTemp2');
@@ -3419,8 +3426,9 @@ class FFlowCard extends HTMLElement {
         else if (_bmsTempRaw.isText) { _bT2o.textContent = _bmsTempRaw.text; _bT2o.style.color = '#c9d1d9'; }
         else { const fmt = _fmtCustom(_bmsTempRaw.val, bmsTempUnit); _bT2o.textContent = fmt.text; _bT2o.style.color = fmt.color; }
       } else {
-        _bT2o.textContent = mos1.toFixed(1) + (dual ? ' / ' + mos2.toFixed(1) : '') + ' °C';
-        _bT2o.style.color = this._cellTempColor(dual ? Math.max(mos1, mos2) : mos1);
+        const m1 = this._val(this.config.battery_mos);
+        _bT2o.textContent = m1 === null ? '-- °C' : m1.toFixed(1) + (dual ? ' / ' + mos2.toFixed(1) : '') + ' °C';
+        _bT2o.style.color = m1 === null ? '#8b949e' : this._cellTempColor(dual ? Math.max(mos1, mos2) : mos1);
       }
     }
     const _bMno = getEl('bMinCell');
@@ -3430,8 +3438,9 @@ class FFlowCard extends HTMLElement {
         else if (_minCellRaw.isText) { _bMno.textContent = _minCellRaw.text; _bMno.style.color = '#c9d1d9'; }
         else { const fmt = _fmtCustom(_minCellRaw.val, minCellUnit); _bMno.textContent = fmt.text; _bMno.style.color = fmt.color; }
       } else {
-        _bMno.textContent = minCell1.toFixed(3) + ' V';
-        _bMno.style.color = this._cellVoltColor(minCell1);
+        const cMin = this._val(this.config.battery_min_cell);
+        _bMno.textContent = cMin === null ? '-- V' : cMin.toFixed(3) + ' V';
+        _bMno.style.color = cMin === null ? '#8b949e' : this._cellVoltColor(cMin);
       }
     }
     const _bMxo = getEl('bMaxCell');
@@ -3441,8 +3450,9 @@ class FFlowCard extends HTMLElement {
         else if (_maxCellRaw.isText) { _bMxo.textContent = _maxCellRaw.text; _bMxo.style.color = '#c9d1d9'; }
         else { const fmt = _fmtCustom(_maxCellRaw.val, maxCellUnit); _bMxo.textContent = fmt.text; _bMxo.style.color = fmt.color; }
       } else {
-        _bMxo.textContent = maxCell1.toFixed(3) + ' V';
-        _bMxo.style.color = this._cellVoltColor(maxCell1);
+        const cMax = this._val(this.config.battery_max_cell);
+        _bMxo.textContent = cMax === null ? '-- V' : cMax.toFixed(3) + ' V';
+        _bMxo.style.color = cMax === null ? '#8b949e' : this._cellVoltColor(cMax);
       }
     }
     const _bDiso = getEl('bBattDis');
