@@ -56,7 +56,7 @@
     'sensor.today_pv': st(14.7, 'kWh'), 'sensor.today_batt_chg': st(11.0, 'kWh'), 'sensor.today_batt_dis': st(3.42, 'kWh'),
     'sensor.today_import': st(0.35, 'kWh'), 'sensor.today_export': st(1.12, 'kWh'), 'sensor.today_load': st(9.6, 'kWh'),
     'camera.tetto': { state: 'streaming', attributes: { access_token: 'demo', friendly_name: 'Tetto' } },
-    'binary_sensor.grid': st('on'), 'select.ems_mode': st('self_consumption'),
+    'binary_sensor.grid': st('on'), 'select.ems_mode': { state: 'Zero Export To CT', attributes: { options: ['Selling First', 'Zero Export To Load', 'Zero Export To CT'] } },
     // Solcast-like forecast: half-hourly pv_estimate (kW) for today in the attributes
     'sensor.pv_forecast': { state: '17.8', attributes: { unit_of_measurement: 'kWh', detailedForecast: (() => {
       const d = new Date(); d.setHours(0, 0, 0, 0); const out = [];

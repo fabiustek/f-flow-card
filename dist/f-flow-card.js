@@ -6,6 +6,9 @@ const FFC_VERSION = '1.11.0';
 //           driven by a two-spring simulation (stiff leader + soft follower → stretch and settle);
 //           panels slide/fade in from the side of the new tab and the height animates.
 //           sections_layout: stack restores the stacked collapsible sections.
+//   NEW  – background_opacity (0–100 %) and background_blur (frosted glass) for the card background.
+//   CHG  – EMS mode moved into the animated graphic as a small badge above the sky (the SVG grows
+//           upward); holding it opens the list of the select's options to switch mode (with confirm).
 // Changes v1.10.2:
 //   DOCS – README images use absolute raw.githubusercontent.com URLs so they also show inside HACS.
 // Changes v1.10.1:
@@ -664,8 +667,10 @@ class FFlowCardEditor extends HTMLElement {
       picker('grid_switch_to_off', 'Comando per passare FUORI RETE (es. switch.studio_off_grid)', true),
       picker('grid_switch_to_on',  'Comando per tornare IN RETE (es. switch.studio_on_grid)', true),
       switchRow('grid_switch_confirm', 'Chiedi conferma prima di commutare', 'Tieni premuto l’indicatore o il traliccio per commutare', true),
-      picker('ems_mode_entity',    'Modalità EMS / di lavoro (sotto il titolo)', true),
+      picker('ems_mode_entity',    'Modalità EMS / di lavoro (badge nel cielo; se è un select, tieni premuto per cambiarla)', true),
       picker('weather_entity',     'Meteo (animazioni nel cielo: nuvole, pioggia, neve, temporale…)', true),
+      numberField('background_opacity', 'Opacità dello sfondo della card (0 = trasparente, 100 = pieno)', 0, 100, 5, '%'),
+      switchRow('background_blur', 'Sfoca ciò che sta dietro la card', 'Effetto vetro smerigliato quando lo sfondo è trasparente'),
       textField('inverter_image', 'URL immagine inverter (sostituisce il riquadro INV)', '/local/sigenergy-inverter.png'),
       divider(),
       switchRow('_show_energy_supply',   'Barra fonti energia', 'Barra Solare / Carica / Scarica / Rete a destra'),
@@ -1128,6 +1133,8 @@ class FFlowCard extends HTMLElement {
       grid_icon_style: 'modern',
       sections_order: ['bms', 'inv', 'cons', 'vent', 'stats', 'cam'],
       sections_layout: 'tabs',
+      background_opacity: 100,
+      background_blur: false,
       tabs_start: 'none',
       home_icon_style: 'modern',
       grid_switch_to_off: '',
@@ -2460,6 +2467,61 @@ class FFlowCard extends HTMLElement {
     return null;
   }
 
+  // ── v1.11.0: EMS mode badge in the sky; hold to pick another mode (select / input_select) ──
+  _emsLabel(v) { return String(v).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); }
+  _emsOptions() {
+    const st = this._hass && this._hass.states[this.config.ems_mode_entity];
+    return (st && Array.isArray(st.attributes && st.attributes.options)) ? st.attributes.options : [];
+  }
+  _bindEms() {
+    const root = this.shadowRoot;
+    const badge = root.getElementById('emsBadge');
+    if (!badge) return;
+    const editable = /^(input_)?select\./.test(this.config.ems_mode_entity || '');
+    if (!editable) { badge.style.cursor = 'default'; return; }
+    badge.style.touchAction = 'none';
+    let timer = null;
+    const start = (ev) => {
+      if (ev.button > 0) return;
+      badge.classList.add('holding');
+      timer = setTimeout(() => { timer = null; badge.classList.remove('holding'); this._openEms(); }, 800);
+    };
+    const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } badge.classList.remove('holding'); };
+    badge.addEventListener('pointerdown', start);
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(e => badge.addEventListener(e, cancel));
+    badge.addEventListener('contextmenu', e => e.preventDefault());
+    const t = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+    t.textContent = 'Tieni premuto per cambiare la modalità EMS';
+    badge.appendChild(t);
+  }
+  _openEms() {
+    const root = this.shadowRoot;
+    const modal = root.getElementById('emsModal'), box = root.getElementById('emsOpts');
+    if (!modal || !box) return;
+    const cur = this._hass.states[this.config.ems_mode_entity]?.state;
+    const opts = this._emsOptions();
+    if (!opts.length) return;
+    let chosen = cur;
+    const esc = (t) => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    box.innerHTML = opts.map(o => `<button class="eo${o === cur ? ' on cur' : ''}" data-o="${esc(o)}">${esc(this._emsLabel(o))}${o === cur ? ' <small>attuale</small>' : ''}</button>`).join('');
+    box.querySelectorAll('.eo').forEach(b => b.addEventListener('click', () => {
+      chosen = b.dataset.o;
+      box.querySelectorAll('.eo').forEach(x => x.classList.toggle('on', x === b));
+      root.getElementById('emsOk').disabled = chosen === cur;
+    }));
+    const ok = root.getElementById('emsOk'), no = root.getElementById('emsNo');
+    ok.disabled = true;
+    ok.onclick = () => {
+      modal.style.display = 'none';
+      if (!chosen || chosen === cur) return;
+      const eid = this.config.ems_mode_entity;
+      this._hass.callService(eid.split('.')[0], 'select_option', { entity_id: eid, option: chosen });
+    };
+    no.onclick = () => { modal.style.display = 'none'; };
+    modal.dataset.mode = 'ems';
+    modal.style.display = 'flex';
+  }
+
   // ── v1.5.0: on-grid / off-grid switch (hold + confirm, like a button-card hold_action) ──
   _gridSwitchEnabled() { return !!(this.config.grid_status_entity && (this.config.grid_switch_to_off || this.config.grid_switch_to_on)); }
 
@@ -2567,6 +2629,11 @@ class FFlowCard extends HTMLElement {
     const iconPath = '/local/community/f-flow-card';    // icons served from HACS community folder
     const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const cardTitle   = esc(this.config.card_title || 'Flusso Energia');
+    // v1.11.0: card background opacity (0–100 %) and optional blur of what is behind it
+    const bgPct = this.config.background_opacity === undefined || this.config.background_opacity === '' ? 100 : Number(this.config.background_opacity);
+    const bgA = Math.max(0, Math.min(100, isFinite(bgPct) ? bgPct : 100)) / 100;
+    const bgCss = `rgba(22,27,34,${bgA.toFixed(2)})`;
+    const bgBlur = this.config.background_blur && bgA < 1 ? 'backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);' : '';
     const invImage    = this.config.inverter_image ? esc(this.config.inverter_image) : '';
     const showSupply  = !!(this.config._show_energy_supply);
     const showBackup  = !!(this.config._show_backup_panel);
@@ -2590,7 +2657,7 @@ class FFlowCard extends HTMLElement {
       <image id="invImg" href="${invImage}" x="200" y="140" width="120" height="130" preserveAspectRatio="xMidYMid meet"/>
       <text class="md" id="invTempFlow" x="322" y="238" font-size="13.5" font-weight="700" fill="#58a6ff">-- °C</text>
       <text class="md" id="invLoadPctFlow" x="322" y="257" font-size="14" font-weight="700" fill="#3ce878">--%</text>` : `
-      <rect id="fcInvRect" x="205" y="155" width="110" height="110" rx="18" fill="#161b22" stroke="#f4a93b" stroke-width="4"/>
+      <rect id="fcInvRect" x="205" y="155" width="110" height="110" rx="18" fill="${bgCss}" stroke="#f4a93b" stroke-width="4"/>
       <text id="invNameLabel" x="260" y="203" text-anchor="middle" font-size="14" font-weight="800" fill="#f4a93b" letter-spacing="1">INV</text>
       <text class="md" id="invTempFlow" x="260" y="224" text-anchor="middle" font-size="14" font-weight="700" fill="#58a6ff">-- °C</text>
       <text class="md" id="invLoadPctFlow" x="260" y="244" text-anchor="middle" font-size="14" font-weight="700" fill="#3ce878">--%</text>`;
@@ -2809,6 +2876,15 @@ class FFlowCard extends HTMLElement {
       .gmodal[data-mode=off] .gbox{color:#f39c4b;border-color:rgba(243,156,75,.45)}
       .gmodal[data-mode=on] .gbox{color:#3fb950;border-color:rgba(63,185,80,.45)}
       .gmodal[data-mode=on] .gx{display:none}
+      .gmodal[data-mode=ems] .gbox{color:#3fb950;border-color:rgba(63,185,80,.45)}
+      .gmodal[data-mode=ems] .gbtns button.ok{background:#3fb950;color:#0d1117}
+      .gbtns button:disabled{opacity:.4;cursor:default}
+      .ems-opts{display:flex;flex-direction:column;gap:6px;margin-top:8px;max-height:260px;overflow:auto}
+      .eo{font:inherit;font-size:.82rem;font-weight:600;text-align:left;padding:9px 12px;border-radius:9px;border:1px solid #30363d;background:#0d1117;color:#c9d1d9;cursor:pointer}
+      .eo small{font-size:.66rem;color:#8b949e;margin-left:6px;font-weight:500}
+      .eo.on{border-color:#3fb950;background:rgba(63,185,80,.12);color:#e6edf3}
+      .emsb .emsh{transform-box:fill-box;transform-origin:left center;transform:scaleX(0);transition:transform .1s}
+      .emsb.holding .emsh{transform:scaleX(1);transition:transform .8s linear}
       .gtitle{font-size:.74rem;letter-spacing:1.5px;text-transform:uppercase;color:#8b949e;margin:6px 0 4px}
       .gtext{font-size:.92rem;font-weight:600;color:#e6edf3;line-height:1.4}
       .gbtns{display:flex;gap:8px;margin-top:14px}
@@ -2863,7 +2939,7 @@ class FFlowCard extends HTMLElement {
       .vk .l{font-size:.6rem;color:#8b949e;letter-spacing:1px;text-transform:uppercase;margin-top:1px}
       .vfi{display:flex;align-items:center;justify-content:center;gap:3px;color:#8b949e}
     </style>
-    <div class="ffc" style="position:relative;background:#161b22;border:1px solid #21262d;border-radius:12px;padding:13px;box-shadow:0 4px 20px rgba(0,0,0,.4);width:100%;box-sizing:border-box;">
+    <div class="ffc" style="position:relative;background:${bgCss};${bgBlur}border:1px solid rgba(48,54,61,${Math.max(0.25, bgA).toFixed(2)});border-radius:12px;padding:13px;box-shadow:0 4px 20px rgba(0,0,0,${(0.4 * bgA).toFixed(2)});width:100%;box-sizing:border-box;">
       ${this._gridSwitchEnabled() ? `<div class="gmodal" id="gridModal">
         <div class="gbox">
           <svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -2876,8 +2952,12 @@ class FFlowCard extends HTMLElement {
       <div class="ct hdr">⚡ <span id="cardTitle">${cardTitle}</span>
         ${showGridStatus ? `<span id="gridStatusPill" class="pill"><span class="hold"></span><span class="dot"></span><span id="gridStatusText">--</span></span>` : ''}
         <span id="battStatusBadge" style="margin-left:auto;font-size:.64rem;font-weight:700;letter-spacing:1.5px;padding:1px 8px;border-radius:8px;background:#21262d;color:#8b949e;text-transform:uppercase">RIPOSO</span></div>
-      ${showEms ? `<div class="ems"><div class="ems-ico">☆</div><div><div class="ems-l">Modalità EMS</div><div class="ems-v" id="emsModeVal">--</div></div></div>` : ''}
-      <div style="width:100%;max-width:520px;margin:0 auto"><svg id="flowSvg" viewBox="-16 0 536 508" style="width:100%;display:block">
+      ${showEms ? `<div class="gmodal" id="emsModal"><div class="gbox ems-box">
+          <div class="gtitle">Modalità EMS</div>
+          <div class="ems-opts" id="emsOpts"></div>
+          <div class="gbtns"><button id="emsNo">Annulla</button><button id="emsOk" class="ok">Applica</button></div>
+        </div></div>` : ''}
+      <div style="width:100%;max-width:520px;margin:0 auto"><svg id="flowSvg" viewBox="-16 ${showEms ? -26 : 0} 536 ${showEms ? 534 : 508}" style="width:100%;display:block">
       <defs>
         <filter id="arcSunF" x="-150%" y="-150%" width="400%" height="400%"><feGaussianBlur stdDeviation="7"/></filter>
         <filter id="arcSunF2" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="3"/></filter>
@@ -2899,7 +2979,7 @@ class FFlowCard extends HTMLElement {
         <linearGradient id="mbCapGrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#2d333b"/><stop offset="50%" stop-color="#8b949e"/><stop offset="100%" stop-color="#2d333b"/></linearGradient>
         <linearGradient id="mbSheenGrad" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="rgba(255,255,255,0)"/><stop offset="50%" stop-color="rgba(255,255,255,.35)"/><stop offset="100%" stop-color="rgba(255,255,255,0)"/></linearGradient>
         <clipPath id="mbClip"><rect x="11" y="132" width="46" height="107" rx="10"/></clipPath>
-        <clipPath id="skyClip"><rect x="-16" y="0" width="536" height="100"/></clipPath>
+        <clipPath id="skyClip"><rect x="-16" y="-26" width="536" height="126"/></clipPath>
         <linearGradient id="shootGrad" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#fff"/></linearGradient>
         <linearGradient id="cloudGrad" x1="0" y1="0" x2="0" y2="1"><stop id="cloudGradTop" offset="0" stop-color="#e6edf3"/><stop id="cloudGradBot" offset="1" stop-color="#9aa7b8"/></linearGradient>
  <filter id="flowGlow" filterUnits="userSpaceOnUse" x="-20" y="0" width="560" height="520"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
@@ -2912,6 +2992,13 @@ class FFlowCard extends HTMLElement {
       </defs>
       <ellipse id="skyAura" cx="260" cy="84" rx="230" ry="110" fill="url(#dynAuraG)"/>
       ${this._buildSkySVG()}
+      ${showEms ? `<g id="emsBadge" class="emsb" style="cursor:pointer">
+        <rect id="emsRect" x="-12" y="-22" width="120" height="19" rx="9.5" fill="rgba(13,17,23,.75)" stroke="#3fb950" stroke-opacity=".55" stroke-width="1"/>
+        <rect id="emsHold" x="-12" y="-22" width="120" height="19" rx="9.5" fill="#3fb950" opacity=".25" class="emsh"/>
+        <text x="-3" y="-8.5" font-size="11" fill="#3fb950">☆</text>
+        <text id="emsLbl" x="10" y="-9" font-size="8.5" font-weight="700" letter-spacing="1" fill="#8b949e">EMS</text>
+        <text id="emsModeVal" x="34" y="-8.5" font-size="10.5" font-weight="700" fill="#3fb950">--</text>
+      </g>` : ''}
       <path d="M 35,78 Q 260,-45 485,78 Z" fill="rgba(30,100,200,.05)"/>
       <line x1="8" y1="78" x2="512" y2="78" stroke="rgba(255,255,255,.12)" stroke-width="1" stroke-dasharray="3,8"/>
       <circle cx="35" cy="78" r="3.5" fill="rgba(255,200,80,.7)"/>
@@ -3038,6 +3125,7 @@ class FFlowCard extends HTMLElement {
     </div>`;
     this._bindExtraSections();
     this._bindGridSwitch();
+    this._bindEms();
     this._bindSections();
     this._bindTabs();
     this._bindChartHours();
@@ -3382,7 +3470,10 @@ class FFlowCard extends HTMLElement {
     if (getEl('emsModeVal')) {
       const st = this._hass.states[this.config.ems_mode_entity];
       const v = st && st.state !== 'unavailable' && st.state !== 'unknown' ? String(st.state) : '--';
-      setText('emsModeVal', v.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()));
+      setText('emsModeVal', this._emsLabel(v));
+      // size the badge to its text
+      const t = getEl('emsModeVal'), r = getEl('emsRect'), h = getEl('emsHold');
+      try { const w = 46 + t.getComputedTextLength(); if (r) r.setAttribute('width', w.toFixed(1)); if (h) h.setAttribute('width', w.toFixed(1)); } catch (e) { /* not rendered yet */ }
     }
 
     // ── v1.2.0: energy supply bar — share of current power by source/sink ──

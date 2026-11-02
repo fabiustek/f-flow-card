@@ -118,7 +118,7 @@ Tutte le funzioni aggiuntive sono facoltative: se non le attivi, non compaiono.
 
 <p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/flow.png" alt="Area dei flussi di energia" width="480"></p>
 
-- **In alto**: titolo, indicatore **IN RETE / FUORI RETE** e chip della **modalità EMS** (se configurati).
+- **In alto**: titolo e indicatore **IN RETE / FUORI RETE**. La **modalità EMS** (se configurata) è un piccolo badge nel cielo, in alto a sinistra sopra l'arco del sole.
 - **Arco del sole**: alba, mezzogiorno e tramonto di oggi; l'etichetta gialla mostra la produzione fotovoltaica totale.
 - **Batteria** a sinistra: SOC, tensione, potenza e corrente, stato **CARICA / SCARICA / RIPOSO**. La scia bianca nella batteria sale quando si carica e scende quando si scarica.
 - **Pannello autonomia** sotto la batteria, allineato al badge:
@@ -131,6 +131,12 @@ Tutte le funzioni aggiuntive sono facoltative: se non le attivi, non compaiono.
 - **Barre FV / POT**: produzione rispetto alla potenza massima dell'impianto e potenza della batteria rispetto a quella dell'inverter.
 
 Nella sezione **🎨 Layout e intestazione** puoi cambiare titolo, attivare la barra delle fonti, il pannello autonomia, l'immagine dell'inverter e tornare alle icone classiche (batteria, rete, casa).
+
+**Modalità EMS** (sezione **🎨 Layout e intestazione** → **Modalità EMS / di lavoro**): scegli l'entità della modalità di lavoro dell'inverter (per Deye di solito un `select` "Work mode"). Compare come badge nel cielo. Se l'entità è un `select` o un `input_select`, **tieni premuto il badge** circa un secondo: si apre l'elenco delle modalità disponibili, con quella attuale segnata; scegline una e premi **Applica** (la card usa `select.select_option`). Con **Annulla** non cambia nulla.
+
+**Sfondo trasparente** (sezione **🎨 Layout e intestazione**):
+- **Opacità dello sfondo della card**: 100 = pieno (predefinito), 0 = completamente trasparente; per esempio 60 lascia intravedere lo sfondo della plancia.
+- **Sfoca ciò che sta dietro la card**: effetto vetro smerigliato, utile con sfondi molto colorati.
 
 **Autonomia fino a un SOC minimo** (sezione **⚙️ Generale**):
 1. **SOC minimo per l'autonomia** (`battery_reserve_soc`): per esempio `20` se l'inverter non scarica la batteria sotto il 20%. L'autonomia viene calcolata solo sull'energia sopra quella soglia. Con `0` (predefinito) arriva fino a batteria vuota.
@@ -469,7 +475,9 @@ Tutte le opzioni si impostano dall'editor visuale; qui trovi le chiavi YAML corr
 | `card_title` | `Flusso Energia` | Titolo nell'intestazione |
 | `inverter_name` | `''` | Nome nel riquadro dell'inverter e nel titolo dei riquadri giornalieri |
 | `inverter_image` | `''` | URL di un'immagine al posto del riquadro INV (es. `/local/inverter.png`) |
-| `ems_mode_entity` | `''` | Modalità EMS mostrata sotto il titolo |
+| `ems_mode_entity` | `''` | Modalità EMS: badge nel cielo; se è un `select`/`input_select`, tenendolo premuto si cambia |
+| `background_opacity` | `100` | Opacità dello sfondo della card (0–100 %) |
+| `background_blur` | `false` | Sfoca ciò che sta dietro la card (vetro smerigliato) |
 | `weather_entity` | `''` | Entità meteo per le animazioni del cielo |
 | `battery_cap_unit` | `ah` | Unità della capacità batteria: `ah` o `kwh` |
 | `battery_full_ah` | `0` | Capacità in Ah (se `ah`) |
@@ -736,6 +744,8 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 ### v1.11.0
 - Nuovo **menu a schede** per le sezioni sotto il disegno: una sezione aperta alla volta, tutte chiuse all'apertura (oppure l'ultima usata o una fissa). La scheda attiva è segnata da una **goccia luminosa** che si allunga e si assesta con una simulazione a molle (filtro SVG "gooey"); il contenuto entra scorrendo dal lato della nuova scheda.
 - Le sezioni impilate di prima restano disponibili (**Sezioni impilate (vecchio stile)**).
+- **Modalità EMS nel disegno**: badge piccolo nel cielo (il disegno si allunga verso l'alto); tenendolo premuto si sceglie un'altra modalità del `select`.
+- **Sfondo della card regolabile**: opacità da 0 a 100% e sfocatura facoltativa di ciò che sta dietro.
 - Le immagini del README si vedono anche dentro HACS (indirizzi completi invece di percorsi relativi).
 
 ### v1.10.1
