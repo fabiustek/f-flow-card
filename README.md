@@ -1,7 +1,7 @@
 # k-flow-card
 
 **Khan Automation — Home Assistant Custom Energy Flow Card**
-`k-flow-card.js` · Unified Edition  fixed some minor issues **V1.1.2**
+`k-flow-card.js` · Unified Edition  Sigenergy-style layout options **V1.2.0**
 <img width="1708" height="2520" alt="IMG_20260513_114249" src="https://github.com/user-attachments/assets/e4c54570-5b9e-43c4-9326-b44d4105a5d1" />
 <img width="1108" height="1688" alt="IMG_20260516_011350" src="https://github.com/user-attachments/assets/6914d4ab-daa6-432a-983d-6abac15a1cac" />
 <img width="1114" height="1744" alt="IMG_20260516_011300" src="https://github.com/user-attachments/assets/ce97703f-ed71-4ab9-a79d-8d7cf3bcd3f6" />
@@ -71,6 +71,42 @@ The card combines an SVG energy-flow canvas (sun arc, animated flow paths, inver
    ```
 
 4. Open the visual editor to configure entities.
+
+---
+
+## Sigenergy-style Layout (v1.2.0)
+
+All options are opt-in — without them the card looks as before. They are also available in the visual editor under **🎨 Layout & Header**.
+
+| Option | Type | Description |
+|---|---|---|
+| `card_title` | string | Header title (default `Energy Flow`) |
+| `grid_status_entity` | entity | Shows an **ON GRID / OFF GRID** pill in the header |
+| `ems_mode_entity` | entity | Shows an **EMS Mode** chip under the header |
+| `inverter_image` | URL | Picture used instead of the drawn INV box (e.g. `/local/sigenergy-inverter.png`) |
+| `_show_energy_supply` | bool | Stacked Solar / Chg / Dis / Grid bar |
+| `_show_backup_panel` | bool | Backup time + remaining kWh panel |
+| `_daily_tiles_extended` | bool | 6 daily tiles (PV, Batt Chg, Batt Dis, Grid Import, Grid Export, Load) |
+| `_show_battery_stats` | bool | Set `false` to hide the JK BMS stat tiles (default `true`) |
+
+PV1 / PV2 labels are hidden automatically when `pv1_power` / `pv2_power` are empty.
+
+```yaml
+type: custom:k-flow-card
+card_title: Sigenergy System
+inverter_name: Sigen
+grid_status_entity: sensor.sigen_grid_status
+ems_mode_entity: select.sigen_ems_work_mode
+inverter_image: /local/sigenergy-inverter.png
+pv1_power: ""
+pv2_power: ""
+_show_energy_supply: true
+_show_backup_panel: true
+_daily_tiles_extended: true
+_show_battery_stats: false
+battery_cap_unit: kwh
+battery_full_wh: 48
+```
 
 ---
 

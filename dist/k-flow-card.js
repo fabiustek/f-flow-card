@@ -1,4 +1,15 @@
-// k-flow-card.js – Unified Edition v1.1.3
+// k-flow-card.js – Unified Edition v1.2.0
+// Changes v1.2.0 (Sigenergy-style layout options — all opt-in, default look unchanged):
+//   NEW  – card_title: custom header title (default 'Energy Flow').
+//   NEW  – grid_status_entity: ON GRID / OFF GRID pill in the header.
+//   NEW  – ems_mode_entity: EMS mode chip under the header (e.g. "Self Consumption").
+//   NEW  – Battery status badge (CHG / DISCHG / IDLE) under the battery icon.
+//   NEW  – inverter_image: show an inverter picture instead of the drawn INV box.
+//   NEW  – _show_energy_supply: stacked "Energy Supply" bar (Solar / Chg / Dis / Grid).
+//   NEW  – _show_backup_panel: Backup Time + Remaining kWh panel in the flow area.
+//   NEW  – _show_battery_stats: hide the JK BMS stat tiles (cell temp, cells, endurance).
+//   NEW  – _daily_tiles_extended: 6 daily tiles (PV, Batt Chg, Batt Dis, Grid Imp, Grid Exp, Load).
+//   NEW  – PV1/PV2 labels hidden when their entities are not configured.
 // Changes v1.1.0 (full audit pass):
 //   FIX  – 8-digit hex #f39c4bff in svgPulseOrange → 6-digit #f5b06a.
 //   FIX  – Grid idle color #3a3a3a (invisible on dark bg) → #8b949e.
@@ -395,7 +406,7 @@ class KFlowCardEditor extends HTMLElement {
 
 
     // Native CSS pill toggle
-    const switchRow = (key, labelText, hintText = '') => {
+    const switchRow = (key, labelText, hintText = '', defaultOn = false) => {
       const wrap = document.createElement('div');
       wrap.className = 'row';
       wrap.style.cssText = 'margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;';
@@ -416,7 +427,7 @@ class KFlowCardEditor extends HTMLElement {
       pillLabel.style.cssText = 'position:relative;display:inline-block;width:40px;height:22px;flex-shrink:0;cursor:pointer;';
       const cb = document.createElement('input');
       cb.type = 'checkbox';
-      cb.checked = !!cfg[key];
+      cb.checked = cfg[key] === undefined ? defaultOn : !!cfg[key];
       cb.style.cssText = 'opacity:0;width:0;height:0;position:absolute;';
       const track = document.createElement('span');
       const knob  = document.createElement('span');
@@ -489,6 +500,18 @@ class KFlowCardEditor extends HTMLElement {
       divider(),
       numberField('pv_max_power',       'PV Array Max Power',    0, 30000, 100, 'W'),
       numberField('inverter_max_power', 'Inverter Max Power',    0, 20000, 100, 'W'),
+    ]));
+
+    shell.appendChild(makeSection('layout', '🎨', 'Layout & Header', [
+      textField('card_title', 'Card Title', 'Energy Flow'),
+      picker('grid_status_entity', 'Grid Status (ON / OFF GRID pill)', true),
+      picker('ems_mode_entity',    'EMS / Work Mode (chip under header)', true),
+      textField('inverter_image', 'Inverter Image URL (replaces INV box)', '/local/sigenergy-inverter.png'),
+      divider(),
+      switchRow('_show_energy_supply',   'Energy Supply bar',     'Stacked Solar / Chg / Dis / Grid bar on the right'),
+      switchRow('_show_backup_panel',    'Backup Time panel',     'Backup time + remaining kWh in the flow area'),
+      switchRow('_daily_tiles_extended', '6 daily tiles',         'PV, Batt Chg, Batt Dis, Grid Import, Grid Export, Load'),
+      switchRow('_show_battery_stats',   'Battery stat tiles',    'Cell temp, BMS temp, min/max cell, endurance (JK BMS)', true),
     ]));
 
     // ── Labels: global gate + per-row activation ──
@@ -761,6 +784,14 @@ class KFlowCard extends HTMLElement {
       invert_grid_power: false,
       _show_pv_extra: false,   // combined toggle
       _show_ev: false,
+      card_title: '',
+      grid_status_entity: '',
+      ems_mode_entity: '',
+      inverter_image: '',
+      _show_energy_supply: false,
+      _show_backup_panel: false,
+      _show_battery_stats: true,
+      _daily_tiles_extended: false,
     };
   }
 
@@ -920,6 +951,59 @@ class KFlowCard extends HTMLElement {
     const ev   = !!(this.config._show_ev);
     const showPvExtra = !!(this.config._show_pv_extra);
     const iconPath = '/local/community/k-flow-card';    // icons served from HACS community folder
+    const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const cardTitle   = esc(this.config.card_title || 'Energy Flow');
+    const invImage    = this.config.inverter_image ? esc(this.config.inverter_image) : '';
+    const showSupply  = !!(this.config._show_energy_supply);
+    const showBackup  = !!(this.config._show_backup_panel);
+    const showBattStats = this.config._show_battery_stats !== false;
+    const tiles6      = !!(this.config._daily_tiles_extended);
+    const showGridStatus = !!(this.config.grid_status_entity);
+    const showEms     = !!(this.config.ems_mode_entity);
+    const invSection  = esc(this.config.inverter_name ? this.config.inverter_name + ' Inverter' : 'Inverter');
+
+    // Battery status badge under the battery icon (battery centre x ≈ 31 after transform)
+    const battBadge = showBatt1 ? `<g id="battBadgeGroup">
+      <rect id="battBadgeRect" x="-1" y="262" width="66" height="16" rx="8" fill="rgba(139,148,158,.10)" stroke="#8b949e" stroke-width="1.2"/>
+      <circle id="battBadgeDot" cx="8" cy="270" r="3" fill="#8b949e"/>
+      <text id="battBadgeText" x="37" y="274" text-anchor="middle" font-size="8.5" font-weight="800" letter-spacing="1.2" fill="#8b949e">IDLE</text>
+    </g>` : '';
+
+    // Inverter: drawn box (default) or user-supplied picture
+    const invBlock = invImage ? `
+      <rect id="fcInvRect" x="205" y="155" width="110" height="110" rx="18" fill="none" stroke="none"/>
+      <image id="invImg" href="${invImage}" x="200" y="140" width="120" height="130" preserveAspectRatio="xMidYMid meet"/>
+      <text id="invTempFlow" x="322" y="240" font-size="11" font-weight="700" fill="#58a6ff">-- °C</text>
+      <text id="invLoadPctFlow" x="322" y="256" font-size="12" font-weight="700" fill="#3ce878">--%</text>` : `
+      <rect id="fcInvRect" x="205" y="155" width="110" height="110" rx="18" fill="#161b22" stroke="#f4a93b" stroke-width="4"/>
+      <text id="invNameLabel" x="260" y="203" text-anchor="middle" font-size="14" font-weight="800" fill="#f4a93b" letter-spacing="1">INV</text>
+      <text id="invTempFlow" x="260" y="222" text-anchor="middle" font-size="12" font-weight="700" fill="#58a6ff">-- °C</text>
+      <text id="invLoadPctFlow" x="260" y="240" text-anchor="middle" font-size="12" font-weight="700" fill="#3ce878">--%</text>`;
+
+    // Energy supply stacked bar (right side, between grid and EV/home row)
+    const supplyBlock = showSupply ? `<g id="supplyGroup">
+      <text x="352" y="292" font-size="8" fill="#8b949e" letter-spacing="1.5">ENERGY SUPPLY</text>
+      <text x="364" y="306" text-anchor="middle" font-size="7" font-weight="700" fill="#f4d03f">SOLAR</text>
+      <text x="408" y="306" text-anchor="middle" font-size="7" font-weight="700" fill="#3fb950">CHG</text>
+      <text x="452" y="306" text-anchor="middle" font-size="7" font-weight="700" fill="#58a6ff">DIS</text>
+      <text x="496" y="306" text-anchor="middle" font-size="7" font-weight="700" fill="#f85149">GRID</text>
+      <rect x="352" y="311" width="158" height="7" rx="3.5" fill="#21262d"/>
+      <rect id="supSolar" x="352" y="311" width="0" height="7" fill="#f4d03f"/>
+      <rect id="supChg"   x="352" y="311" width="0" height="7" fill="#3fb950"/>
+      <rect id="supDis"   x="352" y="311" width="0" height="7" fill="#2b59ff"/>
+      <rect id="supGrid"  x="352" y="311" width="0" height="7" fill="#f85149"/>
+    </g>` : '';
+
+    // Backup panel (left side, above PV string labels)
+    const backupBlock = showBackup ? `<g id="backupGroup">
+      <text x="8" y="296" font-size="8" fill="#8b949e" letter-spacing="1.5">BACKUP TIME</text>
+      <text id="backupTimeVal" x="8" y="313" font-size="15" font-weight="800" fill="#3fb950">--</text>
+      <text id="backupTimeSub" x="8" y="323" font-size="7" fill="#3fb950" opacity=".8">remaining</text>
+      <text x="8" y="337" font-size="8" fill="#8b949e" letter-spacing="1.5">REMAINING</text>
+      <text id="backupRemVal" x="8" y="353" font-size="15" font-weight="800" fill="#3fb950">-- kWh</text>
+    </g>` : '';
+
+    const pv1Show = !!this.config.pv1_power, pv2Show = !!this.config.pv2_power;
 
     const pv3txt = showPvExtra ? `<text id="pv3label" x="8" y="424" font-size="9" fill="#8b949e" letter-spacing="1">PV3</text><text id="pv3FlowVal" x="8" y="438" font-size="12" font-weight="700" fill="#ffe83c">-- W</text>` : '';
     const pv4txt = showPvExtra ? `<text id="pv4label" x="8" y="456" font-size="9" fill="#8b949e" letter-spacing="1">PV4</text><text id="pv4FlowVal" x="8" y="470" font-size="12" font-weight="700" fill="#ffe83c">-- W</text>` : '';
@@ -1004,9 +1088,21 @@ class KFlowCard extends HTMLElement {
       .pvi .lbl{font-size:.44rem;color:#8b949e;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px}
       .pvi .val{font-size:.76rem;font-weight:700;color:#c9d1d9}
       .pvi .val.yw{color:#f4d03f} text{font-family:'Segoe UI',Arial,sans-serif}
+      .pvi .val.gn{color:#3fb950}
+      .pvf.six{grid-template-columns:repeat(6,1fr)}
+      @media (max-width:450px){.pvf.six{grid-template-columns:repeat(3,1fr)}}
+      .hdr .pill{display:inline-flex;align-items:center;gap:6px;font-size:.5rem;font-weight:700;letter-spacing:1.5px;padding:2px 9px;border-radius:10px;border:1px solid #3fb950;color:#3fb950;background:rgba(63,185,80,.08)}
+      .hdr .pill .dot{width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 6px currentColor}
+      .ems{display:inline-flex;align-items:center;gap:9px;background:#0d1117;border:1px solid #21262d;border-radius:10px;padding:6px 12px 6px 7px;margin:-2px 0 6px}
+      .ems-ico{width:26px;height:26px;border-radius:7px;background:rgba(63,185,80,.12);color:#3fb950;display:flex;align-items:center;justify-content:center;font-size:.9rem}
+      .ems-l{font-size:.42rem;color:#8b949e;letter-spacing:1.5px;text-transform:uppercase}
+      .ems-v{font-size:.68rem;font-weight:700;color:#3fb950}
     </style>
     <div style="background:#161b22;border:1px solid #21262d;border-radius:12px;padding:13px;box-shadow:0 4px 20px rgba(0,0,0,.4);width:100%;box-sizing:border-box;">
-      <div class="ct">⚡ Energy Flow <span id="battStatusBadge" style="margin-left:auto;font-size:.5rem;font-weight:700;letter-spacing:1.5px;padding:1px 8px;border-radius:8px;background:#21262d;color:#8b949e;text-transform:uppercase">IDLE</span></div>
+      <div class="ct hdr">⚡ <span id="cardTitle">${cardTitle}</span>
+        ${showGridStatus ? `<span id="gridStatusPill" class="pill"><span class="dot"></span><span id="gridStatusText">--</span></span>` : ''}
+        <span id="battStatusBadge" style="margin-left:auto;font-size:.5rem;font-weight:700;letter-spacing:1.5px;padding:1px 8px;border-radius:8px;background:#21262d;color:#8b949e;text-transform:uppercase">IDLE</span></div>
+      ${showEms ? `<div class="ems"><div class="ems-ico">☆</div><div><div class="ems-l">EMS Mode</div><div class="ems-v" id="emsModeVal">--</div></div></div>` : ''}
       <div style="width:100%;max-width:520px;margin:0 auto"><svg id="flowSvg" viewBox="0 0 520 470" style="width:100%;display:block">
       <defs>
         <filter id="arcSunF" x="-150%" y="-150%" width="400%" height="400%"><feGaussianBlur stdDeviation="7"/></filter>
@@ -1076,15 +1172,15 @@ class KFlowCard extends HTMLElement {
       <text id="gridImportVal" x="397" y="165" text-anchor="middle" font-size="10" font-weight="600" fill="#cde">-- kWh</text>
       <text id="gridExportVal" x="397" y="192" text-anchor="middle" font-size="10" font-weight="600" fill="#cde" style="display:none">-- kWh</text>
 
-      <rect id="fcInvRect" x="205" y="155" width="110" height="110" rx="18" fill="#161b22" stroke="#f4a93b" stroke-width="4"/>
-      <text id="invNameLabel" x="260" y="203" text-anchor="middle" font-size="14" font-weight="800" fill="#f4a93b" letter-spacing="1">INV</text>
-      <text id="invTempFlow" x="260" y="222" text-anchor="middle" font-size="12" font-weight="700" fill="#58a6ff">-- °C</text>
-      <text id="invLoadPctFlow" x="260" y="240" text-anchor="middle" font-size="12" font-weight="700" fill="#3ce878">--%</text>
+      ${invBlock}
 
-      <text id="pv1label" x="8" y="360" font-size="9" fill="#8b949e" letter-spacing="1">PV1</text>
-      <text id="pv1FlowVal" x="8" y="374" font-size="12" font-weight="700" fill="#ffe83c">-- W</text>
-      <text id="pv2label" x="8" y="392" font-size="9" fill="#8b949e" letter-spacing="1">PV2</text>
-      <text id="pv2FlowVal" x="8" y="406" font-size="12" font-weight="700" fill="#ffe83c">-- W</text>
+      ${pv1Show ? `<text id="pv1label" x="8" y="372" font-size="9" fill="#8b949e" letter-spacing="1">PV1</text>
+      <text id="pv1FlowVal" x="8" y="386" font-size="12" font-weight="700" fill="#ffe83c">-- W</text>` : ''}
+      ${pv2Show ? `<text id="pv2label" x="8" y="400" font-size="9" fill="#8b949e" letter-spacing="1">PV2</text>
+      <text id="pv2FlowVal" x="8" y="414" font-size="12" font-weight="700" fill="#ffe83c">-- W</text>` : ''}
+      ${battBadge}
+      ${supplyBlock}
+      ${backupBlock}
       ${pv3txt}
       ${pv4txt}
 
@@ -1098,6 +1194,7 @@ class KFlowCard extends HTMLElement {
         <div style="flex:1;display:flex;align-items:center;gap:4px"><span style="font-size:.42rem;color:#8b949e;letter-spacing:1px;text-transform:uppercase">Pwr</span><div style="flex:1;background:#21262d;border-radius:20px;height:9px;overflow:hidden;position:relative"><div id="pwrBar" style="position:absolute;inset:0;right:auto;width:0%;border-radius:20px;background:#3fb950;transition:width .4s,background .4s"></div></div></div>
       </div>
       <div class="dv"></div>
+      <div id="battStatsWrap" style="${showBattStats ? '' : 'display:none'}">
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-top:5px">
         <div class="st"><div class="l">${this.config.label_cell_temp_minmax || 'CELL TEMP MIN/MAX'}</div><div class="v" id="bTemp1">-- °C</div></div>
         <div class="st"><div class="l">${this.config.label_bms_temp || 'BMS TEMP'}</div><div class="v" id="bTemp2">-- °C</div></div>
@@ -1118,13 +1215,21 @@ class KFlowCard extends HTMLElement {
         </div>
       </div>
       <div class="dv"></div>
-      <div class="ct">☀️ Inverter</div>
-      <div class="pvf">
+      </div>
+      <div class="ct">☀️ ${invSection}</div>
+      ${tiles6 ? `<div class="pvf six">
+        <div class="pvi"><div class="ico">☀️</div><div class="lbl">Today PV</div><div class="val yw" id="invTodayPv">-- kWh</div></div>
+        <div class="pvi"><div class="ico">🔋</div><div class="lbl">Batt Chg</div><div class="val" id="invTodayBattChg">-- kWh</div></div>
+        <div class="pvi"><div class="ico">⚡</div><div class="lbl">Batt Dis</div><div class="val" id="invTodayBattDis">-- kWh</div></div>
+        <div class="pvi"><div class="ico">🗼</div><div class="lbl">Grid Import</div><div class="val" id="invTodayGridImp">-- kWh</div></div>
+        <div class="pvi"><div class="ico">📤</div><div class="lbl">Grid Export</div><div class="val gn" id="invTodayGridExp">-- kWh</div></div>
+        <div class="pvi"><div class="ico">🏡</div><div class="lbl">Today Load</div><div class="val" id="invTodayLoad">-- kWh</div></div>
+      </div>` : `<div class="pvf">
         <div class="pvi"><div class="ico">☀️</div><div class="lbl">Today PV</div><div class="val yw" id="invTodayPv">-- kWh</div></div>
         <div class="pvi"><div class="ico">🔋</div><div class="lbl">Chg / Dis</div><div class="val" id="invTodayBattChg">-- kWh</div><div class="val" id="invTodayBattDis" style="font-size:.62rem;color:#8b949e;margin-top:1px">-- kWh</div></div>
         <div class="pvi"><div class="ico">⚡</div><div class="lbl">Remaining</div><div class="val" id="invRemCap">-- Ah</div><div class="val" id="invRemKwh" style="font-size:.62rem;color:#8b949e;margin-top:1px">-- kWh</div></div>
         <div class="pvi"><div class="ico">🏡</div><div class="lbl">Today Load</div><div class="val" id="invTodayLoad">-- kWh</div></div>
-      </div>
+      </div>`}
     </div>`;
   }
 
@@ -1374,6 +1479,51 @@ class KFlowCard extends HTMLElement {
     const badge = getEl('battStatusBadge');
     if (badge) { badge.textContent = absPwr1 < 50 ? 'IDLE' : isCharging1 ? 'CHG' : 'DISCHG'; badge.style.color = absPwr1 < 50 ? '#8b949e' : isCharging1 ? '#00d7ff' : '#3ce878'; }
 
+    // ── v1.2.0: battery badge under the battery icon ──
+    const _bState = absPwr1 < 50 ? 'IDLE' : isCharging1 ? 'CHG' : 'DISCHG';
+    const _bCol = absPwr1 < 50 ? '#8b949e' : isCharging1 ? '#00d7ff' : '#3ce878';
+    setText('battBadgeText', _bState); setAttr('battBadgeText', 'fill', _bCol);
+    setAttr('battBadgeRect', 'stroke', _bCol); setAttr('battBadgeDot', 'fill', _bCol);
+    // When the battery badge is drawn, the header badge is redundant
+    if (badge && getEl('battBadgeGroup')) badge.style.display = 'none';
+
+    // ── v1.2.0: grid status pill ──
+    const gsPill = getEl('gridStatusPill');
+    if (gsPill) {
+      const raw = this._strVal(this.config.grid_status_entity);
+      let txt, col;
+      if (!raw || raw === 'unavailable' || raw === 'unknown') { txt = '--'; col = '#8b949e'; }
+      else if (/on.?grid|connected|grid.?tied/.test(raw) && !/dis/.test(raw)) { txt = 'ON GRID'; col = '#3fb950'; }
+      else if (/off|island|disconnect|fault|backup|outage/.test(raw)) { txt = 'OFF GRID'; col = '#f85149'; }
+      else if (raw === 'on' || raw === 'true' || raw === '1') { txt = 'ON GRID'; col = '#3fb950'; }
+      else { txt = raw.toUpperCase(); col = '#f39c4b'; }
+      setText('gridStatusText', txt);
+      gsPill.style.color = col; gsPill.style.borderColor = col;
+      gsPill.style.background = col === '#3fb950' ? 'rgba(63,185,80,.08)' : col === '#f85149' ? 'rgba(248,81,73,.08)' : 'rgba(139,148,158,.08)';
+    }
+
+    // ── v1.2.0: EMS mode chip (keeps original casing of the state) ──
+    if (getEl('emsModeVal')) {
+      const st = this._hass.states[this.config.ems_mode_entity];
+      const v = st && st.state !== 'unavailable' && st.state !== 'unknown' ? String(st.state) : '--';
+      setText('emsModeVal', v.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()));
+    }
+
+    // ── v1.2.0: energy supply bar — share of current power by source/sink ──
+    if (getEl('supplyGroup')) {
+      const sSolar = Math.max(0, pvTotal);
+      const bSum = battPwr1 + battPwr2;
+      const sChg = bSum > 10 ? bSum : 0;
+      const sDis = bSum < -10 ? -bSum : 0;
+      const sGrid = gridActive > 10 ? gridActive : 0;
+      const tot = sSolar + sChg + sDis + sGrid;
+      let x = 352; const W = 158;
+      [['supSolar', sSolar], ['supChg', sChg], ['supDis', sDis], ['supGrid', sGrid]].forEach(([id, v]) => {
+        const w = tot > 0 ? (v / tot) * W : 0;
+        setAttr(id, 'x', x.toFixed(1)); setAttr(id, 'width', w.toFixed(1)); x += w;
+      });
+    }
+
     setText('invTempFlow', invTemp.toFixed(1) + ' °C');
     setText('invNameLabel', this.config.inverter_name || 'INV');
     setAttr('invTempFlow', 'fill', invTemp <= 45 ? '#58a6ff' : invTemp <= 55 ? '#f39c4b' : '#f85149');
@@ -1407,6 +1557,11 @@ class KFlowCard extends HTMLElement {
     setText('invTodayBattChg', _todayBattChgRaw !== null ? todayBattChg.toFixed(2) + ' kWh' : '-- kWh');
     setText('invTodayBattDis', battDis1Raw      !== null ? battDis1.toFixed(2)     + ' kWh' : '-- kWh');
     setText('invTodayLoad',    _todayLoadRaw    !== null ? todayLoad.toFixed(2)    + ' kWh' : '-- kWh');
+    if (getEl('invTodayGridImp')) {
+      const gi = this._val(this.config.grid_import_energy), ge = this._val(this.config.grid_export_energy);
+      setText('invTodayGridImp', gi !== null ? gi.toFixed(2) + ' kWh' : '-- kWh');
+      setText('invTodayGridExp', ge !== null ? ge.toFixed(2) + ' kWh' : '-- kWh');
+    }
     // ── Remaining Ah + kWh ──
     // Each battery uses its OWN Ah capacity; battery2_full_ah defaults to fullAh if not set
     const fullAh2 = capUnit === 'ah'
@@ -1611,6 +1766,18 @@ class KFlowCard extends HTMLElement {
     const _bEnduTimeEl = getEl('bEnduranceTime');
     if (_bEnduTimeEl) { _bEnduTimeEl.textContent = _tillStr; _bEnduTimeEl.style.color = endHours !== null ? endColor : '#8b949e'; }
 
+    // ── v1.2.0: backup panel (time + remaining energy) ──
+    if (getEl('backupGroup')) {
+      setText('backupTimeVal', endHours !== null ? endText : '--');
+      setAttr('backupTimeVal', 'fill', endHours !== null ? endColor : '#8b949e');
+      setText('backupTimeSub', endHours === null ? '' : isETA ? 'to full' : 'remaining');
+      setAttr('backupTimeSub', 'fill', endHours !== null ? endColor : '#8b949e');
+      let remKwh = totalRemKwh;
+      if (remKwh === null && fullAh > 0 && battVolt1 > 0) remKwh = (totalRemAh * battVolt1) / 1000;
+      setText('backupRemVal', remKwh !== null ? remKwh.toFixed(1) + ' kWh' : '-- kWh');
+      setAttr('backupRemVal', 'fill', remKwh !== null ? this._remCapColor(battSoc1) : '#8b949e');
+    }
+
     const pvBlocks = getEl('pvBlocks');
     // Fix #11: guard pvBlocks rebuild (was regenerating 20 divs on every state update)
     if (pvBlocks && pvTotal !== this._prevPvBlocksTotal) {
@@ -1675,6 +1842,6 @@ window.customCards.push({
   name: 'K-Flow Card',
   description: 'Real-time solar/battery/grid energy flow card with animated power paths, dual-battery support, EV charger integration, and per-tile label overrides.',
   preview: true,
-  version: '1.1.0',
+  version: '1.2.0',
 });
 customElements.define('k-flow-card', KFlowCard);
