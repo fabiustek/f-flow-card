@@ -17,7 +17,7 @@ const MDI = JSON.parse(fs.readFileSync(path.join(__dirname, 'icons.json'), 'utf8
 (async () => {
   fs.mkdirSync(OUT, { recursive: true });
   const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 540, height: 3200 }, deviceScaleFactor: 2 });
+  const page = await browser.newPage({ viewport: { width: 540, height: 4200 }, deviceScaleFactor: 2 });
   await page.addInitScript((icons) => { window.MDI = icons; }, MDI);
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -62,6 +62,16 @@ const MDI = JSON.parse(fs.readFileSync(path.join(__dirname, 'icons.json'), 'utf8
   await page.waitForTimeout(150);
   await shot('grid-switch.png', '.hdr', '.gbox');
   await page.evaluate(() => { window._card.shadowRoot.getElementById('gridModal').style.display = 'none'; });
+
+  // statistics section, with the tooltip on the PV chart around 11:00
+  const pvSvg = (await page.evaluateHandle(() => window._card.shadowRoot.getElementById('stSvg_pv'))).asElement();
+  if (pvSvg) {
+    const pb = await pvSvg.boundingBox();
+    await page.mouse.move(pb.x + pb.width * 0.52, pb.y + pb.height * 0.5);
+    await page.waitForTimeout(200);
+    await shot('statistics.png', '#stBox_pv', '#stBox_batt');
+    await page.mouse.move(0, 0);
+  }
 
   // wallbox + car (horizontal band around the EV drawing)
   await shot('wallbox.png', '#evPowerVal', '#evSocBar');
