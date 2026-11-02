@@ -1,3 +1,6 @@
 {
-  "name": "f-flow-card"
+  "name": "F-Flow Card",
+  "filename": "f-flow-card.js",
+  "render_readme": true,
+  "homeassistant": "2024.1.0"
 }
