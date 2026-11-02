@@ -7,7 +7,7 @@
 [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
 [![Release](https://img.shields.io/github/v/release/fabiustek/f-flow-card)](https://github.com/fabiustek/f-flow-card/releases)
 
-Versione attuale: **v1.10.2** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
+Versione attuale: **v1.11.0** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/card-overview.png" alt="F-Flow Card con tutte le sezioni attive" width="480">
@@ -36,6 +36,7 @@ Versione attuale: **v1.10.2** · Fork di [k-flow-card](https://github.com/thekha
   - [Statistiche batteria (JK BMS)](#statistiche-batteria-jk-bms)
   - [Auto elettrica / Wallbox](#auto-elettrica--wallbox)
   - [Da telefono](#da-telefono)
+  - [Menu a schede](#menu-a-schede)
   - [Sezioni richiudibili](#sezioni-richiudibili)
 - [Esempio completo](#esempio-completo)
 - [Riferimento delle opzioni](#riferimento-delle-opzioni)
@@ -64,7 +65,7 @@ Versione attuale: **v1.10.2** · Fork di [k-flow-card](https://github.com/thekha
 - **Autonomia** fino a un SOC minimo a scelta (es. 20%) e **tempo alla ricarica**, energia residua, barra delle fonti di energia, modalità EMS
 - **Wallbox e auto** disegnate accanto alla casa, con stato, potenza, SOC dell'auto e tempo alla carica completa
 - **Leggibile anche da telefono**: se la card è stretta, i riquadri vanno su 3 colonne e le etichette si ingrandiscono
-- **Sezioni richiudibili** (Inverter, Utilizzatori, Ventilazione) con riepilogo su una riga e flag 📌 per tenerle sempre aperte
+- **Menu a schede** con la goccia luminosa animata, oppure **sezioni richiudibili** con riepilogo su una riga e flag 📌
 - Supporto per **due batterie** e **stringhe FV aggiuntive** (FV3 sulla falda sinistra, FV4 sulla destra)
 - **Editor visuale** completo in italiano: non serve scrivere YAML
 - Un solo file JavaScript, nessuna dipendenza
@@ -328,7 +329,23 @@ Stati riconosciuti (non importano maiuscole e minuscole):
 | altro (es. `disconnected`, `idle`) | SCOLLEGATA | grigio |
 | nessuno stato configurato e potenza ≤ 50 W | IN ATTESA | grigio |
 
+### Menu a schede
+
+<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/tabs.png" alt="Menu a schede con la sezione Inverter aperta" width="480"><br><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/tabs-goo.png" alt="La goccia luminosa mentre passa da una scheda all'altra" width="480"></p>
+
+Sotto il disegno dei flussi c'è una **barra di schede**, una per ogni sezione attiva: Batteria, Inverter, Utilizzatori, Ventilazione, Statistiche, Video (nell'ordine scelto in **Ordine delle sezioni**).
+
+- **All'apertura della pagina le sezioni sono chiuse**: tocca una scheda per aprirla. Si apre una sezione alla volta; toccando di nuovo la scheda aperta la chiudi.
+- **Animazione**: la scheda attiva è segnata da una **goccia luminosa** blu-viola. Quando cambi scheda la goccia si allunga verso la nuova (il bordo davanti parte subito, quello dietro lo segue) e poi si ricompatta con un piccolo rimbalzo: è un filtro SVG "gooey" mosso da una simulazione a molle. Il contenuto entra scorrendo dal lato della nuova scheda e l'altezza della card si adatta con un'animazione.
+- Se le schede non stanno in una riga (per esempio su telefono), la barra si scorre col dito.
+
+Nell'editor, in **🎨 Layout e intestazione**:
+- **Menu a schede: all'apertura della pagina** → *Tutte chiuse* (predefinito), *Riapri l'ultima scheda usata* (ricordata su quel dispositivo) oppure *Apri sempre* una sezione a scelta.
+- **Sezioni impilate (vecchio stile)** → torna alle sezioni una sotto l'altra, richiudibili con il flag 📌 (vedi sotto).
+
 ### Sezioni richiudibili
+
+Con **Sezioni impilate (vecchio stile)** attivo:
 
 <p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/sections-closed.png" alt="Sezioni chiuse con riepilogo e flag per tenerle aperte" width="480"></p>
 
@@ -466,6 +483,8 @@ Tutte le opzioni si impostano dall'editor visuale; qui trovi le chiavi YAML corr
 | `_daily_tiles_extended` | `false` | 6 riquadri giornalieri invece di 4 |
 | `_show_battery_stats` | `true` | Riquadri statistiche batteria (JK BMS) |
 | `battery_style` | `modern` | `modern` (a segmenti) o `classic` |
+| `sections_layout` | `tabs` | `tabs` (menu a schede) o `stack` (sezioni impilate) |
+| `tabs_start` | `none` | Menu a schede all'apertura: `none` (tutte chiuse), `last` (ultima usata) o il nome di una sezione (`inv`, `cons`…) |
 | `sections_order` | `[bms, inv, cons, vent, stats, cam]` | Ordine delle sezioni sotto il disegno (bms = statistiche batteria, inv = Inverter, cons = Utilizzatori, vent = Ventilazione, stats = Statistiche, cam = Videocamera) |
 | `grid_icon_style` | `modern` | `modern` (traliccio luminoso) o `classic` (immagine) |
 | `home_icon_style` | `modern` | `modern` (casa a due falde) o `classic` (immagine) |
@@ -623,7 +642,7 @@ Nella sezione Etichette la scelta di un'entità alternativa si sblocca solo dopo
 
 A ogni nuova versione viene creata automaticamente una **release** su GitHub e HACS ti propone l'aggiornamento in Home Assistant. Dopo l'aggiornamento ricarica il browser con `Ctrl + Shift + R`.
 
-Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.10.2**.
+Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.11.0**.
 
 ### Icona nella notifica di aggiornamento
 
@@ -714,7 +733,9 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 
 ## Registro delle modifiche
 
-### v1.10.2
+### v1.11.0
+- Nuovo **menu a schede** per le sezioni sotto il disegno: una sezione aperta alla volta, tutte chiuse all'apertura (oppure l'ultima usata o una fissa). La scheda attiva è segnata da una **goccia luminosa** che si allunga e si assesta con una simulazione a molle (filtro SVG "gooey"); il contenuto entra scorrendo dal lato della nuova scheda.
+- Le sezioni impilate di prima restano disponibili (**Sezioni impilate (vecchio stile)**).
 - Le immagini del README si vedono anche dentro HACS (indirizzi completi invece di percorsi relativi).
 
 ### v1.10.1
@@ -799,4 +820,4 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 
 ---
 
-*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.10.2*
+*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.11.0*

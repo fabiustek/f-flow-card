@@ -121,6 +121,7 @@
     _show_energy_supply: true, _show_backup_panel: true, _show_battery_stats: false, _daily_tiles_extended: true,
     _show_ev: true, charger_power: 'sensor.c_wallbox', charger_soc: 'sensor.car_soc', charger_battery_capacity_wh: 43200,
     _show_stats: true, stats_forecast_entity: 'sensor.pv_forecast',
+    sections_layout: 'stack',   // detail pictures use the stacked layout; the "tabs" scene shows the menu
     _show_camera: true, camera_title: 'Videocamera tetto', camera_entity: 'camera.tetto',
     ptz_up: 'button.cam_su', ptz_down: 'button.cam_giu', ptz_left: 'button.cam_sinistra', ptz_right: 'button.cam_destra', ptz_home: 'button.cam_home',
     _show_consumers: true,
@@ -139,6 +140,8 @@
     // whole card with every section
     overview: base,
     // classic JK BMS stat tiles visible, no extra sections
+    // tab menu with the Inverter panel open
+    tabs: { ...base, sections_layout: 'tabs', tabs_start: 'inv' },
     // night, clear sky (stars) — sun set 2 h ago
     night: { ...base, weather_entity: 'weather.casa' },
     // daytime thunderstorm with rain

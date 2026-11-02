@@ -1,5 +1,11 @@
-// f-flow-card.js – Unified Edition v1.10.2
-const FFC_VERSION = '1.10.2';
+// f-flow-card.js – Unified Edition v1.11.0
+const FFC_VERSION = '1.11.0';
+// Changes v1.11.0:
+//   NEW  – Tab menu for the sections below the flow (default): one section open at a time, closed on
+//           load (or last used / fixed via tabs_start). The active-tab indicator is a gooey SVG droplet
+//           driven by a two-spring simulation (stiff leader + soft follower → stretch and settle);
+//           panels slide/fade in from the side of the new tab and the height animates.
+//           sections_layout: stack restores the stacked collapsible sections.
 // Changes v1.10.2:
 //   DOCS – README images use absolute raw.githubusercontent.com URLs so they also show inside HACS.
 // Changes v1.10.1:
@@ -211,6 +217,7 @@ class FFlowCardEditor extends HTMLElement {
     if (key === 'grid_icon_classic') { key = 'grid_icon_style'; value = value ? 'classic' : 'modern'; }
     if (key === 'home_icon_classic') { key = 'home_icon_style'; value = value ? 'classic' : 'modern'; }
     if (key === 'camera_snapshot') { key = 'camera_mode'; value = value ? 'snapshot' : 'live'; }
+    if (key === 'sections_stack') { key = 'sections_layout'; value = value ? 'stack' : 'tabs'; }
     if (this._config[key] === value) return;
     this._config = { ...this._config, [key]: value };
     this._fireChanged();
@@ -520,6 +527,7 @@ class FFlowCardEditor extends HTMLElement {
         : key === 'grid_icon_classic' ? cfg.grid_icon_style === 'classic'
         : key === 'home_icon_classic' ? cfg.home_icon_style === 'classic'
         : key === 'camera_snapshot' ? cfg.camera_mode === 'snapshot'
+        : key === 'sections_stack' ? cfg.sections_layout === 'stack'
         : cfg[key] === undefined ? defaultOn : !!cfg[key];
       cb.style.cssText = 'opacity:0;width:0;height:0;position:absolute;';
       const track = document.createElement('span');
@@ -633,6 +641,23 @@ class FFlowCardEditor extends HTMLElement {
       return wrap;
     })();
 
+    // v1.11.0: which tab opens when the page loads
+    const tabStart = (() => {
+      const wrap = document.createElement('div');
+      wrap.style.marginBottom = '14px';
+      const lbl = document.createElement('div');
+      lbl.className = 'row-label';
+      lbl.textContent = 'Menu a schede: all’apertura della pagina';
+      const sel = document.createElement('select');
+      sel.style.cssText = 'width:100%;padding:8px;border-radius:6px;border:1px solid var(--divider-color,rgba(0,0,0,.3));background:var(--input-fill-color,var(--secondary-background-color));color:var(--primary-text-color);font:inherit;';
+      [['none', 'Tutte chiuse'], ['last', 'Riapri l’ultima scheda usata'], ...FFlowCard.SECTIONS.map(([k, n]) => [k, 'Apri sempre: ' + n])].forEach(([v, t]) => {
+        const o = document.createElement('option'); o.value = v; o.textContent = t; if ((cfg.tabs_start || 'none') === v) o.selected = true; sel.appendChild(o);
+      });
+      sel.addEventListener('change', () => this._set('tabs_start', sel.value));
+      wrap.appendChild(lbl); wrap.appendChild(sel);
+      return wrap;
+    })();
+
     shell.appendChild(makeSection('layout', '🎨', 'Layout e intestazione', [
       textField('card_title', 'Titolo della card', 'Flusso Energia'),
       picker('grid_status_entity', 'Stato rete (indicatore IN RETE / FUORI RETE, es. binary_sensor.deye_grid)', true),
@@ -648,6 +673,8 @@ class FFlowCardEditor extends HTMLElement {
       switchRow('_daily_tiles_extended', '6 riquadri giornalieri', 'FV, carica, scarica, prelievo, immissione, consumo'),
       switchRow('home_icon_classic', 'Icona casa classica', 'Usa la vecchia immagine invece della casa a due falde con FV1 / FV2'),
       divider(),
+      switchRow('sections_stack', 'Sezioni impilate (vecchio stile)', 'Spento: menu a schede con l’animazione a goccia, una sezione aperta alla volta'),
+      tabStart,
       orderList,
       divider(),
       switchRow('grid_icon_classic', 'Icona rete classica', 'Usa la vecchia immagine del traliccio invece di quella luminosa'),
@@ -1100,6 +1127,8 @@ class FFlowCard extends HTMLElement {
       consumers_chart_legend: true,
       grid_icon_style: 'modern',
       sections_order: ['bms', 'inv', 'cons', 'vent', 'stats', 'cam'],
+      sections_layout: 'tabs',
+      tabs_start: 'none',
       home_icon_style: 'modern',
       grid_switch_to_off: '',
       grid_switch_to_on: '',
@@ -1298,7 +1327,134 @@ class FFlowCard extends HTMLElement {
   }
   _orderSections(chunks) {
     const strip = (h) => String(h || '').trim().replace(/^<div class="dv"><\/div>/, '').trim();
-    return FFlowCard.sectionOrder(this.config).map(k => strip(chunks[k])).filter(Boolean).join('<div class="dv"></div>');
+    const keys = FFlowCard.sectionOrder(this.config).filter(k => strip(chunks[k]));
+    if (!this._tabsMode()) return keys.map(k => strip(chunks[k])).join('<div class="dv"></div>');
+    // v1.11.0: tab menu with a gooey, spring-driven indicator; one panel open at a time
+    if (!keys.length) return '';
+    const L = { bms: ['🔋', 'Batteria'], inv: ['☀️', 'Inverter'], cons: ['🔌', 'Utilizzatori'], vent: ['🌀', 'Ventilazione'], stats: ['📈', 'Statistiche'], cam: ['📹', 'Video'] };
+    const tabs = keys.map(k => `<button class="tab" data-k="${k}"><span class="ti">${L[k][0]}</span><span>${L[k][1]}</span></button>`).join('');
+    const panels = keys.map(k => `<div class="tpanel" data-k="${k}" hidden>${strip(chunks[k])}</div>`).join('');
+    return `<div class="tabs" id="tScroll"><div class="ttrack" id="tTrack">
+        <svg class="tgoo" id="tGoo" width="10" height="10"><defs>
+          <filter id="gooF" x="-20%" y="-60%" width="140%" height="220%" color-interpolation-filters="sRGB">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="b"/>
+            <feColorMatrix in="b" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -9" result="goo"/>
+            <feMorphology in="goo" operator="erode" radius="1.6" result="inner"/>
+            <feComposite in="goo" in2="inner" operator="out" result="ring"/>
+            <feFlood flood-color="#8fb4ff" result="c1"/><feComposite in="c1" in2="ring" operator="in" result="ringC"/>
+            <feGaussianBlur in="ringC" stdDeviation="3.2" result="glow"/>
+            <feFlood flood-color="#7c6cff" flood-opacity=".22" result="c2"/><feComposite in="c2" in2="goo" operator="in" result="fillC"/>
+            <feMerge><feMergeNode in="glow"/><feMergeNode in="glow"/><feMergeNode in="fillC"/><feMergeNode in="ringC"/></feMerge>
+          </filter></defs>
+          <g id="tBlobs" filter="url(#gooF)" opacity="0"><rect id="tBlobB" fill="#fff"/><rect id="tBlobA" fill="#fff"/></g>
+        </svg>${tabs}</div></div>
+      <div class="tpanels" id="tPanels">${panels}</div>`;
+  }
+  _tabsMode() { return this.config.sections_layout !== 'stack'; }
+
+  _bindTabs() {
+    const root = this.shadowRoot;
+    const track = root.getElementById('tTrack');
+    if (!track) return;
+    const keys = [...root.querySelectorAll('.tab[data-k]')].map(b => b.dataset.k);
+    root.querySelectorAll('.tab[data-k]').forEach(b => b.addEventListener('click', () => this._tabSelect(b.dataset.k)));
+    // which tab is open: kept across re-renders; on load closed, last used or a fixed one
+    if (this._tabOpen === undefined) {
+      const start = this.config.tabs_start || 'none';
+      this._tabOpen = start === 'last' ? this._lsGet('tab') : start === 'none' ? null : start;
+    }
+    if (!keys.includes(this._tabOpen)) this._tabOpen = null;
+    if (this._gooRaf) { cancelAnimationFrame(this._gooRaf); this._gooRaf = null; }
+    this._goo = null;
+    this._tabSelect(this._tabOpen, true);
+    if (window.ResizeObserver) {
+      this._tabRO && this._tabRO.disconnect();
+      this._tabRO = new ResizeObserver(() => this._gooTarget(true));
+      this._tabRO.observe(track);
+    }
+  }
+
+  _tabSelect(k, instant) {
+    const root = this.shadowRoot;
+    const prev = instant ? null : this._tabOpen;
+    const next = (!instant && k === prev) ? null : k;   // tapping the open tab closes it
+    this._tabOpen = next;
+    if (!instant) this._lsSet('tab', next || '');
+    root.querySelectorAll('.tab[data-k]').forEach(b => b.classList.toggle('on', b.dataset.k === next));
+    const wrap = root.getElementById('tPanels');
+    const panels = [...root.querySelectorAll('.tpanel[data-k]')];
+    const oldH = wrap.offsetHeight;
+    panels.forEach(p => { p.hidden = p.dataset.k !== next; });
+    const np = panels.find(p => p.dataset.k === next);
+    if (!instant) {
+      const newH = np ? wrap.scrollHeight : 0;
+      wrap.style.height = oldH + 'px';
+      void wrap.offsetHeight;
+      wrap.style.height = newH + 'px';
+      const done = () => { wrap.style.height = next ? '' : '0px'; wrap.removeEventListener('transitionend', done); };
+      wrap.addEventListener('transitionend', done);
+      setTimeout(done, 450);
+      if (np && np.animate) {
+        const keys = panels.map(p => p.dataset.k);
+        const dir = prev ? (keys.indexOf(next) > keys.indexOf(prev) ? 1 : -1) : 0;
+        np.animate([{ opacity: 0, transform: `translate(${dir * 28}px, ${dir ? 0 : -8}px) scale(.985)` }, { opacity: 1, transform: 'none' }],
+          { duration: 360, easing: 'cubic-bezier(.2,.8,.2,1)' });
+      }
+    } else wrap.style.height = next ? '' : '0px';
+    if (next === 'cons') this._renderChart();
+    if (next === 'stats') this._renderStats();
+    if (next === 'cam') this._updateCamera();
+    this._gooTarget(instant);
+  }
+
+  // spring-driven gooey indicator: blob A (stiff) leads, blob B (soft) follows → droplet stretch
+  _gooTarget(instant) {
+    const root = this.shadowRoot;
+    const track = root.getElementById('tTrack'), svg = root.getElementById('tGoo');
+    if (!track || !svg) return;
+    svg.setAttribute('width', track.scrollWidth); svg.setAttribute('height', track.offsetHeight);
+    const btn = this._tabOpen ? root.querySelector(`.tab[data-k="${this._tabOpen}"]`) : null;
+    const g = this._goo || (this._goo = { a: { x: 0, w: 0, vx: 0, vw: 0 }, b: { x: 0, w: 0, vx: 0, vw: 0 }, op: 0, y: 0, h: 0 });
+    if (btn) {
+      g.tx = btn.offsetLeft; g.tw = btn.offsetWidth; g.y = btn.offsetTop; g.h = btn.offsetHeight; g.top = 1;
+      if (instant || g.op === 0) { ['a', 'b'].forEach(n => { g[n].x = g.tx; g[n].w = g.tw; g[n].vx = g[n].vw = 0; }); }
+      // keep the chosen tab visible when the bar scrolls
+      const sc = root.getElementById('tScroll');
+      if (sc && !instant) {
+        const l = btn.offsetLeft - 12, r = btn.offsetLeft + btn.offsetWidth + 12;
+        if (l < sc.scrollLeft) sc.scrollTo({ left: l, behavior: 'smooth' });
+        else if (r > sc.scrollLeft + sc.clientWidth) sc.scrollTo({ left: r - sc.clientWidth, behavior: 'smooth' });
+      }
+    } else g.top = 0;
+    if (instant) { g.op = g.top; this._gooDraw(); return; }
+    if (this._gooRaf) return;
+    let last = performance.now();
+    const step = (now) => {
+      const f = Math.min(3, (now - last) / 16.67); last = now;
+      const spring = (o, kx, dx) => {
+        o.vx = (o.vx + (g.tx - o.x) * kx * f) * Math.pow(dx, f); o.x += o.vx * f;
+        o.vw = (o.vw + (g.tw - o.w) * kx * f) * Math.pow(dx, f); o.w += o.vw * f;
+      };
+      spring(g.a, 0.16, 0.66);   // leader: stiff, little overshoot
+      spring(g.b, 0.045, 0.8);   // follower: soft → the droplet stretches between them
+      g.op += (g.top - g.op) * Math.min(1, 0.18 * f);
+      this._gooDraw();
+      const still = ['a', 'b'].every(n => Math.abs(g[n].x - g.tx) < 0.3 && Math.abs(g[n].vx) < 0.05 && Math.abs(g[n].w - g.tw) < 0.3) && Math.abs(g.op - g.top) < 0.01;
+      if (still) { g.op = g.top; this._gooDraw(); this._gooRaf = null; return; }
+      this._gooRaf = requestAnimationFrame(step);
+    };
+    this._gooRaf = requestAnimationFrame(step);
+  }
+  _gooDraw() {
+    const root = this.shadowRoot, g = this._goo;
+    if (!g) return;
+    const set = (id, o) => {
+      const r = root.getElementById(id); if (!r) return;
+      r.setAttribute('x', o.x.toFixed(1)); r.setAttribute('y', g.y.toFixed(1));
+      r.setAttribute('width', Math.max(0, o.w).toFixed(1)); r.setAttribute('height', g.h.toFixed(1)); r.setAttribute('rx', (g.h / 2).toFixed(1));
+    };
+    set('tBlobA', g.a); set('tBlobB', g.b);
+    const grp = root.getElementById('tBlobs'); if (grp) grp.setAttribute('opacity', g.op.toFixed(3));
   }
 
   // ── v1.6.0: collapsible sections (Inverter / Utilizzatori / Ventilazione) ──
@@ -1314,6 +1470,7 @@ class FFlowCard extends HTMLElement {
     return this._secOpen[key];
   }
   _secHTML(key, titleHtml, bodyHtml) {
+    if (this._tabsMode()) return `<div class="sec tsec" data-sec="${key}">${bodyHtml}</div>`;
     const open = this._secIsOpen(key), pinned = this._secPinned(key);
     return `<div class="sec${open ? ' open' : ''}" data-sec="${key}">
       <div class="ct sec-h"><span class="chev">▸</span><span class="sec-t">${titleHtml}</span>
@@ -1324,7 +1481,7 @@ class FFlowCard extends HTMLElement {
     </div>`;
   }
   _bindSections() {
-    this.shadowRoot.querySelectorAll('.sec[data-sec]').forEach(sec => {
+    this.shadowRoot.querySelectorAll('.sec[data-sec]:not(.tsec)').forEach(sec => {
       const key = sec.dataset.sec;
       const head = sec.querySelector('.sec-h');
       const pin = sec.querySelector('.pin');
@@ -2584,6 +2741,17 @@ class FFlowCard extends HTMLElement {
       .dv{height:1px;background:#21262d;margin:8px 0}
       .ct{font-size:.68rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#8b949e;margin-bottom:10px;display:flex;align-items:center;gap:7px}
       .ct::after{content:'';flex:1;height:1px;background:#21262d}
+      .tabs{position:relative;margin:2px -6px 4px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+      .tabs::-webkit-scrollbar{display:none}
+      .tabs{-webkit-mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 22px),transparent);mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 22px),transparent)}
+      .ttrack{position:relative;display:inline-flex;gap:5px;padding:8px 6px;min-width:100%;box-sizing:border-box;justify-content:center}
+      .tgoo{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
+      .tab{position:relative;z-index:1;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;font:inherit;font-size:.72rem;font-weight:700;letter-spacing:.2px;color:#8b949e;
+           background:rgba(22,27,34,.75);border:1px solid #30363d;border-radius:999px;padding:7px 10px;cursor:pointer;transition:color .3s,background .3s,border-color .3s;-webkit-tap-highlight-color:transparent}
+      .tab .ti{font-size:.86rem}
+      .tab.on{color:#e6edf3;background:transparent;border-color:transparent;text-shadow:0 0 8px rgba(143,180,255,.6)}
+      .tpanels{overflow:hidden;transition:height .38s cubic-bezier(.2,.8,.2,1)}
+      .tpanel{padding-top:6px}
       .sec-h{cursor:pointer;user-select:none;-webkit-user-select:none;margin-bottom:0}
       .sec-h::after{display:none}
       .sec-h .chev{display:inline-block;width:12px;transition:transform .2s;color:#8b949e}
@@ -2871,6 +3039,7 @@ class FFlowCard extends HTMLElement {
     this._bindExtraSections();
     this._bindGridSwitch();
     this._bindSections();
+    this._bindTabs();
     this._bindChartHours();
     this._bindCamera();
   }
