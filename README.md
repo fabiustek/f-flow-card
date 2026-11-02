@@ -5,7 +5,7 @@
 [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
 [![Release](https://img.shields.io/github/v/release/fabiustek/f-flow-card)](https://github.com/fabiustek/f-flow-card/releases)
 
-Versione attuale: **v1.7.0** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
+Versione attuale: **v1.7.1** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
 
 <p align="center">
   <img src="docs/images/card-overview.png" alt="F-Flow Card con tutte le sezioni attive" width="480">
@@ -44,7 +44,7 @@ Versione attuale: **v1.7.0** · Fork di [k-flow-card](https://github.com/thekhan
 
 ## Cosa fa
 
-- **Flussi animati** a curve morbide con particelle luminose: fotovoltaico → inverter → batteria / rete / casa / auto, con velocità e colori che seguono la potenza
+- **Flussi animati** a curve morbide con linee tratteggiate luminose: fotovoltaico → inverter → batteria / rete / casa / auto, con velocità e colori che seguono la potenza
 - **Sole e luna** che si muovono su un arco in base all'ora reale (`sun.sun`), con alba e tramonto
 - **Batteria a segmenti** colorata in base al SOC, con scia che sale in carica e scende in scarica
 - **Traliccio luminoso**: rosso quando prelevi, verde quando immetti, barrato quando sei fuori rete
@@ -116,7 +116,7 @@ Tutte le funzioni aggiuntive sono facoltative: se non le attivi, non compaiono.
   - in **scarica** mostra **AUTONOMIA**: il tempo che resta fino al **SOC minimo** che scegli (es. "2h 36m · fino al 20%");
   - in **carica** mostra **TEMPO ALLA RICARICA**: il tempo per arrivare al **SOC obiettivo** (es. "fino al 100%");
   - a riposo mostra "batteria a riposo". Sotto c'è l'**energia residua** in kWh.
-- **Flussi**: curve morbide con particelle luminose che scorrono nella direzione dell'energia, più veloci quando la potenza sale.
+- **Flussi**: curve morbide con linee tratteggiate luminose che scorrono nella direzione dell'energia, più veloci quando la potenza sale.
 - **Inverter** al centro: temperatura e percentuale di carico. Si può sostituire con una foto (`inverter_image`).
 - **Rete** a destra: potenza istantanea, energia prelevata (▼) e immessa (▲) oggi. Sotto, la barra **Fonti energia** mostra in proporzione solare, carica, scarica e rete.
 - **Barre FV / POT**: produzione rispetto alla potenza massima dell'impianto e potenza della batteria rispetto a quella dell'inverter.
@@ -520,7 +520,7 @@ Nella sezione Etichette la scelta di un'entità alternativa si sblocca solo dopo
 
 A ogni nuova versione viene creata automaticamente una **release** su GitHub e HACS ti propone l'aggiornamento in Home Assistant. Dopo l'aggiornamento ricarica il browser con `Ctrl + Shift + R`.
 
-Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.7.0**.
+Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.7.1**.
 
 ---
 
@@ -571,6 +571,9 @@ Per sapere quale versione stai usando, apri la console del browser (`F12`): comp
 ---
 
 ## Registro delle modifiche
+
+### v1.7.1
+- I flussi tornano a **linee tratteggiate** invece dei pallini, mantenendo curve morbide e bagliore.
 
 ### v1.7.0
 - **Autonomia fino a un SOC minimo** (`battery_reserve_soc`) e **tempo alla ricarica** fino a un SOC obiettivo (`battery_target_soc`); l'etichetta passa da AUTONOMIA a TEMPO ALLA RICARICA in base alla direzione della batteria.
@@ -629,4 +632,4 @@ Per sapere quale versione stai usando, apri la console del browser (`F12`): comp
 
 ---
 
-*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.7.0*
+*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.7.1*

@@ -1,5 +1,7 @@
-// f-flow-card.js – Unified Edition v1.7.0
-const FFC_VERSION = '1.7.0';
+// f-flow-card.js – Unified Edition v1.7.1
+const FFC_VERSION = '1.7.1';
+// Changes v1.7.1:
+//   CHG  – Flows back to dashed lines (instead of round particles), keeping the smooth curves and glow.
 // Changes v1.7.0:
 //   NEW  – battery_reserve_soc / battery_target_soc: autonomy down to a reserve SOC and charge
 //           time up to a target SOC; the panel label switches AUTONOMIA ↔ TEMPO ALLA RICARICA.
@@ -1817,7 +1819,7 @@ class FFlowCard extends HTMLElement {
     const carBody = 'M2,34 Q2,24 12,22 L30,20 Q42,6 62,5 L80,5 Q94,6 104,18 L114,22 Q120,24 120,32 L120,38 Q120,40 117,40 L106,40 A11,11 0 0 0 84,40 L36,40 A11,11 0 0 0 14,40 L5,40 Q2,40 2,37 Z';
     // EV drawing: wallbox at x≈398–417, car at x≈420–514 (scaled), info right above the car
     const evtxt = ev ? `<g id="evGroup" style="color:#6e7681;transition:color .5s">
-      <path id="flowHomeEV" d="M 316,452 C 350,452 370,452 398,452" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-dasharray="0.1 10" filter="url(#flowGlow)" opacity="0">
+      <path id="flowHomeEV" d="M 316,452 C 350,452 370,452 398,452" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="13 7" filter="url(#flowGlow)" opacity="0">
         <animate attributeName="stroke-dashoffset" from="20" to="0" dur="0.8s" repeatCount="indefinite"/>
       </path>
       <g transform="translate(398,430) scale(.8)">
@@ -1866,8 +1868,8 @@ class FFlowCard extends HTMLElement {
       ? `<path d="M 59,175 C 140,175 120,205 205,205" fill="none" stroke="#1e3a5f" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.45"/>`
       : '';
     const battFlowPaths = showBatt1 ? `
-      <path id="flowBattIn"  d="M 59,175 C 140,175 120,205 205,205" fill="none" stroke="#8b949e" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="0.1 12" filter="url(#flowGlow)" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="-24" to="0"   dur="4.0s" repeatCount="indefinite"/></path>
-      <path id="flowBattOut" d="M 59,175 C 140,175 120,205 205,205" fill="none" stroke="#8b949e" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="0.1 12" filter="url(#flowGlow)" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="0"   to="-24" dur="4.0s" repeatCount="indefinite"/></path>` : '';
+      <path id="flowBattIn"  d="M 59,175 C 140,175 120,205 205,205" fill="none" stroke="#8b949e" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="16 8" filter="url(#flowGlow)" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="-24" to="0"   dur="4.0s" repeatCount="indefinite"/></path>
+      <path id="flowBattOut" d="M 59,175 C 140,175 120,205 205,205" fill="none" stroke="#8b949e" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="16 8" filter="url(#flowGlow)" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="0"   to="-24" dur="4.0s" repeatCount="indefinite"/></path>` : '';
     const modernBatt = showBatt1 && !dual && this.config.battery_style !== 'classic';
     let mbSegs = '';
     for (let i = 0; i < 10; i++) {
@@ -2063,7 +2065,7 @@ class FFlowCard extends HTMLElement {
         <linearGradient id="mbCapGrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#2d333b"/><stop offset="50%" stop-color="#8b949e"/><stop offset="100%" stop-color="#2d333b"/></linearGradient>
         <linearGradient id="mbSheenGrad" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="rgba(255,255,255,0)"/><stop offset="50%" stop-color="rgba(255,255,255,.35)"/><stop offset="100%" stop-color="rgba(255,255,255,0)"/></linearGradient>
         <clipPath id="mbClip"><rect x="11" y="132" width="46" height="107" rx="10"/></clipPath>
- <filter id="flowGlow" filterUnits="userSpaceOnUse" x="-20" y="0" width="560" height="520"><feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+ <filter id="flowGlow" filterUnits="userSpaceOnUse" x="-20" y="0" width="560" height="520"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
         <filter id="gridNeon" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="1.6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
         <filter id="battGlowBolt"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
         <filter id="iconGlowOrange" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="10" result="b"/><feFlood flood-color="rgba(255,140,0,0.6)" result="c"/><feComposite in="c" in2="b" operator="in" result="d"/><feMerge><feMergeNode in="d"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
@@ -2099,12 +2101,12 @@ class FFlowCard extends HTMLElement {
       <path d="M 399,175 C 350,175 375,202 315,202" fill="none" stroke="#1e3a5f" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.45"/>
       <path d="M 260,265 V 358" fill="none" stroke="#1e3a5f" stroke-width="2.5" stroke-linecap="round" opacity="0.45"/>
 
-      <path id="flowGridIn" d="M 432,175 C 350,175 375,202 315,202" fill="none" stroke="#FF2929" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="0.1 12" filter="url(#flowGlow)" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="0" to="-24" dur="0.8s" repeatCount="indefinite"/></path>
-      <path id="flowGridOut" d="M 432,175 C 350,175 375,202 315,202" fill="none" stroke="#2ecc71" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="0.1 12" filter="url(#flowGlow)" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="-24" to="0" dur="0.8s" repeatCount="indefinite"/></path>
+      <path id="flowGridIn" d="M 432,175 C 350,175 375,202 315,202" fill="none" stroke="#FF2929" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="16 8" filter="url(#flowGlow)" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="0" to="-24" dur="0.8s" repeatCount="indefinite"/></path>
+      <path id="flowGridOut" d="M 432,175 C 350,175 375,202 315,202" fill="none" stroke="#2ecc71" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="16 8" filter="url(#flowGlow)" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="-24" to="0" dur="0.8s" repeatCount="indefinite"/></path>
 
       ${battFlowPaths}
 
-      <path id="flowInvLoad" d="M 260,358 V 265" fill="none" stroke="#29c4f6" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="0.1 12" filter="url(#flowGlow)" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="-24" to="0" dur="0.8s" repeatCount="indefinite"/></path>
+      <path id="flowInvLoad" d="M 260,358 V 265" fill="none" stroke="#29c4f6" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="16 8" filter="url(#flowGlow)" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="-24" to="0" dur="0.8s" repeatCount="indefinite"/></path>
 
       <!-- Battery current/power placed above/below flow bar -->
       ${showBatt1 ? (dual ? battTextDual : battTextSingle) : ''}
