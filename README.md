@@ -7,7 +7,7 @@
 [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
 [![Release](https://img.shields.io/github/v/release/fabiustek/f-flow-card)](https://github.com/fabiustek/f-flow-card/releases)
 
-Versione attuale: **v1.11.0** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
+Versione attuale: **v1.11.1** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/card-overview.png" alt="F-Flow Card con tutte le sezioni attive" width="480">
@@ -316,7 +316,7 @@ Con **Riquadri statistiche batteria** attivo (predefinito) compaiono: temperatur
 
 <p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/wallbox.png" alt="Wallbox e auto in carica" width="480"></p>
 
-A destra della casa, staccate dalle stringhe FV2/FV4, compaiono la **colonnina** e l'**auto**. Quando l'auto si carica, un flusso va dalla casa alla colonnina e il cavo si anima. Sopra l'auto ci sono la potenza di ricarica, lo stato, il SOC dell'auto (anche come barra sotto l'auto), la corrente e il tempo alla carica completa.
+A destra della casa, staccate dalle stringhe FV2/FV4, compaiono la **colonnina** e l'**auto**. Tra casa e colonnina c'è sempre una linea grigia; quando l'auto si carica diventa un flusso azzurro e il cavo si anima. Sopra l'auto ci sono la potenza di ricarica, lo stato, il SOC dell'auto (anche come barra sotto l'auto), la corrente e il tempo alla carica completa.
 
 **Configurazione** (sezione **🚗 Auto elettrica / Wallbox** → **＋ Attiva**):
 1. **Potenza wallbox**: il sensore di potenza della wallbox o della presa (W o kW). È l'unico campo necessario.
@@ -650,7 +650,7 @@ Nella sezione Etichette la scelta di un'entità alternativa si sblocca solo dopo
 
 A ogni nuova versione viene creata automaticamente una **release** su GitHub e HACS ti propone l'aggiornamento in Home Assistant. Dopo l'aggiornamento ricarica il browser con `Ctrl + Shift + R`.
 
-Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.11.0**.
+Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.11.1**.
 
 ### Icona nella notifica di aggiornamento
 
@@ -741,6 +741,10 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 
 ## Registro delle modifiche
 
+### v1.11.1
+- Badge EMS: un po' di spazio a destra, il bordo non tocca più il testo.
+- La linea tra casa e wallbox si vede sempre in grigio, anche quando l'auto non carica (diventa azzurra durante la carica).
+
 ### v1.11.0
 - Nuovo **menu a schede** per le sezioni sotto il disegno: una sezione aperta alla volta, tutte chiuse all'apertura (oppure l'ultima usata o una fissa). La scheda attiva è segnata da una **goccia luminosa** che si allunga e si assesta con una simulazione a molle (filtro SVG "gooey"); il contenuto entra scorrendo dal lato della nuova scheda.
 - Le sezioni impilate di prima restano disponibili (**Sezioni impilate (vecchio stile)**).
@@ -830,4 +834,4 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 
 ---
 
-*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.11.0*
+*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.11.1*

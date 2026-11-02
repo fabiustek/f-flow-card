@@ -1,5 +1,8 @@
-// f-flow-card.js – Unified Edition v1.11.0
-const FFC_VERSION = '1.11.0';
+// f-flow-card.js – Unified Edition v1.11.1
+const FFC_VERSION = '1.11.1';
+// Changes v1.11.1:
+//   FIX  – EMS badge: right padding so the border no longer touches the text.
+//   FIX  – House → wallbox line: grey track always visible (blue dashes only while charging).
 // Changes v1.11.0:
 //   NEW  – Tab menu for the sections below the flow (default): one section open at a time, closed on
 //           load (or last used / fixed via tabs_start). The active-tab indicator is a gooey SVG droplet
@@ -2698,6 +2701,7 @@ class FFlowCard extends HTMLElement {
     const carBody = 'M2,34 Q2,24 12,22 L30,20 Q42,6 62,5 L80,5 Q94,6 104,18 L114,22 Q120,24 120,32 L120,38 Q120,40 117,40 L106,40 A11,11 0 0 0 84,40 L36,40 A11,11 0 0 0 14,40 L5,40 Q2,40 2,37 Z';
     // EV drawing: wallbox at x≈398–417, car at x≈420–514 (scaled), info right above the car
     const evtxt = ev ? `<g id="evGroup" style="color:#6e7681;transition:color .5s">
+      <path d="M 316,452 C 350,452 370,452 398,452" fill="none" stroke="#6e7681" stroke-width="1.5" stroke-linecap="round" opacity="0.55"/>
       <path id="flowHomeEV" d="M 316,452 C 350,452 370,452 398,452" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="12 8" filter="url(#flowGlow)" opacity="0">
         <animate attributeName="stroke-dashoffset" from="20" to="0" dur="0.8s" repeatCount="indefinite"/>
       </path>
@@ -3473,7 +3477,7 @@ class FFlowCard extends HTMLElement {
       setText('emsModeVal', this._emsLabel(v));
       // size the badge to its text
       const t = getEl('emsModeVal'), r = getEl('emsRect'), h = getEl('emsHold');
-      try { const w = 46 + t.getComputedTextLength(); if (r) r.setAttribute('width', w.toFixed(1)); if (h) h.setAttribute('width', w.toFixed(1)); } catch (e) { /* not rendered yet */ }
+      try { const w = 46 + t.getComputedTextLength() + 10; if (r) r.setAttribute('width', w.toFixed(1)); if (h) h.setAttribute('width', w.toFixed(1)); } catch (e) { /* not rendered yet */ }
     }
 
     // ── v1.2.0: energy supply bar — share of current power by source/sink ──
