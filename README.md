@@ -7,7 +7,7 @@
 [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
 [![Release](https://img.shields.io/github/v/release/fabiustek/f-flow-card)](https://github.com/fabiustek/f-flow-card/releases)
 
-Versione attuale: **v1.10.0** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
+Versione attuale: **v1.10.1** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
 
 <p align="center">
   <img src="docs/images/card-overview.png" alt="F-Flow Card con tutte le sezioni attive" width="480">
@@ -623,7 +623,7 @@ Nella sezione Etichette la scelta di un'entità alternativa si sblocca solo dopo
 
 A ogni nuova versione viene creata automaticamente una **release** su GitHub e HACS ti propone l'aggiornamento in Home Assistant. Dopo l'aggiornamento ricarica il browser con `Ctrl + Shift + R`.
 
-Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.10.0**.
+Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.10.1**.
 
 ### Icona nella notifica di aggiornamento
 
@@ -649,6 +649,15 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 - Controlla in **Impostazioni → Plance → Risorse** che ci sia `/hacsfiles/f-flow-card/f-flow-card.js` (HACS) o `/local/community/f-flow-card/f-flow-card.js` (manuale), tipo **Modulo JavaScript**.
 - Ricarica con `Ctrl + Shift + R`; nell'app per telefono svuota la cache o chiudi e riapri l'app.
 - Se arrivi da k-flow-card, cambia `type: custom:k-flow-card` in `type: custom:f-flow-card`.
+
+**Traliccio e casa hanno ancora le immagini vecchie**
+- Nella configurazione della card ci sono `grid_icon_style: classic` e/o `home_icon_style: classic`: nell'editor, in **🎨 Layout e intestazione**, disattiva **Icona rete classica** e **Icona casa classica** (oppure togli le due righe dal YAML). Se invece compaiono le stelle o la batteria a segmenti, la versione è sicuramente quella nuova.
+
+**I riquadri della batteria mostrano `--` o non servono**
+- Sono pensati per un BMS JK con temperature e tensioni delle celle. Se non li hai, disattiva **Riquadri statistiche batteria** in **🎨 Layout e intestazione**.
+
+**L'energia residua sembra troppo bassa**
+- Controlla la **capacità della batteria** in **⚙️ Generale**: in modalità kWh va scritta in kWh (es. `16` per 16 kWh), in modalità Ah in ampere-ora.
 
 **Un valore mostra `--`**
 - In **Strumenti per sviluppatori → Stati** controlla che l'entità esista e abbia un valore numerico (non `unavailable` o `unknown`). La card mostra `--` finché l'entità non torna valida.
@@ -704,6 +713,11 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 ---
 
 ## Registro delle modifiche
+
+### v1.10.1
+- Il titolo della sezione non diventa più "Inverter Inverter" se il nome dell'inverter contiene già "Inverter".
+- Con la casa classica, FV1–FV4 non si sovrappongono più a "Energia residua".
+- I riquadri JK BMS mostrano `--` invece di 0.0 °C / 0.000 V quando i sensori non ci sono.
 
 ### v1.10.0
 - **Ordine delle sezioni a scelta**: in **🎨 Layout e intestazione** sposti con ▲ ▼ statistiche batteria, Inverter, Utilizzatori, Ventilazione, Statistiche e Videocamera.
@@ -782,4 +796,4 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 
 ---
 
-*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.10.0*
+*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.10.1*
