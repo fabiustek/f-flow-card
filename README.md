@@ -1,3 +1,5 @@
+<img src="docs/brand/icon-256.png" alt="Icona F-Flow Card" width="96" align="right">
+
 # F-Flow Card
 
 **Card per Home Assistant con i flussi energetici in tempo reale**: fotovoltaico, batteria, rete, casa, utilizzatori e ventilazione dell'inverter, tutto in un'unica card animata, con interfaccia in italiano.
@@ -5,7 +7,7 @@
 [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
 [![Release](https://img.shields.io/github/v/release/fabiustek/f-flow-card)](https://github.com/fabiustek/f-flow-card/releases)
 
-Versione attuale: **v1.9.0** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
+Versione attuale: **v1.9.1** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
 
 <p align="center">
   <img src="docs/images/card-overview.png" alt="F-Flow Card con tutte le sezioni attive" width="480">
@@ -602,7 +604,23 @@ Nella sezione Etichette la scelta di un'entità alternativa si sblocca solo dopo
 
 A ogni nuova versione viene creata automaticamente una **release** su GitHub e HACS ti propone l'aggiornamento in Home Assistant. Dopo l'aggiornamento ricarica il browser con `Ctrl + Shift + R`.
 
-Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.9.0**.
+Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.9.1**.
+
+### Icona nella notifica di aggiornamento
+
+HACS mostra un'icona accanto agli aggiornamenti **solo per le integrazioni** (la prende dal catalogo ufficiale dei loghi di Home Assistant); per le card della categoria Dashboard non ne passa nessuna. Per questo la card installa la sua icona in `/local/community/f-flow-card/icon.png`, e puoi assegnarla tu all'entità di aggiornamento:
+
+1. In **Impostazioni → Dispositivi e servizi → Entità** cerca "F-Flow" e annota l'ID dell'entità di aggiornamento (di solito `update.f_flow_card_update`).
+2. Aggiungi a `configuration.yaml` (se hai già una sezione `homeassistant:`, aggiungi solo la parte `customize:`):
+   ```yaml
+   homeassistant:
+     customize:
+       update.f_flow_card_update:
+         entity_picture: /local/community/f-flow-card/icon.png
+   ```
+3. Riavvia Home Assistant, oppure in **Strumenti per sviluppatori → YAML** premi **Posizione e personalizzazioni**.
+
+In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Impostazioni** → **Icona** e scegli per esempio `mdi:solar-power-variant`.
 
 ---
 
@@ -666,6 +684,9 @@ Per sapere quale versione stai usando, apri la console del browser (`F12`): comp
 ---
 
 ## Registro delle modifiche
+
+### v1.9.1
+- Nuova **icona della card** (`icon.png`, installata da HACS) da usare nella notifica di aggiornamento di HACS; istruzioni nella sezione [Aggiornamenti](#aggiornamenti).
 
 ### v1.9.0
 - **Cielo di notte** con stelle che brillano e stelle cadenti.
@@ -739,4 +760,4 @@ Per sapere quale versione stai usando, apri la console del browser (`F12`): comp
 
 ---
 
-*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.9.0*
+*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.9.1*

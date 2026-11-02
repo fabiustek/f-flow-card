@@ -1,5 +1,8 @@
-// f-flow-card.js – Unified Edition v1.9.0
-const FFC_VERSION = '1.9.0';
+// f-flow-card.js – Unified Edition v1.9.1
+const FFC_VERSION = '1.9.1';
+// Changes v1.9.1:
+//   NEW  – dist/icon.png: card icon installed by HACS (/local/community/f-flow-card/icon.png), usable as
+//           entity_picture of the HACS update entity (HACS only shows brand icons for integrations).
 // Changes v1.9.0:
 //   NEW  – Night sky: twinkling stars and a shooting star between sunset and sunrise.
 //   NEW  – weather_entity: animated clouds, rain, downpour, snow, fog, wind and lightning in the
