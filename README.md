@@ -7,7 +7,7 @@
 [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
 [![Release](https://img.shields.io/github/v/release/fabiustek/f-flow-card)](https://github.com/fabiustek/f-flow-card/releases)
 
-Versione attuale: **v1.9.1** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
+Versione attuale: **v1.10.0** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
 
 <p align="center">
   <img src="docs/images/card-overview.png" alt="F-Flow Card con tutte le sezioni attive" width="480">
@@ -330,6 +330,8 @@ Il flag **📌** a destra decide come si presenta la sezione quando apri o ricar
 - **📌 spuntato**: la sezione si apre **sempre aperta** (bloccata aperta).
 - **📌 senza spunta**: puoi aprirla quando vuoi, ma a ogni ricaricamento della pagina la trovi **chiusa**.
 
+**Ordine delle sezioni**: in **🎨 Layout e intestazione** → **Ordine delle sezioni** sposti con **▲ ▼** le parti sotto il disegno dei flussi: statistiche batteria (JK BMS), Inverter, Utilizzatori e grafico, Ventilazione, Statistiche, Videocamera. Le sezioni non attive non compaiono nella card ma tengono il loro posto nell'elenco.
+
 Di partenza tutte le sezioni hanno il flag spuntato, quindi la card si presenta come prima finché non togli la spunta. Il flag e la scelta delle ore del grafico vengono salvati **sul dispositivo** (nel browser o nell'app): sul telefono e sul computer puoi avere impostazioni diverse.
 
 ### Da telefono
@@ -453,6 +455,7 @@ Tutte le opzioni si impostano dall'editor visuale; qui trovi le chiavi YAML corr
 | `_daily_tiles_extended` | `false` | 6 riquadri giornalieri invece di 4 |
 | `_show_battery_stats` | `true` | Riquadri statistiche batteria (JK BMS) |
 | `battery_style` | `modern` | `modern` (a segmenti) o `classic` |
+| `sections_order` | `[bms, inv, cons, vent, stats, cam]` | Ordine delle sezioni sotto il disegno (bms = statistiche batteria, inv = Inverter, cons = Utilizzatori, vent = Ventilazione, stats = Statistiche, cam = Videocamera) |
 | `grid_icon_style` | `modern` | `modern` (traliccio luminoso) o `classic` (immagine) |
 | `home_icon_style` | `modern` | `modern` (casa a due falde) o `classic` (immagine) |
 | `sun` | `sun.sun` | Entità del sole |
@@ -604,7 +607,7 @@ Nella sezione Etichette la scelta di un'entità alternativa si sblocca solo dopo
 
 A ogni nuova versione viene creata automaticamente una **release** su GitHub e HACS ti propone l'aggiornamento in Home Assistant. Dopo l'aggiornamento ricarica il browser con `Ctrl + Shift + R`.
 
-Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.9.1**.
+Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.10.0**.
 
 ### Icona nella notifica di aggiornamento
 
@@ -685,7 +688,8 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 
 ## Registro delle modifiche
 
-### v1.9.1
+### v1.10.0
+- **Ordine delle sezioni a scelta**: in **🎨 Layout e intestazione** sposti con ▲ ▼ statistiche batteria, Inverter, Utilizzatori, Ventilazione, Statistiche e Videocamera.
 - Nuova **icona della card** (`icon.png`, installata da HACS) da usare nella notifica di aggiornamento di HACS; istruzioni nella sezione [Aggiornamenti](#aggiornamenti).
 
 ### v1.9.0
@@ -760,4 +764,4 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 
 ---
 
-*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.9.1*
+*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.10.0*

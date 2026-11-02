@@ -1,5 +1,8 @@
-// f-flow-card.js – Unified Edition v1.9.1
-const FFC_VERSION = '1.9.1';
+// f-flow-card.js – Unified Edition v1.10.0
+const FFC_VERSION = '1.10.0';
+// Changes v1.10.0:
+//   NEW  – sections_order: the sections below the flow (JK BMS stats, Inverter, Consumers,
+//           Ventilation, Statistics, Camera) can be reordered from the editor with ▲ ▼.
 // Changes v1.9.1:
 //   NEW  – dist/icon.png: card icon installed by HACS (/local/community/f-flow-card/icon.png), usable as
 //           entity_picture of the HACS update entity (HACS only shows brand icons for integrations).
@@ -586,6 +589,42 @@ class FFlowCardEditor extends HTMLElement {
       numberField('inverter_max_power', 'Potenza max inverter',    0, 20000, 100, 'W'),
     ]));
 
+    // v1.10.0: order of the sections below the flow, moved with ▲ ▼
+    const orderList = (() => {
+      const wrap = document.createElement('div');
+      wrap.style.marginBottom = '14px';
+      const lbl = document.createElement('div');
+      lbl.className = 'row-label';
+      lbl.textContent = 'Ordine delle sezioni (sotto il disegno dei flussi)';
+      wrap.appendChild(lbl);
+      const names = Object.fromEntries(FFlowCard.SECTIONS);
+      const order = FFlowCard.sectionOrder(cfg);
+      order.forEach((k, i) => {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;align-items:center;gap:6px;padding:5px 8px;margin-bottom:4px;border:1px solid var(--divider-color,rgba(0,0,0,.12));border-radius:8px;font-size:.82rem;color:var(--primary-text-color);';
+        const t = document.createElement('span');
+        t.style.flex = '1';
+        t.textContent = (i + 1) + '. ' + names[k];
+        row.appendChild(t);
+        const mk = (label, title, dis, fn) => {
+          const b = document.createElement('button');
+          b.textContent = label; b.title = title; b.disabled = dis;
+          b.style.cssText = 'border:1px solid var(--divider-color,rgba(0,0,0,.2));background:var(--card-background-color,#fff);color:var(--primary-text-color);border-radius:6px;padding:2px 8px;cursor:pointer;font-size:.8rem;opacity:' + (dis ? '.35' : '1');
+          b.addEventListener('click', (e) => { e.stopPropagation(); fn(); });
+          row.appendChild(b);
+        };
+        const move = (d) => { const a = [...order]; [a[i], a[i + d]] = [a[i + d], a[i]]; this._set('sections_order', a); this._render(); };
+        mk('▲', 'Sposta su', i === 0, () => move(-1));
+        mk('▼', 'Sposta giù', i === order.length - 1, () => move(1));
+        wrap.appendChild(row);
+      });
+      const hint = document.createElement('div');
+      hint.style.cssText = 'font-size:.68rem;color:var(--secondary-text-color);margin-top:2px;';
+      hint.textContent = 'Le sezioni non attive non compaiono nella card, ma tengono il loro posto nell’ordine.';
+      wrap.appendChild(hint);
+      return wrap;
+    })();
+
     shell.appendChild(makeSection('layout', '🎨', 'Layout e intestazione', [
       textField('card_title', 'Titolo della card', 'Flusso Energia'),
       picker('grid_status_entity', 'Stato rete (indicatore IN RETE / FUORI RETE, es. binary_sensor.deye_grid)', true),
@@ -600,6 +639,9 @@ class FFlowCardEditor extends HTMLElement {
       switchRow('_show_backup_panel',    'Pannello autonomia', 'Autonomia e kWh residui nell’area del flusso'),
       switchRow('_daily_tiles_extended', '6 riquadri giornalieri', 'FV, carica, scarica, prelievo, immissione, consumo'),
       switchRow('home_icon_classic', 'Icona casa classica', 'Usa la vecchia immagine invece della casa a due falde con FV1 / FV2'),
+      divider(),
+      orderList,
+      divider(),
       switchRow('grid_icon_classic', 'Icona rete classica', 'Usa la vecchia immagine del traliccio invece di quella luminosa'),
       switchRow('battery_style_classic', 'Batteria stile classico', 'Usa la vecchia icona della batteria invece di quella a segmenti'),
       switchRow('_show_battery_stats',   'Riquadri statistiche batteria', 'Temp. celle, temp. BMS, celle min/max, autonomia (JK BMS)', true),
@@ -1044,6 +1086,7 @@ class FFlowCard extends HTMLElement {
       consumers_chart_total: true,
       consumers_chart_legend: true,
       grid_icon_style: 'modern',
+      sections_order: ['bms', 'inv', 'cons', 'vent', 'stats', 'cam'],
       home_icon_style: 'modern',
       grid_switch_to_off: '',
       grid_switch_to_on: '',
@@ -1227,6 +1270,21 @@ class FFlowCard extends HTMLElement {
   _consumers() {
     const list = Array.isArray(this.config.consumers) ? this.config.consumers : [];
     return list.filter(c => c && c.entity);
+  }
+
+  // ── v1.10.0: user-defined order of the sections below the flow ──
+  static get SECTIONS() {
+    return [['bms', 'Statistiche batteria (JK BMS)'], ['inv', 'Inverter (riquadri giornalieri)'], ['cons', 'Utilizzatori e grafico'],
+      ['vent', 'Ventilazione inverter'], ['stats', 'Statistiche'], ['cam', 'Videocamera']];
+  }
+  static sectionOrder(cfg) {
+    const all = FFlowCard.SECTIONS.map(x => x[0]);
+    const want = Array.isArray(cfg.sections_order) ? cfg.sections_order.filter(k => all.includes(k)) : [];
+    return [...new Set([...want, ...all])];
+  }
+  _orderSections(chunks) {
+    const strip = (h) => String(h || '').trim().replace(/^<div class="dv"><\/div>/, '').trim();
+    return FFlowCard.sectionOrder(this.config).map(k => strip(chunks[k])).filter(Boolean).join('<div class="dv"></div>');
   }
 
   // ── v1.6.0: collapsible sections (Inverter / Utilizzatori / Ventilazione) ──
@@ -2743,7 +2801,7 @@ class FFlowCard extends HTMLElement {
         <div style="flex:1;display:flex;align-items:center;gap:4px"><span style="font-size:.58rem;color:#8b949e;letter-spacing:1px;text-transform:uppercase">Pot</span><div style="flex:1;background:#21262d;border-radius:20px;height:9px;overflow:hidden;position:relative"><div id="pwrBar" style="position:absolute;inset:0;right:auto;width:0%;border-radius:20px;background:#3fb950;transition:width .4s,background .4s"></div></div></div>
       </div>
       <div class="dv"></div>
-      <div id="battStatsWrap" style="${showBattStats ? '' : 'display:none'}">
+      ${this._orderSections({ bms: !showBattStats ? '' : `<div id="battStatsWrap">
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-top:5px">
         <div class="st"><div class="l">${this.config.label_cell_temp_minmax || 'TEMP CELLE MIN/MAX'}</div><div class="v" id="bTemp1">-- °C</div></div>
         <div class="st"><div class="l">${this.config.label_bms_temp || 'TEMP BMS'}</div><div class="v" id="bTemp2">-- °C</div></div>
@@ -2763,9 +2821,8 @@ class FFlowCard extends HTMLElement {
           </div>
         </div>
       </div>
-      <div class="dv"></div>
-      </div>
-      ${this._secHTML('inv', '☀️ ' + invSection, tiles6 ? `<div class="pvf six">
+      </div>`,
+      inv: this._secHTML('inv', '☀️ ' + invSection, tiles6 ? `<div class="pvf six">
         <div class="pvi"><div class="ico">☀️</div><div class="lbl">FV Oggi</div><div class="val yw" id="invTodayPv">-- kWh</div></div>
         <div class="pvi"><div class="ico">🔋</div><div class="lbl">Carica Batt</div><div class="val" id="invTodayBattChg">-- kWh</div></div>
         <div class="pvi"><div class="ico">⚡</div><div class="lbl">Scarica Batt</div><div class="val" id="invTodayBattDis">-- kWh</div></div>
@@ -2777,11 +2834,8 @@ class FFlowCard extends HTMLElement {
         <div class="pvi"><div class="ico">🔋</div><div class="lbl">Carica / Scarica</div><div class="val" id="invTodayBattChg">-- kWh</div><div class="val" id="invTodayBattDis" style="font-size:.74rem;color:#8b949e;margin-top:1px">-- kWh</div></div>
         <div class="pvi"><div class="ico">⚡</div><div class="lbl">Residua</div><div class="val" id="invRemCap">-- Ah</div><div class="val" id="invRemKwh" style="font-size:.74rem;color:#8b949e;margin-top:1px">-- kWh</div></div>
         <div class="pvi"><div class="ico">🏡</div><div class="lbl">Consumo Oggi</div><div class="val" id="invTodayLoad">-- kWh</div></div>
-      </div>`)}
-      ${this._buildConsumersHTML(esc)}
-      ${this._buildVentHTML(esc)}
-      ${this._buildStatsHTML(esc)}
-      ${this._buildCameraHTML(esc)}
+      </div>`),
+      cons: this._buildConsumersHTML(esc), vent: this._buildVentHTML(esc), stats: this._buildStatsHTML(esc), cam: this._buildCameraHTML(esc) })}
     </div>`;
     this._bindExtraSections();
     this._bindGridSwitch();
