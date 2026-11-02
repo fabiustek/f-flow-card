@@ -1,5 +1,12 @@
-// f-flow-card.js – Unified Edition v1.4.0
-const FFC_VERSION = '1.4.0';
+// f-flow-card.js – Unified Edition v1.5.0
+const FFC_VERSION = '1.5.0';
+// Changes v1.5.0:
+//   NEW  – On-grid / off-grid switching from the card: hold the grid pill or the tower, confirm,
+//           and the card turns on grid_switch_to_off / grid_switch_to_on (switch, button, script…).
+//           Pill shows "COMMUTAZIONE…" until the status entity changes; tower greys out off grid.
+//   NEW  – Two-slope house drawn in SVG: FV1 panels on the left slope, FV2 on the right, each
+//           glowing with its own production, values beside their slope; load value under the house.
+//           The PNG house stays available with home_icon_style: classic.
 // Changes v1.4.0:
 //   NEW  – Consumption chart under the consumers: stacked areas per consumer over the last
 //           24 h (configurable) from HA history, dashed house-total line, tooltip, kWh legend.
@@ -145,6 +152,7 @@ class FFlowCardEditor extends HTMLElement {
   _set(key, value) {
     if (key === 'battery_style_classic') { key = 'battery_style'; value = value ? 'classic' : 'modern'; }
     if (key === 'grid_icon_classic') { key = 'grid_icon_style'; value = value ? 'classic' : 'modern'; }
+    if (key === 'home_icon_classic') { key = 'home_icon_style'; value = value ? 'classic' : 'modern'; }
     if (this._config[key] === value) return;
     this._config = { ...this._config, [key]: value };
     this._fireChanged();
@@ -451,6 +459,7 @@ class FFlowCardEditor extends HTMLElement {
       cb.type = 'checkbox';
       cb.checked = key === 'battery_style_classic' ? cfg.battery_style === 'classic'
         : key === 'grid_icon_classic' ? cfg.grid_icon_style === 'classic'
+        : key === 'home_icon_classic' ? cfg.home_icon_style === 'classic'
         : cfg[key] === undefined ? defaultOn : !!cfg[key];
       cb.style.cssText = 'opacity:0;width:0;height:0;position:absolute;';
       const track = document.createElement('span');
@@ -528,13 +537,17 @@ class FFlowCardEditor extends HTMLElement {
 
     shell.appendChild(makeSection('layout', '🎨', 'Layout e intestazione', [
       textField('card_title', 'Titolo della card', 'Flusso Energia'),
-      picker('grid_status_entity', 'Stato rete (indicatore IN RETE / FUORI RETE)', true),
+      picker('grid_status_entity', 'Stato rete (indicatore IN RETE / FUORI RETE, es. binary_sensor.deye_grid)', true),
+      picker('grid_switch_to_off', 'Comando per passare FUORI RETE (es. switch.studio_off_grid)', true),
+      picker('grid_switch_to_on',  'Comando per tornare IN RETE (es. switch.studio_on_grid)', true),
+      switchRow('grid_switch_confirm', 'Chiedi conferma prima di commutare', 'Tieni premuto l’indicatore o il traliccio per commutare', true),
       picker('ems_mode_entity',    'Modalità EMS / di lavoro (sotto il titolo)', true),
       textField('inverter_image', 'URL immagine inverter (sostituisce il riquadro INV)', '/local/sigenergy-inverter.png'),
       divider(),
       switchRow('_show_energy_supply',   'Barra fonti energia', 'Barra Solare / Carica / Scarica / Rete a destra'),
       switchRow('_show_backup_panel',    'Pannello autonomia', 'Autonomia e kWh residui nell’area del flusso'),
       switchRow('_daily_tiles_extended', '6 riquadri giornalieri', 'FV, carica, scarica, prelievo, immissione, consumo'),
+      switchRow('home_icon_classic', 'Icona casa classica', 'Usa la vecchia immagine invece della casa a due falde con FV1 / FV2'),
       switchRow('grid_icon_classic', 'Icona rete classica', 'Usa la vecchia immagine del traliccio invece di quella luminosa'),
       switchRow('battery_style_classic', 'Batteria stile classico', 'Usa la vecchia icona della batteria invece di quella a segmenti'),
       switchRow('_show_battery_stats',   'Riquadri statistiche batteria', 'Temp. celle, temp. BMS, celle min/max, autonomia (JK BMS)', true),
@@ -950,6 +963,10 @@ class FFlowCard extends HTMLElement {
       consumers_chart_hours: 24,
       consumers_chart_total: true,
       grid_icon_style: 'modern',
+      home_icon_style: 'modern',
+      grid_switch_to_off: '',
+      grid_switch_to_on: '',
+      grid_switch_confirm: true,
       _show_ventilation: false,
       vent_title: 'Ventilazione inverter',
       vent_state_entity: '',
@@ -1500,6 +1517,113 @@ class FFlowCard extends HTMLElement {
     }
   }
 
+  // ── v1.5.0: two-slope house, FV1 panels on the left slope and FV2 on the right ──
+  // true = on grid, false = off grid, null = unknown / not configured
+  _gridOnState() {
+    const raw = this._strVal(this.config.grid_status_entity);
+    if (!raw || raw === 'unavailable' || raw === 'unknown') return null;
+    if (/on.?grid|connected|grid.?tied/.test(raw) && !/dis/.test(raw)) return true;
+    if (/off|island|disconnect|fault|backup|outage/.test(raw)) return false;
+    if (raw === 'on' || raw === 'true' || raw === '1') return true;
+    return null;
+  }
+
+  // ── v1.5.0: on-grid / off-grid switch (hold + confirm, like a button-card hold_action) ──
+  _gridSwitchEnabled() { return !!(this.config.grid_status_entity && (this.config.grid_switch_to_off || this.config.grid_switch_to_on)); }
+
+  _bindGridSwitch() {
+    if (!this._gridSwitchEnabled()) return;
+    const root = this.shadowRoot;
+    const HOLD = 800;
+    [root.getElementById('gridStatusPill'), root.getElementById('gridIconImg')].filter(Boolean).forEach(el => {
+      el.style.cursor = 'pointer';
+      el.style.touchAction = 'none';
+      let timer = null;
+      const pill = root.getElementById('gridStatusPill');
+      const start = (ev) => {
+        if (ev.button > 0 || this._gridPending) return;
+        if (pill) pill.classList.add('holding');
+        timer = setTimeout(() => { timer = null; if (pill) pill.classList.remove('holding'); this._askGridSwitch(); }, HOLD);
+      };
+      const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } if (pill) pill.classList.remove('holding'); };
+      el.addEventListener('pointerdown', start);
+      ['pointerup', 'pointerleave', 'pointercancel'].forEach(e => el.addEventListener(e, cancel));
+      el.addEventListener('contextmenu', e => e.preventDefault());
+    });
+  }
+
+  _askGridSwitch() {
+    const on = this._gridOnState();
+    if (on === null) return;
+    const target = on ? this.config.grid_switch_to_off : this.config.grid_switch_to_on;
+    if (!target) return;
+    if (this.config.grid_switch_confirm === false) { this._doGridSwitch(on, target); return; }
+    const root = this.shadowRoot;
+    const modal = root.getElementById('gridModal');
+    if (!modal) return;
+    root.getElementById('gridModalText').textContent = on
+      ? 'Stai per mettere FUORI RETE (OFF GRID) l’impianto, vuoi procedere?'
+      : 'Stai per rimettere IN RETE (ON GRID) l’impianto, vuoi procedere?';
+    modal.dataset.mode = on ? 'off' : 'on';
+    modal.style.display = 'flex';
+    const ok = root.getElementById('gridModalOk'), no = root.getElementById('gridModalNo');
+    ok.onclick = () => { modal.style.display = 'none'; this._doGridSwitch(on, target); };
+    no.onclick = () => { modal.style.display = 'none'; };
+  }
+
+  _doGridSwitch(wasOn, entityId) {
+    const domain = entityId.split('.')[0];
+    const service = (domain === 'button' || domain === 'input_button') ? 'press' : 'turn_on';
+    this._gridPending = { wasOn, until: Date.now() + 30000 };
+    this._hass.callService(domain, service, { entity_id: entityId })
+      .catch(() => { this._gridPending = null; })
+      .finally(() => this._updateDynamic());
+    this._updateDynamic();
+  }
+
+  _buildHouseSVG(pv1Show, pv2Show) {
+    const cx = 260;
+    const Lq = { a: [cx, 352], b: [184, 410], c: [197, 420], d: [cx, 373] };
+    const mir = (p) => [2 * cx - p[0], p[1]];
+    const Rq = { a: Lq.a, b: mir(Lq.b), c: mir(Lq.c), d: Lq.d };
+    const lerp = (p, q, t) => [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
+    const P = (Q, u, v) => lerp(lerp(Q.a, Q.b, u), lerp(Q.d, Q.c, u), v);
+    const pt = (p) => p[0].toFixed(1) + ',' + p[1].toFixed(1);
+    const quad = (Q) => [Q.a, Q.b, Q.c, Q.d].map(pt).join(' ');
+    // 4 × 2 solar cells per slope
+    const cells = (Q, side) => {
+      let h = '';
+      const cols = 4, rows = 2, u0 = 0.1, u1 = 0.94, v0 = 0.16, v1 = 0.86, gu = 0.018, gv = 0.07;
+      for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
+        const ua = u0 + (u1 - u0) * i / cols + gu, ub = u0 + (u1 - u0) * (i + 1) / cols - gu;
+        const va = v0 + (v1 - v0) * j / rows + gv / 2, vb = v0 + (v1 - v0) * (j + 1) / rows - gv / 2;
+        h += `<polygon points="${[P(Q, ua, va), P(Q, ub, va), P(Q, ub, vb), P(Q, ua, vb)].map(pt).join(' ')}"/>`;
+      }
+      return `<g fill="#123a6b" stroke="#2f6fb5" stroke-width=".5">${h}</g>
+        <g id="hpGlow${side}" fill="#ffe83c" opacity="0" style="transition:opacity .6s">${h}</g>`;
+    };
+    return `<g id="homeIconImg" data-modern="1" style="color:#8b949e;transition:color .5s">
+      <ellipse cx="${cx}" cy="473" rx="82" ry="7" fill="currentColor" fill-opacity=".10" stroke="currentColor" stroke-opacity=".35" stroke-width="1.2"/>
+      <polygon points="${pt(Lq.d)} 206,414 314,414" fill="#0f141a"/>
+      <rect x="204" y="412" width="112" height="58" rx="3" fill="#0f141a" stroke="currentColor" stroke-width="1.8" filter="url(#gridNeon)"/>
+      <circle cx="${cx}" cy="397" r="6" fill="#0f141a" stroke="currentColor" stroke-width="1.4"/>
+      <g id="homeWindows" fill="#1c2128" stroke="currentColor" stroke-width="1.2" style="transition:fill .5s">
+        <rect x="215" y="425" width="24" height="18" rx="2"/><rect x="281" y="425" width="24" height="18" rx="2"/>
+      </g>
+      <path d="M227,425 V443 M215,434 H239 M293,425 V443 M281,434 H305" stroke="currentColor" stroke-width=".8" stroke-opacity=".6"/>
+      <rect x="250" y="442" width="20" height="28" rx="2" fill="#161b22" stroke="currentColor" stroke-width="1.4"/>
+      <circle cx="265" cy="457" r="1.3" fill="currentColor"/>
+      <polygon points="${quad(Lq)}" fill="#1b2230" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+      <polygon points="${quad(Rq)}" fill="#1b2230" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+      ${cells(Lq, 'L')}${cells(Rq, 'R')}
+    </g>
+    ${pv1Show ? `<text id="pv1label" x="180" y="392" text-anchor="end" font-size="8" fill="#8b949e" letter-spacing="1">FV1</text>
+    <text id="pv1FlowVal" x="180" y="406" text-anchor="end" font-size="12" font-weight="700" fill="#ffe83c">-- W</text>` : ''}
+    ${pv2Show ? `<text id="pv2label" x="340" y="392" font-size="8" fill="#8b949e" letter-spacing="1">FV2</text>
+    <text id="pv2FlowVal" x="340" y="406" font-size="12" font-weight="700" fill="#ffe83c">-- W</text>` : ''}
+    <text id="fcLoadVal" x="${cx}" y="496" text-anchor="middle" font-size="13" font-weight="700" fill="#F7F6D3">-- W</text>`;
+  }
+
   _buildStaticSVG() {
     const dual = !!(this.config._show_battery2);
     const showBatt1 = !!(this.config._show_battery !== false);
@@ -1559,6 +1683,7 @@ class FFlowCard extends HTMLElement {
     </g>` : '';
 
     const pv1Show = !!this.config.pv1_power, pv2Show = !!this.config.pv2_power;
+    const modernHome = this.config.home_icon_style !== 'classic';
 
     const pv3txt = showPvExtra ? `<text id="pv3label" x="8" y="424" font-size="9" fill="#8b949e" letter-spacing="1">FV3</text><text id="pv3FlowVal" x="8" y="438" font-size="12" font-weight="700" fill="#ffe83c">-- W</text>` : '';
     const pv4txt = showPvExtra ? `<text id="pv4label" x="8" y="456" font-size="9" fill="#8b949e" letter-spacing="1">FV4</text><text id="pv4FlowVal" x="8" y="470" font-size="12" font-weight="700" fill="#ffe83c">-- W</text>` : '';
@@ -1665,6 +1790,24 @@ class FFlowCard extends HTMLElement {
       .pvf.six{grid-template-columns:repeat(6,1fr)}
       @media (max-width:450px){.pvf.six{grid-template-columns:repeat(3,1fr)}}
       .hdr .pill{display:inline-flex;align-items:center;gap:6px;font-size:.5rem;font-weight:700;letter-spacing:1.5px;padding:2px 9px;border-radius:10px;border:1px solid #3fb950;color:#3fb950;background:rgba(63,185,80,.08)}
+      .hdr .pill{position:relative;overflow:hidden;user-select:none;-webkit-user-select:none}
+      .hdr .pill .hold{position:absolute;left:0;top:0;bottom:0;width:0;background:currentColor;opacity:.25;transition:width .1s}
+      .hdr .pill.holding .hold{width:100%;transition:width .8s linear}
+      .hdr .pill > span:not(.hold){position:relative}
+      .hdr .pill.pending{animation:gpend 1s ease-in-out infinite}
+      @keyframes gpend{50%{opacity:.45}}
+      .gmodal{display:none;position:absolute;inset:0;z-index:20;align-items:flex-start;justify-content:center;padding-top:70px;box-sizing:border-box;background:rgba(1,4,9,.72);border-radius:12px;backdrop-filter:blur(2px)}
+      .gbox{width:min(320px,86%);background:#161b22;border:1px solid #30363d;border-radius:14px;padding:16px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.6)}
+      .gmodal[data-mode=off] .gbox{color:#f39c4b;border-color:rgba(243,156,75,.45)}
+      .gmodal[data-mode=on] .gbox{color:#3fb950;border-color:rgba(63,185,80,.45)}
+      .gmodal[data-mode=on] .gx{display:none}
+      .gtitle{font-size:.62rem;letter-spacing:1.5px;text-transform:uppercase;color:#8b949e;margin:6px 0 4px}
+      .gtext{font-size:.82rem;font-weight:600;color:#e6edf3;line-height:1.4}
+      .gbtns{display:flex;gap:8px;margin-top:14px}
+      .gbtns button{flex:1;padding:8px;border-radius:9px;border:1px solid #30363d;background:#0d1117;color:#c9d1d9;font-weight:700;font-size:.78rem;cursor:pointer;font-family:inherit}
+      .gbtns button.ok{background:currentColor;border-color:transparent}
+      .gmodal[data-mode=off] .gbtns button.ok{background:#f39c4b;color:#0d1117}
+      .gmodal[data-mode=on] .gbtns button.ok{background:#3fb950;color:#0d1117}
       .hdr .pill .dot{width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 6px currentColor}
       .ems{display:inline-flex;align-items:center;gap:9px;background:#0d1117;border:1px solid #21262d;border-radius:10px;padding:6px 12px 6px 7px;margin:-2px 0 6px}
       .ems-ico{width:26px;height:26px;border-radius:7px;background:rgba(63,185,80,.12);color:#3fb950;display:flex;align-items:center;justify-content:center;font-size:.9rem}
@@ -1712,9 +1855,18 @@ class FFlowCard extends HTMLElement {
       .vk .l{font-size:.44rem;color:#8b949e;letter-spacing:1px;text-transform:uppercase;margin-top:1px}
       .vfi{display:flex;align-items:center;justify-content:center;gap:3px;color:#8b949e}
     </style>
-    <div style="background:#161b22;border:1px solid #21262d;border-radius:12px;padding:13px;box-shadow:0 4px 20px rgba(0,0,0,.4);width:100%;box-sizing:border-box;">
+    <div style="position:relative;background:#161b22;border:1px solid #21262d;border-radius:12px;padding:13px;box-shadow:0 4px 20px rgba(0,0,0,.4);width:100%;box-sizing:border-box;">
+      ${this._gridSwitchEnabled() ? `<div class="gmodal" id="gridModal">
+        <div class="gbox">
+          <svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14,36 L18.5,10 L20,4 L21.5,10 L26,36"/><path d="M8,12 H32 M11,19 H29"/><path class="gx" d="M6,6 L34,34"/></svg>
+          <div class="gtitle">Modalità impianto</div>
+          <div class="gtext" id="gridModalText"></div>
+          <div class="gbtns"><button id="gridModalNo">Annulla</button><button id="gridModalOk" class="ok">Procedi</button></div>
+        </div>
+      </div>` : ''}
       <div class="ct hdr">⚡ <span id="cardTitle">${cardTitle}</span>
-        ${showGridStatus ? `<span id="gridStatusPill" class="pill"><span class="dot"></span><span id="gridStatusText">--</span></span>` : ''}
+        ${showGridStatus ? `<span id="gridStatusPill" class="pill"><span class="hold"></span><span class="dot"></span><span id="gridStatusText">--</span></span>` : ''}
         <span id="battStatusBadge" style="margin-left:auto;font-size:.5rem;font-weight:700;letter-spacing:1.5px;padding:1px 8px;border-radius:8px;background:#21262d;color:#8b949e;text-transform:uppercase">RIPOSO</span></div>
       ${showEms ? `<div class="ems"><div class="ems-ico">☆</div><div><div class="ems-l">Modalità EMS</div><div class="ems-v" id="emsModeVal">--</div></div></div>` : ''}
       <div style="width:100%;max-width:520px;margin:0 auto"><svg id="flowSvg" viewBox="-16 0 536 508" style="width:100%;display:block">
@@ -1803,6 +1955,7 @@ class FFlowCard extends HTMLElement {
         <g fill="none" stroke="currentColor" stroke-width="1" stroke-opacity=".55">
           <path d="M92,39 Q106,48 119,43"/><path d="M84,59 Q102,68 119,63"/>
         </g>
+        <g id="gridOffMark" style="display:none"><circle cx="61" cy="60" r="34" fill="none" stroke="#f85149" stroke-width="2.5" opacity=".85"/><path d="M37,84 L85,36" stroke="#f85149" stroke-width="2.5" stroke-linecap="round" opacity=".85"/></g>
         <g id="gridWires" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="3 14" opacity="0">
           <path d="M92,39 Q106,48 119,43"><animate attributeName="stroke-dashoffset" from="0" to="-34" dur="1.2s" repeatCount="indefinite"/></path>
           <path d="M84,59 Q102,68 119,63"><animate attributeName="stroke-dashoffset" from="0" to="-34" dur="1.2s" repeatCount="indefinite"/></path>
@@ -1814,9 +1967,9 @@ class FFlowCard extends HTMLElement {
 
       ${invBlock}
 
-      ${pv1Show ? `<text id="pv1label" x="8" y="372" font-size="9" fill="#8b949e" letter-spacing="1">FV1</text>
+      ${!modernHome && pv1Show ? `<text id="pv1label" x="8" y="372" font-size="9" fill="#8b949e" letter-spacing="1">FV1</text>
       <text id="pv1FlowVal" x="8" y="386" font-size="12" font-weight="700" fill="#ffe83c">-- W</text>` : ''}
-      ${pv2Show ? `<text id="pv2label" x="8" y="400" font-size="9" fill="#8b949e" letter-spacing="1">FV2</text>
+      ${!modernHome && pv2Show ? `<text id="pv2label" x="8" y="400" font-size="9" fill="#8b949e" letter-spacing="1">FV2</text>
       <text id="pv2FlowVal" x="8" y="414" font-size="12" font-weight="700" fill="#ffe83c">-- W</text>` : ''}
       ${battBadge}
       ${supplyBlock}
@@ -1824,8 +1977,8 @@ class FFlowCard extends HTMLElement {
       ${pv3txt}
       ${pv4txt}
 
-      <g id="homeIconImg" transform="translate(179,339)" style="opacity:1"><image href="${iconPath}/home-icon.png" x="0" y="0" width="160" height="160" preserveAspectRatio="xMidYMid meet"/></g>
-      <text id="fcLoadVal" x="174" y="420" text-anchor="end" font-size="13" font-weight="700" fill="#F7F6D3">-- W</text>
+      ${modernHome ? this._buildHouseSVG(pv1Show, pv2Show) : `<g id="homeIconImg" transform="translate(179,339)" style="opacity:1"><image href="${iconPath}/home-icon.png" x="0" y="0" width="160" height="160" preserveAspectRatio="xMidYMid meet"/></g>
+      <text id="fcLoadVal" x="174" y="420" text-anchor="end" font-size="13" font-weight="700" fill="#F7F6D3">-- W</text>`}
       ${evtxt}
       </svg></div>`+
 
@@ -1874,6 +2027,7 @@ class FFlowCard extends HTMLElement {
       ${this._buildVentHTML(esc)}
     </div>`;
     this._bindExtraSections();
+    this._bindGridSwitch();
   }
 
   _updateDynamic() {
@@ -2027,8 +2181,10 @@ class FFlowCard extends HTMLElement {
     if (battIconWrap) { battIconWrap.setAttribute('filter', absPwr1 >= 50 ? 'url(#iconGlowBlue)' : ''); }
     const gridImg = getEl('gridIconImg');
     if (gridImg && gridImg.dataset.modern) {
-      const gCol = gridActive > 10 ? '#FF2929' : gridActive < -10 ? '#2ecc71' : '#8b949e';
+      const offGrid = this._gridOnState() === false;
+      const gCol = offGrid ? '#6e7681' : gridActive > 10 ? '#FF2929' : gridActive < -10 ? '#2ecc71' : '#8b949e';
       gridImg.style.color = gCol;
+      const offMark = getEl('gridOffMark'); if (offMark) offMark.style.display = offGrid ? '' : 'none';
       const wires = getEl('gridWires');
       if (wires) {
         wires.setAttribute('opacity', Math.abs(gridActive) > 10 ? '1' : '0');
@@ -2037,7 +2193,16 @@ class FFlowCard extends HTMLElement {
       }
     } else if (gridImg) { gridImg.style.opacity = Math.abs(gridActive) < 10 ? '0.4' : '1'; gridImg.setAttribute('filter', Math.abs(gridActive) >= 50 ? 'url(#iconGlowOrange)' : ''); }
     const homeImg = getEl('homeIconImg');
-    if (homeImg) { homeImg.style.opacity = load > 10 ? '1' : '0.7'; homeImg.setAttribute('filter', load > 10 ? 'url(#iconGlowOrange)' : ''); }
+    if (homeImg && homeImg.dataset.modern) {
+      homeImg.style.color = load > 10 ? loadFlowColor : '#8b949e';
+      const win = getEl('homeWindows'); if (win) win.setAttribute('fill', load > 10 ? 'rgba(255,214,102,.55)' : '#1c2128');
+      // each slope glows with its own string: full glow at half of the PV array max
+      const half = Math.max(100, pvMax / 2);
+      const gl = getEl('hpGlowL'), gr = getEl('hpGlowR');
+      const glow = (w) => w > 10 ? (0.25 + 0.65 * Math.min(1, w / half)).toFixed(2) : '0';
+      if (gl) gl.setAttribute('opacity', glow(pv1));
+      if (gr) gr.setAttribute('opacity', glow(pv2));
+    } else if (homeImg) { homeImg.style.opacity = load > 10 ? '1' : '0.7'; homeImg.setAttribute('filter', load > 10 ? 'url(#iconGlowOrange)' : ''); }
 
     // Battery fill & stats
     if (dual) {
@@ -2168,6 +2333,11 @@ class FFlowCard extends HTMLElement {
       else if (/off|island|disconnect|fault|backup|outage/.test(raw)) { txt = 'FUORI RETE'; col = '#f85149'; }
       else if (raw === 'on' || raw === 'true' || raw === '1') { txt = 'IN RETE'; col = '#3fb950'; }
       else { txt = raw.toUpperCase(); col = '#f39c4b'; }
+      const gOn = this._gridOnState();
+      if (this._gridPending && (gOn !== this._gridPending.wasOn || Date.now() > this._gridPending.until)) this._gridPending = null;
+      if (this._gridPending) { txt = 'COMMUTAZIONE…'; col = '#f39c4b'; }
+      gsPill.classList.toggle('pending', !!this._gridPending);
+      if (this._gridSwitchEnabled()) gsPill.title = gOn === true ? 'Tieni premuto per passare FUORI RETE (OFF GRID)' : gOn === false ? 'Tieni premuto per tornare IN RETE (ON GRID)' : '';
       setText('gridStatusText', txt);
       gsPill.style.color = col; gsPill.style.borderColor = col;
       gsPill.style.background = col === '#3fb950' ? 'rgba(63,185,80,.08)' : col === '#f85149' ? 'rgba(248,81,73,.08)' : 'rgba(139,148,158,.08)';
