@@ -861,16 +861,16 @@ class FFlowCardEditor extends HTMLElement {
 
     shell.appendChild(makeSection('solar', '☀️', 'Fotovoltaico', [
       picker('pv1_power', 'Potenza FV1'),
-      textField('pv1_name', 'Nome stringa FV1 (es. Sud-Est)', 'FV1'),
+      textField('pv1_name', 'Nome della falda sinistra / stringa FV1 (facoltativo: se vuoto resta "FV1")', 'FV1'),
       picker('pv2_power', 'Potenza FV2'),
-      textField('pv2_name', 'Nome stringa FV2 (es. Nord-Ovest)', 'FV2'),
+      textField('pv2_name', 'Nome della falda destra / stringa FV2 (facoltativo: se vuoto resta "FV2")', 'FV2'),
     ]));
 
     shell.appendChild(makeSection('solar_extra', '☀️', 'Stringhe FV aggiuntive', [
       picker('pv3_power', 'Potenza FV3', true),
-      textField('pv3_name', 'Nome stringa FV3', 'FV3'),
+      textField('pv3_name', 'Nome stringa FV3 (facoltativo)', 'FV3'),
       picker('pv4_power', 'Potenza FV4', true),
-      textField('pv4_name', 'Nome stringa FV4', 'FV4'),
+      textField('pv4_name', 'Nome stringa FV4 (facoltativo)', 'FV4'),
     ], { toggleKey: '_show_pv_extra', toggleOn: showPVExtra, hidden: !showPVExtra }));
 
     shell.appendChild(makeSection('solar_extras', '☀️', 'Altri dati fotovoltaico', [

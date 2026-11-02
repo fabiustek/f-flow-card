@@ -142,7 +142,7 @@ La casa ha due falde di pannelli: **FV1 sulla sinistra** e **FV2 sulla destra**.
 
 **Stringhe aggiuntive FV3 e FV4**: attivale nella sezione **☀️ Stringhe FV aggiuntive** (＋ Attiva). **FV3** compare sotto FV1, sul lato della falda sinistra; **FV4** sotto FV2, sul lato della falda destra. Ogni falda si illumina con la somma delle sue stringhe (sinistra FV1 + FV3, destra FV2 + FV4). Con l'icona casa classica, FV3 e FV4 restano nella colonna di sinistra.
 
-Se nel tuo impianto le stringhe sono al contrario, basta scambiare i sensori FV1 e FV2 nella sezione **☀️ Fotovoltaico**. Lì puoi anche dare un **nome** a ogni stringa (es. "Sud-Est", "Nord-Ovest"): compare accanto alla casa e nelle statistiche. Per tornare all'immagine vecchia: **Icona casa classica** (`home_icon_style: classic`).
+Se nel tuo impianto le stringhe sono al contrario, basta scambiare i sensori FV1 e FV2 nella sezione **☀️ Fotovoltaico**. Lì puoi anche dare il **nome che vuoi** a ogni falda/stringa, in base al tuo impianto (per esempio l'orientamento o "Garage"): compare accanto alla casa e nelle statistiche. Se lasci il campo vuoto resta **FV1**, **FV2**… Per tornare all'immagine vecchia: **Icona casa classica** (`home_icon_style: classic`).
 
 ### Commutazione IN RETE / FUORI RETE
 
@@ -460,7 +460,7 @@ Tutte le opzioni si impostano dall'editor visuale; qui trovi le chiavi YAML corr
 | Chiave | Predefinito | Descrizione |
 |---|---|---|
 | `pv1_power` / `pv2_power` | sensori GoodWe | Potenza delle stringhe FV1 (falda sinistra) e FV2 (falda destra) |
-| `pv1_name` … `pv4_name` | `''` | Nome delle stringhe (es. `Sud-Est`); se vuoto `FV1`… |
+| `pv1_name` … `pv4_name` | `''` | Nome libero delle falde/stringhe; se vuoto `FV1`, `FV2`… |
 | `_show_pv_extra` | `false` | Mostra le stringhe FV3 e FV4 |
 | `pv3_power` / `pv4_power` | `''` | Potenza delle stringhe FV3 (sotto FV1, falda sinistra) e FV4 (sotto FV2, falda destra) |
 | `pv_total_power` | `sensor.goodwe_pv_power` | Potenza FV totale (se vuota: somma delle stringhe) |
