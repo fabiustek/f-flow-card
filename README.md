@@ -676,7 +676,7 @@ Per sapere quale versione stai usando, apri la console del browser (`F12`): comp
 
 ### v1.8.0
 - Nuova sezione **📈 Statistiche** con tre grafici: produzione FV di oggi a barre orarie per stringa con la curva della stima, consumi della casa nelle 24 ore colorati per intensità con il picco evidenziato, batteria nelle 24 ore (carica, scarica e SOC).
-- **Nomi delle stringhe** (es. Sud-Est, Nord-Ovest) accanto alla casa e nelle statistiche.
+- **Nomi delle stringhe a scelta** (se vuoti restano FV1, FV2…) accanto alla casa e nelle statistiche.
 - **Linee dei flussi più sottili**, come quella dal sole all'inverter; il flusso della batteria è sempre **blu**.
 
 ### v1.7.1
