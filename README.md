@@ -138,7 +138,7 @@ Esempio: SOC 45%, soglia 20%, batteria da 16 kWh, scarica a 1533 W → 25% di 16
 
 ### Casa a due falde
 
-La casa ha due falde di pannelli: **FV1 sulla sinistra** e **FV2 sulla destra**. Quando una stringa produce, la sua **falda diventa gialla** (come il flusso dal sole all'inverter) e i pannelli si illuminano tanto più quanto più produce; nome e potenza sono scritti in alto, accanto alla falda. Sotto la casa c'è il consumo istantaneo, e l'**anello alla base gira più veloce quanto più la casa consuma** (fermo sotto i 10 W). La casa prende il colore della fonte che la alimenta: giallo fotovoltaico, arancione batteria, rosso rete. Le finestre si accendono quando c'è consumo.
+La casa ha due falde di pannelli: **FV1 sulla sinistra** e **FV2 sulla destra**. Quando una stringa produce, la sua **falda diventa gialla** (come il flusso dal sole all'inverter) e i pannelli si illuminano tanto più quanto più produce; nome e potenza sono scritti in alto, accanto alla falda. Sotto la casa c'è il consumo istantaneo, e l'**anello alla base gira più veloce quanto più la casa consuma** (fermo sotto i 10 W). La casa (con il flusso che arriva dall'inverter, l'anello e il valore del consumo) prende il **colore delle fonti che la alimentano, mescolate in proporzione**: **giallo** per il solare, **blu** per la batteria, **rosso** per la rete. Per esempio, se la casa prende il 60% dal solare e il 40% dalla rete diventa arancione; metà solare e metà batteria dà un verde chiaro. La quota solare è la produzione FV che resta dopo la carica della batteria e l'immissione in rete. Le finestre si accendono quando c'è consumo.
 
 **Stringhe aggiuntive FV3 e FV4**: attivale nella sezione **☀️ Stringhe FV aggiuntive** (＋ Attiva). **FV3** compare sotto FV1, sul lato della falda sinistra; **FV4** sotto FV2, sul lato della falda destra. Ogni falda si illumina con la somma delle sue stringhe (sinistra FV1 + FV3, destra FV2 + FV4). Con l'icona casa classica, FV3 e FV4 restano nella colonna di sinistra.
 
@@ -588,7 +588,7 @@ Nella sezione Etichette la scelta di un'entità alternativa si sblocca solo dopo
 |---|---|
 | **Batteria (SOC)** | ≤20% rosso · ≤40% arancione · ≤75% verde · >75% azzurro |
 | **Rete** | rosso prelievo · verde immissione · grigio a riposo · barrato fuori rete |
-| **Casa** | colore della fonte principale: giallo FV · arancione batteria · rosso rete |
+| **Casa e flusso verso la casa** | miscela in proporzione delle fonti: giallo solare · blu batteria · rosso rete (es. solare + rete = arancione) |
 | **Temperatura celle** | ≤15°C blu · ≤35°C verde · ≤45°C arancione · >45°C rosso |
 | **Tensione celle** | <3,0 V rosso · <3,1 V arancione · <3,4 V giallo · ≤3,65 V verde · >3,65 V rosso |
 | **Ventilazione** | da grigio (idle) ad azzurro, blu, indaco, viola, fino a magenta (critical) |
@@ -672,6 +672,7 @@ Per sapere quale versione stai usando, apri la console del browser (`F12`): comp
 - **Meteo animato** nel cielo (nuvole, pioggia, acquazzone, temporale con fulmini, neve, nebbia, vento) dall'entità `weather.*`.
 - Nuova sezione **📹 Videocamera**: video in diretta (o immagine ogni 10 s) con le frecce per muovere una telecamera ONVIF; tocco = un passo, tenere premuto = movimento continuo.
 - Le **falde** diventano gialle quando le loro stringhe producono; nomi e potenze di FV1/FV2 più in alto e vicini alle falde.
+- **Colore della casa in base alle fonti**: flusso inverter → casa, casa, anello e consumo prendono una miscela di giallo (solare), blu (batteria) e rosso (rete) nella proporzione in cui ciascuna fonte alimenta la casa.
 
 ### v1.8.0
 - Nuova sezione **📈 Statistiche** con tre grafici: produzione FV di oggi a barre orarie per stringa con la curva della stima, consumi della casa nelle 24 ore colorati per intensità con il picco evidenziato, batteria nelle 24 ore (carica, scarica e SOC).

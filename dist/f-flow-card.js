@@ -7,6 +7,8 @@ const FFC_VERSION = '1.9.0';
 //   NEW  – Camera section (collapsible): live view through HA's ha-camera-stream (MJPEG proxy or
 //           10 s snapshot fallback) with an on-video PTZ pad (up/down/left/right/home entities;
 //           tap = one step, hold = repeat).
+//   NEW  – Inverter→house flow, house, ring and load value coloured by a weighted mix of the sources
+//           feeding the house (solar yellow, battery blue, grid red), e.g. 70 % solar + 30 % grid.
 //   CHG  – Roof slopes turn PV-yellow while their strings produce; FV1/FV2 labels moved up, next to
 //           their slopes.
 // Changes v1.8.0:
@@ -2918,14 +2920,23 @@ class FFlowCard extends HTMLElement {
     const absGrid = Math.abs(gridActive > 10 ? gridActive : 0);  // only count grid import
     const absBattOut = battPwr1 < -10 ? Math.abs(battPwr1) : 0;  // only count discharge
     const absPvLoad = pvTotal > 10 ? pvTotal : 0;
-    let loadFlowColor = '#ffe83c'; // default PV yellow
-    if (absGrid >= absPvLoad && absGrid >= absBattOut && absGrid > 10) {
-      loadFlowColor = '#FF2929'; // grid dominant
-    } else if (absBattOut >= absPvLoad && absBattOut >= absGrid && absBattOut > 10) {
-      // battery dominant — mirror battLineColor scale
-      loadFlowColor = absBattOut < 1000 ? '#f39c4b' : absBattOut < 2500 ? '#e67e22' : '#f85149';
-    } else {
-      loadFlowColor = '#ffe83c'; // PV dominant
+    // v1.9.0: house colour = mix of its sources, weighted by how much each one supplies:
+    //   solar  = PV left after charging the battery and exporting  → yellow
+    //   battery = discharge power                                  → battery blue
+    //   grid    = import power                                     → red
+    const pvToLoad = Math.max(0, absPvLoad - Math.max(0, battPwr1 + battPwr2) - (gridActive < -10 ? -gridActive : 0));
+    const battToLoad = Math.max(0, -(battPwr1 + battPwr2));
+    const srcSum = pvToLoad + battToLoad + absGrid;
+    const SRC = { pv: [255, 232, 60], batt: [0, 200, 255], grid: [255, 41, 41] };
+    let loadFlowColor = '#ffe83c';
+    this._loadMix = { pv: 1, batt: 0, grid: 0 };
+    if (srcSum > 10) {
+      const w = { pv: pvToLoad / srcSum, batt: battToLoad / srcSum, grid: absGrid / srcSum };
+      const rgb = [0, 1, 2].map(k => Math.round(w.pv * SRC.pv[k] + w.batt * SRC.batt[k] + w.grid * SRC.grid[k]));
+      // keep mixes bright: scale up so the strongest channel reaches at least 230
+      const mx = Math.max(...rgb), f = mx > 0 && mx < 230 ? 230 / mx : 1;
+      loadFlowColor = '#' + rgb.map(v => Math.min(255, Math.round(v * f)).toString(16).padStart(2, '0')).join('');
+      this._loadMix = w;
     }
     setFlow('flowInvLoad', load > 10, load, flowDur(load), loadFlowColor);
 
