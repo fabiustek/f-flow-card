@@ -8,6 +8,10 @@ const FFC_VERSION = '1.6.0';
 //           coloured by state, with house→wallbox flow, animated cable and car SOC bar.
 //   CHG  – Larger fonts everywhere (SVG labels and HTML tiles) for readability on phones.
 //   FIX  – Entity pickers in the editor no longer show the "required" asterisk.
+//   NEW  – Collapsible Inverter / Consumers / Ventilation sections with a one-line summary and a
+//           📌 pin (per browser, localStorage): pinned = open on load, unpinned = closed on load.
+//   NEW  – Chart period buttons 1h · 4h · 8h · 12h · 24h (remembered per browser; finer buckets
+//           for short periods) and consumers_chart_legend to hide the legend.
 // Changes v1.5.0:
 //   NEW  – On-grid / off-grid switching from the card: hold the grid pill or the tower, confirm,
 //           and the card turns on grid_switch_to_off / grid_switch_to_on (switch, button, script…).
@@ -654,8 +658,9 @@ class FFlowCardEditor extends HTMLElement {
       textField('consumers_title', 'Titolo sezione', 'Utilizzatori'),
       numberField('consumers_meter_speed', 'Velocità dischi contatore (1 = normale)', 0.1, 5, 0.1),
       switchRow('consumers_chart', 'Grafico dei consumi', 'Aree colorate per utilizzatore, dallo storico di Home Assistant', true),
-      numberField('consumers_chart_hours', 'Ore mostrate nel grafico', 1, 72, 1, 'h'),
+      numberField('consumers_chart_hours', 'Ore mostrate all’apertura (poi si cambiano dai pulsanti 1h · 4h · 8h · 12h · 24h sul grafico)', 1, 72, 1, 'h'),
       switchRow('consumers_chart_total', 'Linea consumo totale casa', 'Tratteggiata, usa il sensore "Consumo casa"', true),
+      switchRow('consumers_chart_legend', 'Legenda sotto il grafico', 'Togli la spunta per un grafico più compatto', true),
       divider(),
       listEditor('consumers', [
         { key: 'name', label: 'Nome', type: 'text', placeholder: 'es. Lavatrice' },
@@ -973,6 +978,7 @@ class FFlowCard extends HTMLElement {
       consumers_chart: true,
       consumers_chart_hours: 24,
       consumers_chart_total: true,
+      consumers_chart_legend: true,
       grid_icon_style: 'modern',
       home_icon_style: 'modern',
       grid_switch_to_off: '',
@@ -1145,12 +1151,55 @@ class FFlowCard extends HTMLElement {
     return list.filter(c => c && c.entity);
   }
 
+  // ── v1.6.0: collapsible sections (Inverter / Utilizzatori / Ventilazione) ──
+  // Pinned (📌) sections open on every load; unpinned ones start closed after a reload.
+  // The pin is stored per browser in localStorage; the open/closed state survives re-renders.
+  _lsKey(name) { return 'ffc:' + (this.config.card_title || 'Flusso Energia') + ':' + name; }
+  _lsGet(name) { try { return localStorage.getItem(this._lsKey(name)); } catch (e) { return null; } }
+  _lsSet(name, v) { try { localStorage.setItem(this._lsKey(name), v); } catch (e) { /* storage unavailable */ } }
+  _secPinned(key) { const v = this._lsGet('pin:' + key); return v === null ? true : v === '1'; }
+  _secIsOpen(key) {
+    if (!this._secOpen) this._secOpen = {};
+    if (this._secOpen[key] === undefined) this._secOpen[key] = this._secPinned(key);
+    return this._secOpen[key];
+  }
+  _secHTML(key, titleHtml, bodyHtml) {
+    const open = this._secIsOpen(key), pinned = this._secPinned(key);
+    return `<div class="sec${open ? ' open' : ''}" data-sec="${key}">
+      <div class="ct sec-h"><span class="chev">▸</span><span class="sec-t">${titleHtml}</span>
+        <span class="sec-sum" id="sum_${key}"></span>
+        <label class="pin${pinned ? ' on' : ''}" title="Tieni la sezione sempre aperta (anche dopo aver ricaricato la pagina)"><input type="checkbox"${pinned ? ' checked' : ''}><span>📌</span></label>
+      </div>
+      <div class="sec-b">${bodyHtml}</div>
+    </div>`;
+  }
+  _bindSections() {
+    this.shadowRoot.querySelectorAll('.sec[data-sec]').forEach(sec => {
+      const key = sec.dataset.sec;
+      const head = sec.querySelector('.sec-h');
+      const pin = sec.querySelector('.pin');
+      const cb = pin.querySelector('input');
+      head.addEventListener('click', (e) => {
+        if (pin.contains(e.target)) return;
+        this._secOpen[key] = !sec.classList.contains('open');
+        sec.classList.toggle('open', this._secOpen[key]);
+        if (this._secOpen[key] && key === 'cons') this._renderChart();
+      });
+      cb.addEventListener('change', () => {
+        this._lsSet('pin:' + key, cb.checked ? '1' : '0');
+        pin.classList.toggle('on', cb.checked);
+        if (cb.checked) { this._secOpen[key] = true; sec.classList.add('open'); }
+      });
+      pin.addEventListener('click', (e) => e.stopPropagation());
+    });
+  }
+
   _buildConsumersHTML(esc) {
     if (!this.config._show_consumers) return '';
     const list = this._consumers();
     const title = esc(this.config.consumers_title || 'Utilizzatori');
     const pal = FFlowCard.PALETTE;
-    let h = `<div class="dv"></div><div class="ct">🔌 ${title}</div><div class="cons">`;
+    let h = `<div class="cons">`;
     if (!list.length) h += `<div style="grid-column:1/-1;font-size:.74rem;color:#8b949e;padding:6px 2px">Nessun utilizzatore: aggiungili dall'editor (sezione Utilizzatori).</div>`;
     list.forEach((c, i) => {
       const col = esc(c.color || pal[i % pal.length]);
@@ -1164,21 +1213,47 @@ class FFlowCard extends HTMLElement {
     h += '</div>';
     if (this._chartEnabled()) {
       const hrs = this._chartHours();
+      const opts = [1, 4, 8, 12, 24];
+      if (!opts.includes(hrs)) opts.push(hrs);
+      opts.sort((a, b) => a - b);
       h += `<div class="cch">
-        <div class="cch-h"><span>Consumi ultime ${hrs} ore</span><span id="cChartInfo"></span></div>
+        <div class="cch-h"><span id="cChartTitle">${this._chartTitle(hrs)}</span>
+          <span class="hsel">${opts.map(o => `<button class="hb${o === hrs ? ' on' : ''}" data-h="${o}">${o}h</button>`).join('')}</span></div>
         <div class="cch-w" id="cChartWrap">
           <svg id="cChartSvg" viewBox="0 0 500 170" style="width:100%;display:block"></svg>
           <div class="cch-tip" id="cChartTip"></div>
         </div>
-        <div class="cch-leg" id="cChartLeg"></div>
+        ${this.config.consumers_chart_legend !== false ? '<div class="cch-leg" id="cChartLeg"></div>' : ''}
+        <div class="cch-info" id="cChartInfo"></div>
       </div>`;
     }
-    return h;
+    return '<div class="dv"></div>' + this._secHTML('cons', '🔌 ' + title, h);
   }
 
   // ── v1.4.0: 24 h consumption chart (HA recorder history) ─────────
   _chartEnabled() { return !!this.config._show_consumers && this.config.consumers_chart !== false; }
-  _chartHours() { return Math.max(1, Math.min(72, Number(this.config.consumers_chart_hours) || 24)); }
+  _chartHours() {
+    if (this._chartHoursSel === undefined) {
+      const saved = Number(this._lsGet('chartHours'));
+      this._chartHoursSel = saved > 0 ? saved : null;
+    }
+    return Math.max(1, Math.min(72, this._chartHoursSel || Number(this.config.consumers_chart_hours) || 24));
+  }
+  _chartTitle(h) { return h === 1 ? 'Consumi ultima ora' : `Consumi ultime ${h} ore`; }
+  _bindChartHours() {
+    const root = this.shadowRoot;
+    root.querySelectorAll('.hb[data-h]').forEach(b => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const h = Number(b.dataset.h);
+      this._chartHoursSel = h;
+      this._lsSet('chartHours', String(h));
+      root.querySelectorAll('.hb[data-h]').forEach(x => x.classList.toggle('on', x === b));
+      const t = root.getElementById('cChartTitle'); if (t) t.textContent = this._chartTitle(h);
+      this._hist = null;
+      this._renderChart();
+      this._maybeLoadHistory();
+    }));
+  }
   _chartIds() {
     const ids = this._consumers().filter(c => c.chart !== false).map(c => c.entity);
     if (this.config.consumers_chart_total !== false && this.config.consump) ids.push(this.config.consump);
@@ -1244,9 +1319,13 @@ class FFlowCard extends HTMLElement {
     if (!h || h.error || !h.raw) {
       svg.innerHTML = `<text x="250" y="88" text-anchor="middle" font-size="13" fill="#8b949e">${h && h.error ? 'Storico non disponibile' : 'Caricamento storico…'}</text>`;
       this._chartData = null;
+      const lg = root.getElementById('cChartLeg'); if (lg) lg.innerHTML = '';
+      const inf = root.getElementById('cChartInfo'); if (inf) inf.textContent = '';
       return;
     }
-    const N = Math.round(h.hours * 12);
+    // bucket size: 1 min for 1 h, 2 min up to 4 h, 4 min up to 8 h, then 5 min
+    const bMin = h.hours <= 1 ? 1 : h.hours <= 4 ? 2 : h.hours <= 8 ? 4 : 5;
+    const N = Math.round(h.hours * 60 / bMin);
     const W = 500, H = 170, L = 50, R = 6, T = 8, B = 22, pw = W - L - R, ph = H - T - B;
     const pal = FFlowCard.PALETTE;
     const series = this._consumers().map((c, i) => ({ c, col: c.color || pal[i % pal.length] }))
@@ -1274,14 +1353,15 @@ class FFlowCard extends HTMLElement {
       g += `<line x1="${L}" x2="${W - R}" y1="${yy}" y2="${yy}" stroke="#21262d" stroke-width="1"/>`;
       g += `<text x="${L - 4}" y="${(+yy + 3).toFixed(1)}" text-anchor="end" font-size="11" fill="#8b949e">${fmt(v)}</text>`;
     }
-    const stepH = h.hours <= 12 ? 2 : h.hours <= 24 ? 3 : 6;
-    const first = new Date(h.start); first.setMinutes(0, 0, 0); first.setHours(first.getHours() + 1);
-    for (let t = +first; t < h.end; t += 3600000) {
+    // x labels every 15 min (1 h), 1 h (≤4 h), 2 h (≤12 h), 3 h (≤24 h), 6 h beyond
+    const stepMin = h.hours <= 1 ? 15 : h.hours <= 4 ? 60 : h.hours <= 12 ? 120 : h.hours <= 24 ? 180 : 360;
+    const first = new Date(h.start); first.setSeconds(0, 0); first.setMinutes(Math.ceil(first.getMinutes() / 15) * 15);
+    for (let t = +first; t < h.end; t += 15 * 60000) {
       const d = new Date(t);
-      if (d.getHours() % stepH) continue;
+      if ((d.getHours() * 60 + d.getMinutes()) % stepMin) continue;
       const xx = (L + (t - h.start) / (h.end - h.start) * pw).toFixed(1);
       g += `<line x1="${xx}" x2="${xx}" y1="${T}" y2="${T + ph}" stroke="#21262d" stroke-width="1" stroke-dasharray="2 3"/>`;
-      g += `<text x="${xx}" y="${H - 6}" text-anchor="middle" font-size="11" fill="#8b949e">${String(d.getHours()).padStart(2, '0')}:00</text>`;
+      g += `<text x="${xx}" y="${H - 6}" text-anchor="middle" font-size="11" fill="#8b949e">${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}</text>`;
     }
     // stacked areas, bottom series first
     series.forEach((sr, k) => {
@@ -1389,8 +1469,7 @@ class FFlowCard extends HTMLElement {
       fh += `<div class="vk"><div class="vfi" id="vfIco${i}">${this._fanSVG('vfRot' + i, 14)}<span class="v" id="vfVal${i}">--</span></div>
         <div class="l">${esc(f.name || 'FAN' + (i + 1))}</div></div>`;
     });
-    return `<div class="dv"></div>
-      <div class="ct">🌀 ${esc(this.config.vent_title || 'Ventilazione inverter')}</div>
+    return '<div class="dv"></div>' + this._secHTML('vent', '🌀 ' + esc(this.config.vent_title || 'Ventilazione inverter'), `
       <div class="vent" id="ventBox">
         <div class="vrow">
           <div class="vico" id="ventMainIco">${this._fanSVG('ventMainRot', 26)}
@@ -1403,7 +1482,7 @@ class FFlowCard extends HTMLElement {
         <div class="vgrid">
           ${kpi('ventAmb', 'Ambiente')}${kpi('ventPwm', 'PWM')}${kpi('ventRpm', 'RPM medio')}${fh}
         </div>
-      </div>`;
+      </div>`);
   }
 
   _bindExtraSections() {
@@ -1458,6 +1537,7 @@ class FFlowCard extends HTMLElement {
     // consumers
     if (this.config._show_consumers) {
       const k = Number(this.config.consumers_meter_speed) || 1;
+      let sumW = 0, nOn = 0;
       this._consumers().forEach((c, i) => {
         const w = this._val(c.entity, true);
         const pw = root.getElementById('cnPw' + i);
@@ -1465,12 +1545,16 @@ class FFlowCard extends HTMLElement {
         const tile = root.getElementById('cn' + i);
         const thr = Number(c.threshold) >= 0 && c.threshold !== '' && c.threshold !== undefined ? Number(c.threshold) : 50;
         if (tile) tile.classList.toggle('on', w !== null && w >= thr);
+        if (w !== null && c.chart !== false) sumW += Math.max(0, w);
+        if (w !== null && w >= thr) nOn++;
         // 1 kW ≈ 0.6 giri/s; a few watts still turn slowly; capped so it stays readable
         const rps = w === null || w < 1 ? 0 : Math.min(3, Math.max(0.05, (w / 1000) * 0.6 * k));
         const id = 'cnMk' + i;
         if (!sp.meters[id]) sp.meters[id] = { a: Math.random() * Math.PI, rps: 0 };
         sp.meters[id].rps = rps;
       });
+      const sumEl = root.getElementById('sum_cons');
+      if (sumEl) sumEl.textContent = fmtW(sumW) + ' · ' + (nOn === 1 ? '1 acceso' : nOn + ' accesi');
     }
     // ventilation
     if (this.config._show_ventilation) {
@@ -1497,6 +1581,8 @@ class FFlowCard extends HTMLElement {
       const box = root.getElementById('ventBox');
       if (box) box.style.setProperty('--vc', lv.c);
       const stEl = root.getElementById('ventState'); if (stEl) stEl.textContent = lv.l;
+      const sumV = root.getElementById('sum_vent');
+      if (sumV) { sumV.textContent = lv.l + (avg !== null ? ' · ' + Math.round(avg) + ' rpm' : ''); sumV.style.color = lv.c; }
       const statusTxt = st(this.config.vent_status_entity);
       const sEl = root.getElementById('ventStatus'); if (sEl) sEl.textContent = statusTxt !== null ? statusTxt : lv.t;
       const temps = [];
@@ -1808,6 +1894,22 @@ class FFlowCard extends HTMLElement {
       .dv{height:1px;background:#21262d;margin:8px 0}
       .ct{font-size:.68rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#8b949e;margin-bottom:10px;display:flex;align-items:center;gap:7px}
       .ct::after{content:'';flex:1;height:1px;background:#21262d}
+      .sec-h{cursor:pointer;user-select:none;-webkit-user-select:none;margin-bottom:0}
+      .sec-h::after{display:none}
+      .sec-h .chev{display:inline-block;width:12px;transition:transform .2s;color:#8b949e}
+      .sec.open .sec-h .chev{transform:rotate(90deg)}
+      .sec-h .sec-t{white-space:nowrap}
+      .sec-h .sec-sum{flex:1;min-width:0;text-align:right;text-transform:none;letter-spacing:0;font-weight:600;color:#c9d1d9;font-size:.74rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .sec.open .sec-h .sec-sum{visibility:hidden}
+      .pin{display:inline-flex;align-items:center;gap:3px;padding:2px 7px 2px 5px;border-radius:10px;border:1px solid #30363d;cursor:pointer;opacity:.55;font-size:.72rem;letter-spacing:0}
+      .pin.on{opacity:1;border-color:#58a6ff;background:rgba(88,166,255,.12)}
+      .pin input{margin:0;width:12px;height:12px;accent-color:#58a6ff;cursor:pointer}
+      .sec-b{display:none;padding-top:10px}
+      .sec.open .sec-b{display:block}
+      .cch-h .hsel{display:inline-flex;gap:3px}
+      .hb{font:inherit;font-size:.68rem;font-weight:700;letter-spacing:0;padding:2px 7px;border-radius:8px;border:1px solid #30363d;background:#161b22;color:#8b949e;cursor:pointer}
+      .hb.on{color:#0d1117;background:#58a6ff;border-color:#58a6ff}
+      .cch-info{font-size:.7rem;color:#8b949e;text-align:right;margin-top:3px}
       .pvf{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:2px}
       .pvi{text-align:center;background:#0d1117;border:1px solid #21262d;border-radius:8px;padding:6px 2px}
       .pvi .ico{font-size:.95rem;margin-bottom:2px}
@@ -1862,7 +1964,7 @@ class FFlowCard extends HTMLElement {
              background:linear-gradient(180deg,#05070a,#1b2027 45%,#2e353e 50%,#1b2027 55%,#05070a);border:1px solid #2a313a}
       .meter .mk{position:absolute;top:1px;bottom:1px;width:4px;margin-left:-2px;left:50%;border-radius:1px;background:var(--c);box-shadow:0 0 6px var(--c)}
       .cch{margin-top:10px;background:#0d1117;border:1px solid #21262d;border-radius:10px;padding:8px 8px 6px}
-      .cch-h{display:flex;justify-content:space-between;align-items:baseline;font-size:.64rem;letter-spacing:1px;text-transform:uppercase;color:#8b949e;margin-bottom:4px}
+      .cch-h{display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;font-size:.64rem;letter-spacing:1px;text-transform:uppercase;color:#8b949e;margin-bottom:4px}
       .cch-h #cChartInfo{text-transform:none;letter-spacing:0}
       .cch-w{position:relative;touch-action:pan-y}
       .cch-tip{display:none;position:absolute;top:4px;pointer-events:none;background:rgba(22,27,34,.95);border:1px solid #30363d;border-radius:8px;padding:6px 8px;font-size:.72rem;color:#c9d1d9;min-width:110px;box-shadow:0 4px 14px rgba(0,0,0,.5);z-index:2}
@@ -2046,8 +2148,7 @@ class FFlowCard extends HTMLElement {
       </div>
       <div class="dv"></div>
       </div>
-      <div class="ct">☀️ ${invSection}</div>
-      ${tiles6 ? `<div class="pvf six">
+      ${this._secHTML('inv', '☀️ ' + invSection, tiles6 ? `<div class="pvf six">
         <div class="pvi"><div class="ico">☀️</div><div class="lbl">FV Oggi</div><div class="val yw" id="invTodayPv">-- kWh</div></div>
         <div class="pvi"><div class="ico">🔋</div><div class="lbl">Carica Batt</div><div class="val" id="invTodayBattChg">-- kWh</div></div>
         <div class="pvi"><div class="ico">⚡</div><div class="lbl">Scarica Batt</div><div class="val" id="invTodayBattDis">-- kWh</div></div>
@@ -2059,12 +2160,14 @@ class FFlowCard extends HTMLElement {
         <div class="pvi"><div class="ico">🔋</div><div class="lbl">Carica / Scarica</div><div class="val" id="invTodayBattChg">-- kWh</div><div class="val" id="invTodayBattDis" style="font-size:.74rem;color:#8b949e;margin-top:1px">-- kWh</div></div>
         <div class="pvi"><div class="ico">⚡</div><div class="lbl">Residua</div><div class="val" id="invRemCap">-- Ah</div><div class="val" id="invRemKwh" style="font-size:.74rem;color:#8b949e;margin-top:1px">-- kWh</div></div>
         <div class="pvi"><div class="ico">🏡</div><div class="lbl">Consumo Oggi</div><div class="val" id="invTodayLoad">-- kWh</div></div>
-      </div>`}
+      </div>`)}
       ${this._buildConsumersHTML(esc)}
       ${this._buildVentHTML(esc)}
     </div>`;
     this._bindExtraSections();
     this._bindGridSwitch();
+    this._bindSections();
+    this._bindChartHours();
   }
 
   _updateDynamic() {
@@ -2435,6 +2538,7 @@ class FFlowCard extends HTMLElement {
     setText('invTodayBattChg', _todayBattChgRaw !== null ? todayBattChg.toFixed(2) + ' kWh' : '-- kWh');
     setText('invTodayBattDis', battDis1Raw      !== null ? battDis1.toFixed(2)     + ' kWh' : '-- kWh');
     setText('invTodayLoad',    _todayLoadRaw    !== null ? todayLoad.toFixed(2)    + ' kWh' : '-- kWh');
+    setText('sum_inv', 'FV ' + (_todayPvRaw !== null ? todayPv.toFixed(1) : '--') + ' · Consumo ' + (_todayLoadRaw !== null ? todayLoad.toFixed(1) : '--') + ' kWh');
     if (getEl('invTodayGridImp')) {
       const gi = this._val(this.config.grid_import_energy), ge = this._val(this.config.grid_export_energy);
       setText('invTodayGridImp', gi !== null ? gi.toFixed(2) + ' kWh' : '-- kWh');

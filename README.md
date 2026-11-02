@@ -31,6 +31,7 @@ Versione attuale: **v1.6.0** · Fork di [k-flow-card](https://github.com/thekhan
   - [Statistiche batteria (JK BMS)](#statistiche-batteria-jk-bms)
   - [Auto elettrica / Wallbox](#auto-elettrica--wallbox)
   - [Da telefono](#da-telefono)
+  - [Sezioni richiudibili](#sezioni-richiudibili)
 - [Esempio completo](#esempio-completo)
 - [Riferimento delle opzioni](#riferimento-delle-opzioni)
 - [Logica dei colori](#logica-dei-colori)
@@ -55,6 +56,7 @@ Versione attuale: **v1.6.0** · Fork di [k-flow-card](https://github.com/thekhan
 - **Autonomia** della batteria, energia residua, barra delle fonti di energia, modalità EMS
 - **Wallbox e auto** disegnate accanto alla casa, con stato, potenza, SOC dell'auto e tempo alla carica completa
 - **Leggibile anche da telefono**: se la card è stretta, i riquadri vanno su 3 colonne e le etichette si ingrandiscono
+- **Sezioni richiudibili** (Inverter, Utilizzatori, Ventilazione) con riepilogo su una riga e flag 📌 per tenerle sempre aperte
 - Supporto per **due batterie** e **stringhe FV aggiuntive** (FV3/FV4)
 - **Editor visuale** completo in italiano: non serve scrivere YAML
 - Un solo file JavaScript, nessuna dipendenza
@@ -168,9 +170,13 @@ Nella card:
 
 <p align="center"><img src="docs/images/chart-tooltip.png" alt="Dettaglio del grafico dei consumi" width="480"></p>
 
-Sotto gli utilizzatori c'è il grafico delle ultime 24 ore (regolabile da 1 a 72). Ogni utilizzatore è un'**area del suo colore**, impilata sulle altre: si vede subito **cosa ha consumato e quando**.
+Sotto gli utilizzatori c'è il grafico dei consumi. Ogni utilizzatore è un'**area del suo colore**, impilata sulle altre: si vede subito **cosa ha consumato e quando**.
 
-- I dati arrivano dallo **storico di Home Assistant** (recorder), con una media ogni 5 minuti, e si aggiornano ogni 5 minuti.
+- **Periodo a vista**: con i pulsanti **1h · 4h · 8h · 12h · 24h** in alto a destra del grafico cambi il periodo con un tocco. La scelta viene ricordata su quel dispositivo. Il valore di **Ore mostrate all'apertura** nell'editor (predefinito 24) vale finché non premi un pulsante.
+- Con periodi brevi il grafico è più dettagliato: una media al minuto per 1 ora, ogni 2 minuti fino a 4 ore, ogni 4 minuti fino a 8 ore, poi ogni 5 minuti.
+- **Legenda**: per un grafico più compatto togli la spunta **Legenda sotto il grafico** nella sezione **🔌 Utilizzatori** dell'editor. Il totale "misurato X di Y kWh" resta visibile.
+
+- I dati arrivano dallo **storico di Home Assistant** (recorder) e si aggiornano ogni 5 minuti.
 - La **linea tratteggiata** è il consumo totale della casa (sensore **Consumo casa**): lo spazio tra le aree e la linea è il consumo non misurato.
 - **Tocca il grafico** (o passaci sopra col mouse) per vedere l'orario e i watt di ogni utilizzatore, dal più alto al più basso.
 - Sotto il grafico, la legenda riporta i **kWh** di ciascuno nel periodo; in alto, "misurato X di Y kWh".
@@ -236,6 +242,21 @@ Stati riconosciuti (non importano maiuscole e minuscole):
 | contiene `connected`, `plugged`, `waiting`, `paused`, `ready` | COLLEGATA | giallo |
 | altro (es. `disconnected`, `idle`) | SCOLLEGATA | grigio |
 | nessuno stato configurato e potenza ≤ 50 W | IN ATTESA | grigio |
+
+### Sezioni richiudibili
+
+<p align="center"><img src="docs/images/sections-closed.png" alt="Sezioni chiuse con riepilogo e flag per tenerle aperte" width="480"></p>
+
+Le sezioni **Inverter** (riquadri giornalieri), **Utilizzatori** e **Ventilazione inverter** si aprono e si chiudono toccando il titolo. Da chiuse occupano una sola riga, con un riepilogo:
+- **Inverter**: produzione FV e consumo di oggi.
+- **Utilizzatori**: potenza totale degli utilizzatori e quanti sono accesi.
+- **Ventilazione**: livello termico e giri medi, con il colore del livello.
+
+Il flag **📌** a destra decide come si presenta la sezione quando apri o ricarichi la pagina:
+- **📌 spuntato**: la sezione si apre **sempre aperta** (bloccata aperta).
+- **📌 senza spunta**: puoi aprirla quando vuoi, ma a ogni ricaricamento della pagina la trovi **chiusa**.
+
+Di partenza tutte le sezioni hanno il flag spuntato, quindi la card si presenta come prima finché non togli la spunta. Il flag e la scelta delle ore del grafico vengono salvati **sul dispositivo** (nel browser o nell'app): sul telefono e sul computer puoi avere impostazioni diverse.
 
 ### Da telefono
 
@@ -414,7 +435,8 @@ Tutte le opzioni si impostano dall'editor visuale; qui trovi le chiavi YAML corr
 | `consumers_meter_speed` | `1` | Velocità dei dischi contatore (0.1–5) |
 | `consumers` | `[]` | Elenco con `name`, `entity`, `icon`, `color`, `threshold` (W), `chart` (`false` per escluderlo dal grafico) |
 | `consumers_chart` | `true` | Mostra il grafico dei consumi |
-| `consumers_chart_hours` | `24` | Ore mostrate (1–72) |
+| `consumers_chart_hours` | `24` | Ore mostrate all'apertura (1–72); poi si cambiano con i pulsanti sul grafico |
+| `consumers_chart_legend` | `true` | Legenda sotto il grafico (`false` per un grafico più compatto) |
 | `consumers_chart_total` | `true` | Linea tratteggiata del consumo totale (`consump`) |
 
 ### Ventilazione inverter
@@ -507,6 +529,9 @@ Per sapere quale versione stai usando, apri la console del browser (`F12`): comp
 - Controlla il sensore **Potenza wallbox**: è l'unico necessario. Senza **Stato wallbox**, la card mostra "IN CARICA" solo quando la potenza supera 50 W, altrimenti "IN ATTESA".
 - Se hai configurato lo stato ma il valore non è tra quelli riconosciuti (vedi [Auto elettrica / Wallbox](#auto-elettrica--wallbox)), la card mostra "SCOLLEGATA": in quel caso lascia vuoto lo stato.
 
+**Una sezione si apre sempre chiusa (o sempre aperta)**
+- Dipende dal flag **📌** accanto al titolo della sezione: spuntato = sempre aperta, senza spunta = chiusa a ogni ricaricamento. Il flag è salvato su ogni dispositivo separatamente; in una finestra in incognito non viene ricordato.
+
 **I testi sono troppo piccoli**
 - Dalla v1.6.0 i caratteri sono più grandi e, quando la card è stretta, le etichette del disegno si ingrandiscono da sole. Se usi una plancia a più colonne, una colonna più larga rende tutto più leggibile.
 
@@ -528,6 +553,8 @@ Per sapere quale versione stai usando, apri la console del browser (`F12`): comp
 - Nuove icone **colonnina + auto** disegnate in SVG accanto alla casa, colorate in base allo stato, con flusso dalla casa, cavo animato e barra del SOC.
 - **Caratteri più grandi** in tutta la card; quando la card è stretta (telefono) i riquadri vanno su 3 colonne e le etichette si ingrandiscono.
 - Nell'editor i campi delle entità non mostrano più l'asterisco "obbligatorio".
+- **Sezioni richiudibili** Inverter, Utilizzatori e Ventilazione, con riepilogo su una riga e flag 📌 per tenerle aperte anche dopo il ricaricamento.
+- **Grafico dei consumi**: pulsanti 1h · 4h · 8h · 12h · 24h per cambiare periodo a vista (più dettaglio sui periodi brevi) e opzione per nascondere la legenda.
 
 ### v1.5.0
 - **Commutazione IN RETE / FUORI RETE** dalla card: tieni premuto l'indicatore o il traliccio, conferma, e la card attiva lo switch giusto. "COMMUTAZIONE…" in attesa del cambio di stato; traliccio barrato fuori rete.
