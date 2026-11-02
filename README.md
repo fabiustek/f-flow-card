@@ -5,7 +5,7 @@
 [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
 [![Release](https://img.shields.io/github/v/release/fabiustek/f-flow-card)](https://github.com/fabiustek/f-flow-card/releases)
 
-Versione attuale: **v1.5.0** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
+Versione attuale: **v1.6.0** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
 
 <p align="center">
   <img src="docs/images/card-overview.png" alt="F-Flow Card con tutte le sezioni attive" width="480">
@@ -30,6 +30,7 @@ Versione attuale: **v1.5.0** · Fork di [k-flow-card](https://github.com/thekhan
   - [Ventilazione inverter](#ventilazione-inverter)
   - [Statistiche batteria (JK BMS)](#statistiche-batteria-jk-bms)
   - [Auto elettrica / Wallbox](#auto-elettrica--wallbox)
+  - [Da telefono](#da-telefono)
 - [Esempio completo](#esempio-completo)
 - [Riferimento delle opzioni](#riferimento-delle-opzioni)
 - [Logica dei colori](#logica-dei-colori)
@@ -52,7 +53,9 @@ Versione attuale: **v1.5.0** · Fork di [k-flow-card](https://github.com/thekhan
 - **Grafico dei consumi** delle ultime 24 ore: chi ha consumato e quando
 - **Ventilazione inverter** con livelli termici, temperature, PWM e ventole animate
 - **Autonomia** della batteria, energia residua, barra delle fonti di energia, modalità EMS
-- Supporto per **due batterie**, **stringhe FV aggiuntive** (FV3/FV4) e **auto elettrica**
+- **Wallbox e auto** disegnate accanto alla casa, con stato, potenza, SOC dell'auto e tempo alla carica completa
+- **Leggibile anche da telefono**: se la card è stretta, i riquadri vanno su 3 colonne e le etichette si ingrandiscono
+- Supporto per **due batterie** e **stringhe FV aggiuntive** (FV3/FV4)
 - **Editor visuale** completo in italiano: non serve scrivere YAML
 - Un solo file JavaScript, nessuna dipendenza
 
@@ -213,7 +216,32 @@ Con **Riquadri statistiche batteria** attivo (predefinito) compaiono: temperatur
 
 ### Auto elettrica / Wallbox
 
-Sezione **🚗 Auto elettrica / Wallbox** → **＋ Attiva**: stato della wallbox (`charging`, `completed`…), potenza, corrente, SOC dell'auto e tempo alla carica completa (da un sensore in minuti, oppure calcolato dalla capacità della batteria dell'auto).
+<p align="center"><img src="docs/images/wallbox.png" alt="Wallbox e auto in carica" width="480"></p>
+
+A destra della casa compaiono la **colonnina** e l'**auto**. Quando l'auto si carica, un flusso va dalla casa alla colonnina e il cavo si anima. Sopra l'auto ci sono la potenza di ricarica, lo stato, il SOC dell'auto (anche come barra sotto l'auto), la corrente e il tempo alla carica completa.
+
+**Configurazione** (sezione **🚗 Auto elettrica / Wallbox** → **＋ Attiva**):
+1. **Potenza wallbox**: il sensore di potenza della wallbox o della presa (W o kW). È l'unico campo necessario.
+2. **Stato wallbox** (facoltativo): se lo lasci vuoto, la card considera l'auto **in carica** quando la potenza supera 50 W.
+3. **SOC batteria auto** (facoltativo): per esempio il livello batteria dall'integrazione della tua auto.
+4. **Corrente wallbox** e **Tempo alla carica completa** (facoltativi).
+5. **Capacità batteria auto** in Wh (facoltativa): se non hai un sensore del tempo residuo, la card lo stima da capacità, SOC e potenza. Per esempio 43,2 kWh → `43200`.
+
+Stati riconosciuti (non importano maiuscole e minuscole):
+
+| Stato della wallbox | Nella card | Colore |
+|---|---|---|
+| contiene `charging`, `ricarica`, `in carica` | IN CARICA | azzurro |
+| contiene `complete`, `finished`, `full` | CARICA COMPLETA | verde |
+| contiene `connected`, `plugged`, `waiting`, `paused`, `ready` | COLLEGATA | giallo |
+| altro (es. `disconnected`, `idle`) | SCOLLEGATA | grigio |
+| nessuno stato configurato e potenza ≤ 50 W | IN ATTESA | grigio |
+
+### Da telefono
+
+<p align="center"><img src="docs/images/phone.png" alt="La card in una colonna stretta, come da telefono" width="340"></p>
+
+La card si adatta alla **propria larghezza**, non a quella dello schermo: se è stretta (sotto 440 px, come su un telefono o in una colonna stretta della plancia), i 6 riquadri giornalieri vanno su 3 colonne e le etichette del disegno (orari, autonomia, FV1/FV2, wallbox…) diventano più grandi.
 
 ---
 
@@ -261,6 +289,12 @@ _show_energy_supply: true
 _show_backup_panel: true
 _daily_tiles_extended: true
 _show_battery_stats: false
+
+# Wallbox e auto
+_show_ev: true
+charger_power: sensor.wallbox_power
+charger_soc: sensor.auto_livello_batteria
+charger_battery_capacity_wh: 43200
 
 # Utilizzatori e grafico
 _show_consumers: true
@@ -403,8 +437,9 @@ Tutte le opzioni si impostano dall'editor visuale; qui trovi le chiavi YAML corr
 | Chiave | Descrizione |
 |---|---|
 | `_show_ev` | Mostra la sezione |
-| `charger_state` | Stato (`charging`, `completed`, `finished`…) |
-| `charger_power` / `charger_current` | Potenza (W) e corrente (A) |
+| `charger_power` | Potenza della wallbox (W o kW) — **necessario** |
+| `charger_state` | Stato (`charging`, `completed`, `connected`…). Facoltativo: se vuoto, "in carica" quando la potenza supera 50 W |
+| `charger_current` | Corrente (A) |
 | `charger_soc` | SOC della batteria dell'auto (%) |
 | `charger_eta` | Minuti alla carica completa (facoltativo) |
 | `charger_battery_capacity_wh` | Capacità della batteria dell'auto (Wh), per stimare il tempo |
@@ -437,6 +472,7 @@ Nella sezione Etichette la scelta di un'entità alternativa si sblocca solo dopo
 | **Temperatura celle** | ≤15°C blu · ≤35°C verde · ≤45°C arancione · >45°C rosso |
 | **Tensione celle** | <3,0 V rosso · <3,1 V arancione · <3,4 V giallo · ≤3,65 V verde · >3,65 V rosso |
 | **Ventilazione** | da grigio (idle) ad azzurro, blu, indaco, viola, fino a magenta (critical) |
+| **Wallbox e auto** | azzurro in carica · verde carica completa · giallo collegata · grigio scollegata / in attesa |
 
 ---
 
@@ -444,7 +480,7 @@ Nella sezione Etichette la scelta di un'entità alternativa si sblocca solo dopo
 
 A ogni nuova versione viene creata automaticamente una **release** su GitHub e HACS ti propone l'aggiornamento in Home Assistant. Dopo l'aggiornamento ricarica il browser con `Ctrl + Shift + R`.
 
-Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.5.0**.
+Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.6.0**.
 
 ---
 
@@ -467,6 +503,13 @@ Per sapere quale versione stai usando, apri la console del browser (`F12`): comp
 **La commutazione IN RETE / FUORI RETE non fa nulla**
 - Servono sia **Stato rete** sia almeno uno dei due **Comandi**. Bisogna **tenere premuto** circa un secondo: il tocco breve è ignorato di proposito. Se lo stato rete è sconosciuto, la card non commuta.
 
+**La wallbox mostra `--` o resta grigia**
+- Controlla il sensore **Potenza wallbox**: è l'unico necessario. Senza **Stato wallbox**, la card mostra "IN CARICA" solo quando la potenza supera 50 W, altrimenti "IN ATTESA".
+- Se hai configurato lo stato ma il valore non è tra quelli riconosciuti (vedi [Auto elettrica / Wallbox](#auto-elettrica--wallbox)), la card mostra "SCOLLEGATA": in quel caso lascia vuoto lo stato.
+
+**I testi sono troppo piccoli**
+- Dalla v1.6.0 i caratteri sono più grandi e, quando la card è stretta, le etichette del disegno si ingrandiscono da sole. Se usi una plancia a più colonne, una colonna più larga rende tutto più leggibile.
+
 **Le icone degli utilizzatori non si vedono**
 - Usa nomi di icone `mdi:` validi (es. `mdi:washing-machine`); nell'editor puoi cercarle per nome.
 
@@ -479,6 +522,12 @@ Per sapere quale versione stai usando, apri la console del browser (`F12`): comp
 ---
 
 ## Registro delle modifiche
+
+### v1.6.0
+- **Wallbox rifatta**: potenza, SOC e corrente si vedono sempre; senza sensore di stato la card capisce dalla potenza quando l'auto è in carica; più stati riconosciuti (collegata, in pausa…).
+- Nuove icone **colonnina + auto** disegnate in SVG accanto alla casa, colorate in base allo stato, con flusso dalla casa, cavo animato e barra del SOC.
+- **Caratteri più grandi** in tutta la card; quando la card è stretta (telefono) i riquadri vanno su 3 colonne e le etichette si ingrandiscono.
+- Nell'editor i campi delle entità non mostrano più l'asterisco "obbligatorio".
 
 ### v1.5.0
 - **Commutazione IN RETE / FUORI RETE** dalla card: tieni premuto l'indicatore o il traliccio, conferma, e la card attiva lo switch giusto. "COMMUTAZIONE…" in attesa del cambio di stato; traliccio barrato fuori rete.
@@ -519,4 +568,4 @@ Per sapere quale versione stai usando, apri la console del browser (`F12`): comp
 
 ---
 
-*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.5.0*
+*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.6.0*

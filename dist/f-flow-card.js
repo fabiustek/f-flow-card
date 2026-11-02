@@ -1,5 +1,13 @@
-// f-flow-card.js – Unified Edition v1.5.0
-const FFC_VERSION = '1.5.0';
+// f-flow-card.js – Unified Edition v1.6.0
+const FFC_VERSION = '1.6.0';
+// Changes v1.6.0:
+//   FIX  – EV / wallbox: values were shown only with a charger_state of "charging"/"completed";
+//           now power, SOC and current are always shown and, without a state entity, charging is
+//           inferred from the power (> 50 W). More state words recognised (connected, paused…).
+//   NEW  – EV drawn in SVG (wallbox + car, neon style) to the right of the house, inside the card,
+//           coloured by state, with house→wallbox flow, animated cable and car SOC bar.
+//   CHG  – Larger fonts everywhere (SVG labels and HTML tiles) for readability on phones.
+//   FIX  – Entity pickers in the editor no longer show the "required" asterisk.
 // Changes v1.5.0:
 //   NEW  – On-grid / off-grid switching from the card: hold the grid pill or the tower, confirm,
 //           and the card turns on grid_switch_to_off / grid_switch_to_on (switch, button, script…).
@@ -328,6 +336,7 @@ class FFlowCardEditor extends HTMLElement {
       const sel = document.createElement('ha-selector');
       sel.hass = this._hass;
       sel.selector = { entity: {} };
+      sel.required = false;
       sel.value = cfg[key] || '';
       sel._configKey = key;
       sel.addEventListener('value-changed', (ev) => {
@@ -594,6 +603,7 @@ class FFlowCardEditor extends HTMLElement {
             const sel = document.createElement('ha-selector');
             sel.hass = this._hass;
             sel.selector = f.type === 'entity' ? { entity: {} } : { icon: {} };
+            sel.required = false;
             sel.value = item[f.key] || '';
             sel.addEventListener('value-changed', (ev) => { ev.stopPropagation(); upd(f.key, ev.detail.value || ''); });
             row.appendChild(sel);
@@ -748,6 +758,7 @@ class FFlowCardEditor extends HTMLElement {
       const sel = document.createElement('ha-selector');
       sel.hass = this._hass;
       sel.selector = { entity: {} };
+      sel.required = false;
       sel.value = cfg[entityKey] || '';
       sel._configKey = entityKey;
       sel.style.cssText = 'width:100%;display:block;';
@@ -847,12 +858,12 @@ class FFlowCardEditor extends HTMLElement {
     ], { toggleKey: '_show_battery2', toggleOn: showBatt2, hidden: !showBatt2 }));
 
     shell.appendChild(makeSection('ev', '🚗', 'Auto elettrica / Wallbox', [
-      picker('charger_state',           'Stato wallbox'),
-      picker('charger_power',           'Potenza wallbox'),
-      picker('charger_current',         'Corrente wallbox'),
-      picker('charger_soc',             'SOC batteria auto'),
+      picker('charger_power',           'Potenza wallbox (W o kW)'),
+      picker('charger_state',           'Stato wallbox (se vuoto: "in carica" quando la potenza supera 50 W)', true),
+      picker('charger_soc',             'SOC batteria auto (%)', true),
+      picker('charger_current',         'Corrente wallbox (A)', true),
       picker('charger_eta',             'Tempo alla carica completa (min)', true),
-      numberField('charger_battery_capacity_wh', 'Capacità batteria auto', 0, 200000, 1, 'Wh'),
+      numberField('charger_battery_capacity_wh', 'Capacità batteria auto, per stimare il tempo (es. 43200 per 43,2 kWh)', 0, 200000, 1, 'Wh'),
     ], { toggleKey: '_show_ev', toggleOn: showEV, hidden: !showEV }));
 
     this.innerHTML = '';
@@ -1140,7 +1151,7 @@ class FFlowCard extends HTMLElement {
     const title = esc(this.config.consumers_title || 'Utilizzatori');
     const pal = FFlowCard.PALETTE;
     let h = `<div class="dv"></div><div class="ct">🔌 ${title}</div><div class="cons">`;
-    if (!list.length) h += `<div style="grid-column:1/-1;font-size:.62rem;color:#8b949e;padding:6px 2px">Nessun utilizzatore: aggiungili dall'editor (sezione Utilizzatori).</div>`;
+    if (!list.length) h += `<div style="grid-column:1/-1;font-size:.74rem;color:#8b949e;padding:6px 2px">Nessun utilizzatore: aggiungili dall'editor (sezione Utilizzatori).</div>`;
     list.forEach((c, i) => {
       const col = esc(c.color || pal[i % pal.length]);
       h += `<div class="cn" id="cn${i}" data-entity="${esc(c.entity)}" style="--c:${col}">
@@ -1231,12 +1242,12 @@ class FFlowCard extends HTMLElement {
     const h = this._hist;
     const fmt = (v) => v >= 1000 ? (+(v / 1000).toFixed(2)).toString() + ' kW' : Math.round(v) + ' W';
     if (!h || h.error || !h.raw) {
-      svg.innerHTML = `<text x="250" y="88" text-anchor="middle" font-size="11" fill="#8b949e">${h && h.error ? 'Storico non disponibile' : 'Caricamento storico…'}</text>`;
+      svg.innerHTML = `<text x="250" y="88" text-anchor="middle" font-size="13" fill="#8b949e">${h && h.error ? 'Storico non disponibile' : 'Caricamento storico…'}</text>`;
       this._chartData = null;
       return;
     }
     const N = Math.round(h.hours * 12);
-    const W = 500, H = 170, L = 38, R = 6, T = 8, B = 20, pw = W - L - R, ph = H - T - B;
+    const W = 500, H = 170, L = 50, R = 6, T = 8, B = 22, pw = W - L - R, ph = H - T - B;
     const pal = FFlowCard.PALETTE;
     const series = this._consumers().map((c, i) => ({ c, col: c.color || pal[i % pal.length] }))
       .filter(x => x.c.chart !== false)
@@ -1261,7 +1272,7 @@ class FFlowCard extends HTMLElement {
     for (let k = 0; k <= nTicks; k++) {
       const v = tick * k, yy = Y(v);
       g += `<line x1="${L}" x2="${W - R}" y1="${yy}" y2="${yy}" stroke="#21262d" stroke-width="1"/>`;
-      g += `<text x="${L - 4}" y="${(+yy + 3).toFixed(1)}" text-anchor="end" font-size="8" fill="#8b949e">${fmt(v)}</text>`;
+      g += `<text x="${L - 4}" y="${(+yy + 3).toFixed(1)}" text-anchor="end" font-size="11" fill="#8b949e">${fmt(v)}</text>`;
     }
     const stepH = h.hours <= 12 ? 2 : h.hours <= 24 ? 3 : 6;
     const first = new Date(h.start); first.setMinutes(0, 0, 0); first.setHours(first.getHours() + 1);
@@ -1270,7 +1281,7 @@ class FFlowCard extends HTMLElement {
       if (d.getHours() % stepH) continue;
       const xx = (L + (t - h.start) / (h.end - h.start) * pw).toFixed(1);
       g += `<line x1="${xx}" x2="${xx}" y1="${T}" y2="${T + ph}" stroke="#21262d" stroke-width="1" stroke-dasharray="2 3"/>`;
-      g += `<text x="${xx}" y="${H - 6}" text-anchor="middle" font-size="8" fill="#8b949e">${String(d.getHours()).padStart(2, '0')}:00</text>`;
+      g += `<text x="${xx}" y="${H - 6}" text-anchor="middle" font-size="11" fill="#8b949e">${String(d.getHours()).padStart(2, '0')}:00</text>`;
     }
     // stacked areas, bottom series first
     series.forEach((sr, k) => {
@@ -1617,11 +1628,11 @@ class FFlowCard extends HTMLElement {
       <polygon points="${quad(Rq)}" fill="#1b2230" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
       ${cells(Lq, 'L')}${cells(Rq, 'R')}
     </g>
-    ${pv1Show ? `<text id="pv1label" x="180" y="392" text-anchor="end" font-size="8" fill="#8b949e" letter-spacing="1">FV1</text>
-    <text id="pv1FlowVal" x="180" y="406" text-anchor="end" font-size="12" font-weight="700" fill="#ffe83c">-- W</text>` : ''}
-    ${pv2Show ? `<text id="pv2label" x="340" y="392" font-size="8" fill="#8b949e" letter-spacing="1">FV2</text>
-    <text id="pv2FlowVal" x="340" y="406" font-size="12" font-weight="700" fill="#ffe83c">-- W</text>` : ''}
-    <text id="fcLoadVal" x="${cx}" y="496" text-anchor="middle" font-size="13" font-weight="700" fill="#F7F6D3">-- W</text>`;
+    ${pv1Show ? `<text class="sm" id="pv1label" x="180" y="389" text-anchor="end" font-size="10.5" fill="#8b949e" letter-spacing="1">FV1</text>
+    <text id="pv1FlowVal" x="180" y="406" text-anchor="end" font-size="14.5" font-weight="700" fill="#ffe83c">-- W</text>` : ''}
+    ${pv2Show ? `<text class="sm" id="pv2label" x="340" y="389" font-size="10.5" fill="#8b949e" letter-spacing="1">FV2</text>
+    <text id="pv2FlowVal" x="340" y="406" font-size="14.5" font-weight="700" fill="#ffe83c">-- W</text>` : ''}
+    <text id="fcLoadVal" x="${cx}" y="497" text-anchor="middle" font-size="15.5" font-weight="700" fill="#F7F6D3">-- W</text>`;
   }
 
   _buildStaticSVG() {
@@ -1643,29 +1654,29 @@ class FFlowCard extends HTMLElement {
 
     // Battery status badge under the battery icon (battery centre x ≈ 31 after transform)
     const battBadge = showBatt1 ? `<g id="battBadgeGroup">
-      <rect id="battBadgeRect" x="2" y="262" width="64" height="16" rx="8" fill="rgba(139,148,158,.10)" stroke="#8b949e" stroke-width="1.2"/>
-      <circle id="battBadgeDot" cx="11" cy="270" r="3" fill="#8b949e"/>
-      <text id="battBadgeText" x="38" y="274" text-anchor="middle" font-size="8.5" font-weight="800" letter-spacing="1.2" fill="#8b949e">RIPOSO</text>
+      <rect id="battBadgeRect" x="-6" y="263" width="80" height="19" rx="9.5" fill="rgba(139,148,158,.10)" stroke="#8b949e" stroke-width="1.2"/>
+      <circle id="battBadgeDot" cx="4" cy="272.5" r="3" fill="#8b949e"/>
+      <text class="bd" id="battBadgeText" x="38" y="277" text-anchor="middle" font-size="10.5" font-weight="800" letter-spacing="1.2" fill="#8b949e">RIPOSO</text>
     </g>` : '';
 
     // Inverter: drawn box (default) or user-supplied picture
     const invBlock = invImage ? `
       <rect id="fcInvRect" x="205" y="155" width="110" height="110" rx="18" fill="none" stroke="none"/>
       <image id="invImg" href="${invImage}" x="200" y="140" width="120" height="130" preserveAspectRatio="xMidYMid meet"/>
-      <text id="invTempFlow" x="322" y="240" font-size="11" font-weight="700" fill="#58a6ff">-- °C</text>
-      <text id="invLoadPctFlow" x="322" y="256" font-size="12" font-weight="700" fill="#3ce878">--%</text>` : `
+      <text class="md" id="invTempFlow" x="322" y="238" font-size="13.5" font-weight="700" fill="#58a6ff">-- °C</text>
+      <text class="md" id="invLoadPctFlow" x="322" y="257" font-size="14" font-weight="700" fill="#3ce878">--%</text>` : `
       <rect id="fcInvRect" x="205" y="155" width="110" height="110" rx="18" fill="#161b22" stroke="#f4a93b" stroke-width="4"/>
       <text id="invNameLabel" x="260" y="203" text-anchor="middle" font-size="14" font-weight="800" fill="#f4a93b" letter-spacing="1">INV</text>
-      <text id="invTempFlow" x="260" y="222" text-anchor="middle" font-size="12" font-weight="700" fill="#58a6ff">-- °C</text>
-      <text id="invLoadPctFlow" x="260" y="240" text-anchor="middle" font-size="12" font-weight="700" fill="#3ce878">--%</text>`;
+      <text class="md" id="invTempFlow" x="260" y="224" text-anchor="middle" font-size="14" font-weight="700" fill="#58a6ff">-- °C</text>
+      <text class="md" id="invLoadPctFlow" x="260" y="244" text-anchor="middle" font-size="14" font-weight="700" fill="#3ce878">--%</text>`;
 
     // Energy supply stacked bar (right side, between grid and EV/home row)
     const supplyBlock = showSupply ? `<g id="supplyGroup">
-      <text x="352" y="292" font-size="8" fill="#8b949e" letter-spacing="1.5">FONTI ENERGIA</text>
-      <text x="364" y="306" text-anchor="middle" font-size="7" font-weight="700" fill="#f4d03f">SOLARE</text>
-      <text x="408" y="306" text-anchor="middle" font-size="7" font-weight="700" fill="#3fb950">CARICA</text>
-      <text x="452" y="306" text-anchor="middle" font-size="7" font-weight="700" fill="#58a6ff">SCARICA</text>
-      <text x="496" y="306" text-anchor="middle" font-size="7" font-weight="700" fill="#f85149">RETE</text>
+      <text class="sm" x="352" y="291" font-size="10" fill="#8b949e" letter-spacing="1.2">FONTI ENERGIA</text>
+      <text class="lg" x="364" y="305" text-anchor="middle" font-size="8.5" font-weight="700" fill="#f4d03f">SOLARE</text>
+      <text class="lg" x="408" y="305" text-anchor="middle" font-size="8.5" font-weight="700" fill="#3fb950">CARICA</text>
+      <text class="lg" x="452" y="305" text-anchor="middle" font-size="8.5" font-weight="700" fill="#58a6ff">SCARICA</text>
+      <text class="lg" x="496" y="305" text-anchor="middle" font-size="8.5" font-weight="700" fill="#f85149">RETE</text>
       <rect x="352" y="311" width="158" height="7" rx="3.5" fill="#21262d"/>
       <rect id="supSolar" x="352" y="311" width="0" height="7" fill="#f4d03f"/>
       <rect id="supChg"   x="352" y="311" width="0" height="7" fill="#3fb950"/>
@@ -1675,37 +1686,54 @@ class FFlowCard extends HTMLElement {
 
     // Backup panel (left side, above PV string labels)
     const backupBlock = showBackup ? `<g id="backupGroup">
-      <text x="8" y="296" font-size="8" fill="#8b949e" letter-spacing="1.5">AUTONOMIA</text>
-      <text id="backupTimeVal" x="8" y="313" font-size="15" font-weight="800" fill="#3fb950">--</text>
-      <text id="backupTimeSub" x="8" y="323" font-size="7" fill="#3fb950" opacity=".8">rimanente</text>
-      <text x="8" y="337" font-size="8" fill="#8b949e" letter-spacing="1.5">ENERGIA RESIDUA</text>
-      <text id="backupRemVal" x="8" y="353" font-size="15" font-weight="800" fill="#3fb950">-- kWh</text>
+      <text class="sm" x="8" y="294" font-size="10" fill="#8b949e" letter-spacing="1.2">AUTONOMIA</text>
+      <text id="backupTimeVal" x="8" y="315" font-size="18" font-weight="800" fill="#3fb950">--</text>
+      <text class="sm" id="backupTimeSub" x="8" y="327" font-size="9.5" fill="#3fb950" opacity=".8">rimanente</text>
+      <text class="sm" x="8" y="344" font-size="10" fill="#8b949e" letter-spacing="1.2">ENERGIA RESIDUA</text>
+      <text id="backupRemVal" x="8" y="364" font-size="18" font-weight="800" fill="#3fb950">-- kWh</text>
     </g>` : '';
 
     const pv1Show = !!this.config.pv1_power, pv2Show = !!this.config.pv2_power;
     const modernHome = this.config.home_icon_style !== 'classic';
 
-    const pv3txt = showPvExtra ? `<text id="pv3label" x="8" y="424" font-size="9" fill="#8b949e" letter-spacing="1">FV3</text><text id="pv3FlowVal" x="8" y="438" font-size="12" font-weight="700" fill="#ffe83c">-- W</text>` : '';
-    const pv4txt = showPvExtra ? `<text id="pv4label" x="8" y="456" font-size="9" fill="#8b949e" letter-spacing="1">FV4</text><text id="pv4FlowVal" x="8" y="470" font-size="12" font-weight="700" fill="#ffe83c">-- W</text>` : '';
+    const pv3txt = showPvExtra ? `<text id="pv3label" x="8" y="424" font-size="11" fill="#8b949e" letter-spacing="1">FV3</text><text id="pv3FlowVal" x="8" y="438" font-size="13.5" font-weight="700" fill="#ffe83c">-- W</text>` : '';
+    const pv4txt = showPvExtra ? `<text id="pv4label" x="8" y="456" font-size="11" fill="#8b949e" letter-spacing="1">FV4</text><text id="pv4FlowVal" x="8" y="470" font-size="13.5" font-weight="700" fill="#ffe83c">-- W</text>` : '';
 
-    // EV placement inline with home and grid
-    const evX = 462 - 39.5;   // centre of grid icon
-    const evY = 397 - 39.5;   // centre of home icon
-    const evtxt = ev ? `<g id="evGroup">
-      <path id="flowHomeEV" d="M 317,397 H ${evX}" fill="none" stroke="#2b59ff" stroke-width="3" stroke-linecap="round" stroke-dasharray="8 6" opacity="0">
-        <animate attributeName="stroke-dashoffset" from="-14" to="0" dur="0.8s" repeatCount="indefinite"/>
+    // EV: SVG wallbox + car to the right of the house (x 344–514, y 330–480)
+    const carBody = 'M2,34 Q2,24 12,22 L30,20 Q42,6 62,5 L80,5 Q94,6 104,18 L114,22 Q120,24 120,32 L120,38 Q120,40 117,40 L106,40 A11,11 0 0 0 84,40 L36,40 A11,11 0 0 0 14,40 L5,40 Q2,40 2,37 Z';
+    const evtxt = ev ? `<g id="evGroup" style="color:#6e7681;transition:color .5s">
+      <path id="flowHomeEV" d="M 316,440 H 348" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-dasharray="8 6" opacity="0">
+        <animate attributeName="stroke-dashoffset" from="14" to="0" dur="0.8s" repeatCount="indefinite"/>
       </path>
-      <image id="evIconImg" href="${iconPath}/ev-charger-icon.png" x="${evX}" y="${evY}" width="79" height="79" preserveAspectRatio="xMidYMid meet"/>
-      <text id="evPowerVal" x="${evX+39.5}" y="${evY+98}" text-anchor="middle" font-size="10" font-weight="600" fill="#29c4f6">-- W</text>
-      <text id="evCurrentVal" x="${evX+39.5}" y="${evY+110}" text-anchor="middle" font-size="9" fill="#cde">-- A</text>
-      <text id="evSocVal" x="${evX+39.5}" y="${evY+122}" text-anchor="middle" font-size="9" fill="#fff">-- %</text>
-      <text id="evEtaVal" x="${evX+39.5}" y="${evY+134}" text-anchor="middle" font-size="10" font-weight="600" fill="#4ade80">--</text>
+      <ellipse cx="359" cy="471" rx="13" ry="2.6" fill="currentColor" fill-opacity=".25"/>
+      <rect x="357" y="446" width="4" height="25" rx="1" fill="currentColor" fill-opacity=".55"/>
+      <rect x="347" y="412" width="24" height="36" rx="5" fill="#0f141a" stroke="currentColor" stroke-width="1.8" filter="url(#gridNeon)"/>
+      <rect x="351" y="417" width="16" height="9" rx="1.5" fill="currentColor" fill-opacity=".28"/>
+      <path d="M359.5,418.5 L356.5,422.5 H359 L358,425 L361.5,420.5 H359 Z" fill="currentColor"/>
+      <circle id="evLed" cx="359" cy="436" r="2.6" fill="currentColor"><animate attributeName="opacity" values="1;.25;1" dur="1.2s" repeatCount="indefinite"/></circle>
+      <path id="evCable" d="M367,446 C 376,466 386,464 396,451" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".7"/>
+      <path id="evCableFlow" d="M367,446 C 376,466 386,464 396,451" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-dasharray="2 7" opacity="0">
+        <animate attributeName="stroke-dashoffset" from="9" to="0" dur="0.6s" repeatCount="indefinite"/></path>
+      <g transform="translate(392,420)">
+        <ellipse cx="61" cy="49" rx="62" ry="3.5" fill="currentColor" fill-opacity=".14"/>
+        <path d="${carBody}" fill="#0f141a" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" filter="url(#gridNeon)"/>
+        <path d="M36,19 Q46,9 62,9 L64,9 L64,19 Z M68,9 L80,9 Q92,10 99,19 L68,19 Z" fill="currentColor" fill-opacity=".18" stroke="currentColor" stroke-width="1"/>
+        <path d="M112,25 h5 M4,28 h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        <g fill="#0f141a" stroke="currentColor" stroke-width="1.8"><circle cx="25" cy="40" r="8.5"/><circle cx="95" cy="40" r="8.5"/></g>
+        <g fill="currentColor"><circle cx="25" cy="40" r="2.6"/><circle cx="95" cy="40" r="2.6"/></g>
+      </g>
+      <rect x="402" y="475" width="100" height="4" rx="2" fill="#21262d"/>
+      <rect id="evSocBar" x="402" y="475" width="0" height="4" rx="2" fill="currentColor"/>
+      <text id="evPowerVal" x="458" y="350" text-anchor="middle" font-size="16" font-weight="800" fill="currentColor">-- W</text>
+      <text class="sm" id="evStateVal" x="458" y="366" text-anchor="middle" font-size="10.5" font-weight="700" letter-spacing="1" fill="currentColor">--</text>
+      <text class="md" id="evSocVal" x="458" y="384" text-anchor="middle" font-size="12.5" font-weight="700" fill="#e6edf3">-- %</text>
+      <text class="sm" id="evEtaVal" x="458" y="400" text-anchor="middle" font-size="11.5" font-weight="600" fill="#c9d1d9"></text>
     </g>` : '';
 
     // Battery current/power placed OUTSIDE the transformed group, above/below the flow bar (center y=175)
     const battTextSingle = `
-      <text id="battPwrFlow" x="75" y="165" font-size="10" font-weight="600" fill="#cde">-- W</text>
-      <text id="battCurrFlow" x="75" y="196" font-size="10" font-weight="600" fill="#fff">-- A</text>
+      <text class="md" id="battPwrFlow" x="75" y="164" font-size="13" font-weight="600" fill="#cde">-- W</text>
+      <text class="md" id="battCurrFlow" x="75" y="198" font-size="13" font-weight="600" fill="#fff">-- A</text>
     `;
     const battTextDual = `
       <text id="battPwrFlow1" x="75" y="158" font-size="10" font-weight="600" fill="#cde">-- W</text>
@@ -1741,7 +1769,7 @@ class FFlowCard extends HTMLElement {
         <text id="fcBattVal" x="34" y="188" text-anchor="middle" font-size="14.5" font-weight="900" fill="#fff" stroke="rgba(0,0,0,.65)" stroke-width="3" paint-order="stroke">--%</text>
         <g id="battBoltGroup" opacity="0"><polygon points="37,196 29,210 34,210 31,222 40,207 35,207 39,196" fill="#fff" stroke="rgba(0,0,0,.5)" stroke-width="0.8"><animate attributeName="opacity" values="0.55;1;0.55" dur="1.2s" repeatCount="indefinite"/></polygon></g>
       </g>
-      <text id="battVoltageFlow" x="34" y="256" text-anchor="middle" font-size="10" font-weight="700" fill="#c9d1d9">-- V</text>` : (
+      <text class="md" id="battVoltageFlow" x="34" y="257" text-anchor="middle" font-size="12.5" font-weight="700" fill="#c9d1d9">-- V</text>` : (
       `<g transform="translate(-36.6, 25.4) scale(0.8)">
         <g id="battIconWrap">
           <rect x="49" y="135" width="70" height="132" rx="10" fill="url(#battShellGrad)"/>
@@ -1775,21 +1803,30 @@ class FFlowCard extends HTMLElement {
     this.shadowRoot.innerHTML = `<style>
       :host{display:block} @keyframes svgPulseOrange{0%,100%{filter:drop-shadow(0 0 5px #f39c4b)}50%{filter:drop-shadow(0 0 8px #f5b06a)}}
       .st{background:#0d1117;border:1px solid #21262d;border-radius:8px;padding:7px 9px}
-      .st .l{font-size:.48rem;color:#8b949e;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px}
-      .st .v{font-size:.8rem;font-weight:600;color:#c9d1d9}
+      .st .l{font-size:.64rem;color:#8b949e;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px}
+      .st .v{font-size:.92rem;font-weight:600;color:#c9d1d9}
       .dv{height:1px;background:#21262d;margin:8px 0}
-      .ct{font-size:.56rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#8b949e;margin-bottom:10px;display:flex;align-items:center;gap:7px}
+      .ct{font-size:.68rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#8b949e;margin-bottom:10px;display:flex;align-items:center;gap:7px}
       .ct::after{content:'';flex:1;height:1px;background:#21262d}
       .pvf{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:2px}
       .pvi{text-align:center;background:#0d1117;border:1px solid #21262d;border-radius:8px;padding:6px 2px}
       .pvi .ico{font-size:.95rem;margin-bottom:2px}
-      .pvi .lbl{font-size:.44rem;color:#8b949e;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px}
-      .pvi .val{font-size:.76rem;font-weight:700;color:#c9d1d9}
+      .pvi .lbl{font-size:.6rem;color:#8b949e;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px}
+      .pvi .val{font-size:.88rem;font-weight:700;color:#c9d1d9}
       .pvi .val.yw{color:#f4d03f} text{font-family:'Segoe UI',Arial,sans-serif}
       .pvi .val.gn{color:#3fb950}
       .pvf.six{grid-template-columns:repeat(6,1fr)}
-      @media (max-width:450px){.pvf.six{grid-template-columns:repeat(3,1fr)}}
-      .hdr .pill{display:inline-flex;align-items:center;gap:6px;font-size:.5rem;font-weight:700;letter-spacing:1.5px;padding:2px 9px;border-radius:10px;border:1px solid #3fb950;color:#3fb950;background:rgba(63,185,80,.08)}
+      .pvi{min-width:0}
+      .ffc{container-type:inline-size;container-name:ffc}
+      /* narrow card (phones, narrow dashboard columns): fewer columns, bigger SVG labels */
+      @container ffc (max-width:440px){
+        .pvf.six{grid-template-columns:repeat(3,1fr)}
+        svg text.sm{font-size:13.5px}
+        svg text.md{font-size:15.5px}
+        svg text.lg{font-size:10px}
+        svg text.bd{font-size:11.5px}
+      }
+      .hdr .pill{display:inline-flex;align-items:center;gap:6px;font-size:.64rem;font-weight:700;letter-spacing:1.5px;padding:2px 9px;border-radius:10px;border:1px solid #3fb950;color:#3fb950;background:rgba(63,185,80,.08)}
       .hdr .pill{position:relative;overflow:hidden;user-select:none;-webkit-user-select:none}
       .hdr .pill .hold{position:absolute;left:0;top:0;bottom:0;width:0;background:currentColor;opacity:.25;transition:width .1s}
       .hdr .pill.holding .hold{width:100%;transition:width .8s linear}
@@ -1801,40 +1838,40 @@ class FFlowCard extends HTMLElement {
       .gmodal[data-mode=off] .gbox{color:#f39c4b;border-color:rgba(243,156,75,.45)}
       .gmodal[data-mode=on] .gbox{color:#3fb950;border-color:rgba(63,185,80,.45)}
       .gmodal[data-mode=on] .gx{display:none}
-      .gtitle{font-size:.62rem;letter-spacing:1.5px;text-transform:uppercase;color:#8b949e;margin:6px 0 4px}
-      .gtext{font-size:.82rem;font-weight:600;color:#e6edf3;line-height:1.4}
+      .gtitle{font-size:.74rem;letter-spacing:1.5px;text-transform:uppercase;color:#8b949e;margin:6px 0 4px}
+      .gtext{font-size:.92rem;font-weight:600;color:#e6edf3;line-height:1.4}
       .gbtns{display:flex;gap:8px;margin-top:14px}
-      .gbtns button{flex:1;padding:8px;border-radius:9px;border:1px solid #30363d;background:#0d1117;color:#c9d1d9;font-weight:700;font-size:.78rem;cursor:pointer;font-family:inherit}
+      .gbtns button{flex:1;padding:8px;border-radius:9px;border:1px solid #30363d;background:#0d1117;color:#c9d1d9;font-weight:700;font-size:.88rem;cursor:pointer;font-family:inherit}
       .gbtns button.ok{background:currentColor;border-color:transparent}
       .gmodal[data-mode=off] .gbtns button.ok{background:#f39c4b;color:#0d1117}
       .gmodal[data-mode=on] .gbtns button.ok{background:#3fb950;color:#0d1117}
       .hdr .pill .dot{width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 6px currentColor}
       .ems{display:inline-flex;align-items:center;gap:9px;background:#0d1117;border:1px solid #21262d;border-radius:10px;padding:6px 12px 6px 7px;margin:-2px 0 6px}
       .ems-ico{width:26px;height:26px;border-radius:7px;background:rgba(63,185,80,.12);color:#3fb950;display:flex;align-items:center;justify-content:center;font-size:.9rem}
-      .ems-l{font-size:.42rem;color:#8b949e;letter-spacing:1.5px;text-transform:uppercase}
-      .ems-v{font-size:.68rem;font-weight:700;color:#3fb950}
+      .ems-l{font-size:.58rem;color:#8b949e;letter-spacing:1.5px;text-transform:uppercase}
+      .ems-v{font-size:.8rem;font-weight:700;color:#3fb950}
       .cons{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
       .cn{--c:#58a6ff;position:relative;cursor:pointer;border-radius:16px;padding:12px 8px 10px;text-align:center;
           background:linear-gradient(160deg,color-mix(in srgb,var(--c) 14%,#161b22),#0d1117 75%);
           border:1px solid color-mix(in srgb,var(--c) 22%,#21262d);transition:border-color .4s,box-shadow .4s}
       .cn.on{border-color:color-mix(in srgb,var(--c) 70%,transparent);box-shadow:0 0 14px color-mix(in srgb,var(--c) 30%,transparent)}
       .cn ha-icon{--mdc-icon-size:24px;color:var(--c);display:block;margin:0 auto 6px;height:24px}
-      .cn .nm{font-size:.7rem;font-weight:700;color:#e6edf3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-      .cn .pw{font-size:.66rem;color:#c9d1d9;margin-top:2px;font-variant-numeric:tabular-nums}
+      .cn .nm{font-size:.8rem;font-weight:700;color:#e6edf3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .cn .pw{font-size:.78rem;color:#c9d1d9;margin-top:2px;font-variant-numeric:tabular-nums}
       .meter{position:relative;height:8px;margin:9px auto 0;width:78%;border-radius:4px;overflow:hidden;
              background:linear-gradient(180deg,#05070a,#1b2027 45%,#2e353e 50%,#1b2027 55%,#05070a);border:1px solid #2a313a}
       .meter .mk{position:absolute;top:1px;bottom:1px;width:4px;margin-left:-2px;left:50%;border-radius:1px;background:var(--c);box-shadow:0 0 6px var(--c)}
       .cch{margin-top:10px;background:#0d1117;border:1px solid #21262d;border-radius:10px;padding:8px 8px 6px}
-      .cch-h{display:flex;justify-content:space-between;align-items:baseline;font-size:.5rem;letter-spacing:1px;text-transform:uppercase;color:#8b949e;margin-bottom:4px}
+      .cch-h{display:flex;justify-content:space-between;align-items:baseline;font-size:.64rem;letter-spacing:1px;text-transform:uppercase;color:#8b949e;margin-bottom:4px}
       .cch-h #cChartInfo{text-transform:none;letter-spacing:0}
       .cch-w{position:relative;touch-action:pan-y}
-      .cch-tip{display:none;position:absolute;top:4px;pointer-events:none;background:rgba(22,27,34,.95);border:1px solid #30363d;border-radius:8px;padding:6px 8px;font-size:.6rem;color:#c9d1d9;min-width:110px;box-shadow:0 4px 14px rgba(0,0,0,.5);z-index:2}
+      .cch-tip{display:none;position:absolute;top:4px;pointer-events:none;background:rgba(22,27,34,.95);border:1px solid #30363d;border-radius:8px;padding:6px 8px;font-size:.72rem;color:#c9d1d9;min-width:110px;box-shadow:0 4px 14px rgba(0,0,0,.5);z-index:2}
       .cch-tip .tt{font-weight:800;color:#e6edf3;margin-bottom:3px}
       .cch-tip div{display:flex;align-items:center;gap:5px;white-space:nowrap}
       .cch-tip b{margin-left:auto;padding-left:8px;font-variant-numeric:tabular-nums}
       .cch-tip i,.cch-leg i{display:inline-block;width:8px;height:8px;border-radius:2px;flex-shrink:0}
       .cch-tip i.tot,.cch-leg i.tot{background:none;border-top:2px dashed #e6edf3;height:0;border-radius:0;margin-top:2px}
-      .cch-leg{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:5px;font-size:.56rem;color:#8b949e}
+      .cch-leg{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:5px;font-size:.68rem;color:#8b949e}
       .cch-leg span{display:inline-flex;align-items:center;gap:4px}
       .cch-leg b{color:#c9d1d9;font-weight:600}
       .vent{--vc:#8b949e;background:linear-gradient(160deg,color-mix(in srgb,var(--vc) 10%,#0d1117),#0d1117 70%);border:1px solid color-mix(in srgb,var(--vc) 35%,#21262d);border-radius:10px;padding:9px;transition:border-color .5s,background .5s}
@@ -1845,17 +1882,17 @@ class FFlowCard extends HTMLElement {
       .vico.vpCool{animation:vpulse 2s ease-in-out infinite}.vico.vpWarm{animation:vpulse 1.6s ease-in-out infinite}.vico.vpHot{animation:vpulse 1.1s ease-in-out infinite}
       @keyframes vpulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--vc) 35%,transparent)}70%{box-shadow:0 0 0 10px transparent}100%{box-shadow:0 0 0 0 transparent}}
       .vtxt{min-width:0;flex:1}
-      .vsub{font-size:.66rem;font-weight:700;color:color-mix(in srgb,var(--vc) 55%,#e6edf3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-      .vtmp{font-size:.56rem;color:#8b949e;margin-top:2px}
-      .vpill{font-size:.5rem;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 9px;border-radius:10px;color:var(--vc);border:1px solid color-mix(in srgb,var(--vc) 55%,transparent);background:color-mix(in srgb,var(--vc) 10%,transparent);white-space:nowrap}
+      .vsub{font-size:.78rem;font-weight:700;color:color-mix(in srgb,var(--vc) 55%,#e6edf3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .vtmp{font-size:.68rem;color:#8b949e;margin-top:2px}
+      .vpill{font-size:.64rem;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 9px;border-radius:10px;color:var(--vc);border:1px solid color-mix(in srgb,var(--vc) 55%,transparent);background:color-mix(in srgb,var(--vc) 10%,transparent);white-space:nowrap}
       .vgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(58px,1fr));gap:4px}
       .vk{text-align:center;background:#0d1117;border:1px solid #21262d;border-radius:8px;padding:5px 2px}
-      .vk .v{font-size:.74rem;font-weight:700;color:#c9d1d9;font-variant-numeric:tabular-nums}
-      .vk .v small{font-size:.5rem;color:#8b949e;margin-left:1px}
-      .vk .l{font-size:.44rem;color:#8b949e;letter-spacing:1px;text-transform:uppercase;margin-top:1px}
+      .vk .v{font-size:.86rem;font-weight:700;color:#c9d1d9;font-variant-numeric:tabular-nums}
+      .vk .v small{font-size:.64rem;color:#8b949e;margin-left:1px}
+      .vk .l{font-size:.6rem;color:#8b949e;letter-spacing:1px;text-transform:uppercase;margin-top:1px}
       .vfi{display:flex;align-items:center;justify-content:center;gap:3px;color:#8b949e}
     </style>
-    <div style="position:relative;background:#161b22;border:1px solid #21262d;border-radius:12px;padding:13px;box-shadow:0 4px 20px rgba(0,0,0,.4);width:100%;box-sizing:border-box;">
+    <div class="ffc" style="position:relative;background:#161b22;border:1px solid #21262d;border-radius:12px;padding:13px;box-shadow:0 4px 20px rgba(0,0,0,.4);width:100%;box-sizing:border-box;">
       ${this._gridSwitchEnabled() ? `<div class="gmodal" id="gridModal">
         <div class="gbox">
           <svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1867,7 +1904,7 @@ class FFlowCard extends HTMLElement {
       </div>` : ''}
       <div class="ct hdr">⚡ <span id="cardTitle">${cardTitle}</span>
         ${showGridStatus ? `<span id="gridStatusPill" class="pill"><span class="hold"></span><span class="dot"></span><span id="gridStatusText">--</span></span>` : ''}
-        <span id="battStatusBadge" style="margin-left:auto;font-size:.5rem;font-weight:700;letter-spacing:1.5px;padding:1px 8px;border-radius:8px;background:#21262d;color:#8b949e;text-transform:uppercase">RIPOSO</span></div>
+        <span id="battStatusBadge" style="margin-left:auto;font-size:.64rem;font-weight:700;letter-spacing:1.5px;padding:1px 8px;border-radius:8px;background:#21262d;color:#8b949e;text-transform:uppercase">RIPOSO</span></div>
       ${showEms ? `<div class="ems"><div class="ems-ico">☆</div><div><div class="ems-l">Modalità EMS</div><div class="ems-v" id="emsModeVal">--</div></div></div>` : ''}
       <div style="width:100%;max-width:520px;margin:0 auto"><svg id="flowSvg" viewBox="-16 0 536 508" style="width:100%;display:block">
       <defs>
@@ -1904,9 +1941,9 @@ class FFlowCard extends HTMLElement {
       <circle cx="35" cy="78" r="3.5" fill="rgba(255,200,80,.7)"/>
       <circle cx="260" cy="78" r="2.5" fill="rgba(255,255,255,.25)"/>
       <circle cx="485" cy="78" r="3.5" fill="rgba(255,110,55,.7)"/>
-      <text id="arcRiseLabel" x="35" y="92" fill="rgba(255,255,255,.5)" font-size="10" text-anchor="middle">06:00</text>
-      <text x="260" y="92" fill="rgba(255,255,255,.28)" font-size="10" text-anchor="middle">12:00</text>
-      <text id="arcSetLabel" x="485" y="92" fill="rgba(255,255,255,.5)" font-size="10" text-anchor="middle">18:00</text>
+      <text class="sm" id="arcRiseLabel" x="35" y="95" fill="rgba(255,255,255,.6)" font-size="12.5" text-anchor="middle">06:00</text>
+      <text class="sm" x="260" y="95" fill="rgba(255,255,255,.35)" font-size="12.5" text-anchor="middle">12:00</text>
+      <text class="sm" id="arcSetLabel" x="485" y="95" fill="rgba(255,255,255,.6)" font-size="12.5" text-anchor="middle">18:00</text>
       <path d="M 35,78 Q 260,-45 485,78" fill="none" stroke="url(#arcDayGrad)" stroke-width="2.2"/>
       <path d="M 485,78 Q 260,158 35,78" fill="none" stroke="url(#arcNightGrad)" stroke-width="1.5" stroke-dasharray="4,5" opacity=".35"/>
       <g id="arcSunGroup" opacity="1">
@@ -1918,8 +1955,8 @@ class FFlowCard extends HTMLElement {
         <circle id="moonGlow" cx="260" cy="72" r="12" fill="rgba(180,205,255,.18)"/>
         <circle id="moonDot" cx="260" cy="72" r="6" fill="rgba(220,235,255,.92)" stroke="rgba(240,248,255,.9)" stroke-width="1.2"/>
       </g>
-      <rect id="arcPvLabelRect" x="162" y="22" width="96" height="26" rx="13" fill="rgba(255,200,50,.22)" stroke="rgba(255,210,60,.5)" stroke-width="1.2"/>
-      <text id="arcPvLabelText" x="210" y="39" text-anchor="middle" fill="rgba(255,235,110,.98)" font-size="13" font-weight="800">0 W ⚡</text>
+      <rect id="arcPvLabelRect" x="162" y="22" width="100" height="28" rx="14" fill="rgba(255,200,50,.22)" stroke="rgba(255,210,60,.5)" stroke-width="1.2"/>
+      <text id="arcPvLabelText" x="210" y="39" text-anchor="middle" fill="rgba(255,235,110,.98)" font-size="15" font-weight="800">0 W ⚡</text>
       <g id="pvFlowGroup"></g>
 
       ${battGhostPath}
@@ -1961,16 +1998,16 @@ class FFlowCard extends HTMLElement {
           <path d="M84,59 Q102,68 119,63"><animate attributeName="stroke-dashoffset" from="0" to="-34" dur="1.2s" repeatCount="indefinite"/></path>
         </g>
       </g>`}
-      <text id="fcGridVal" x="445" y="269" text-anchor="middle" font-size="13" font-weight="700" fill="#e05c00">-- W</text>
-      <text id="gridImportVal" x="397" y="165" text-anchor="middle" font-size="10" font-weight="600" fill="#cde">-- kWh</text>
-      <text id="gridExportVal" x="397" y="192" text-anchor="middle" font-size="10" font-weight="600" fill="#cde" style="display:none">-- kWh</text>
+      <text id="fcGridVal" x="445" y="271" text-anchor="middle" font-size="15" font-weight="700" fill="#e05c00">-- W</text>
+      <text class="md" id="gridImportVal" x="393" y="164" text-anchor="middle" font-size="12" font-weight="600" fill="#cde">-- kWh</text>
+      <text class="md" id="gridExportVal" x="393" y="194" text-anchor="middle" font-size="12" font-weight="600" fill="#cde" style="display:none">-- kWh</text>
 
       ${invBlock}
 
-      ${!modernHome && pv1Show ? `<text id="pv1label" x="8" y="372" font-size="9" fill="#8b949e" letter-spacing="1">FV1</text>
-      <text id="pv1FlowVal" x="8" y="386" font-size="12" font-weight="700" fill="#ffe83c">-- W</text>` : ''}
-      ${!modernHome && pv2Show ? `<text id="pv2label" x="8" y="400" font-size="9" fill="#8b949e" letter-spacing="1">FV2</text>
-      <text id="pv2FlowVal" x="8" y="414" font-size="12" font-weight="700" fill="#ffe83c">-- W</text>` : ''}
+      ${!modernHome && pv1Show ? `<text id="pv1label" x="8" y="372" font-size="11" fill="#8b949e" letter-spacing="1">FV1</text>
+      <text id="pv1FlowVal" x="8" y="386" font-size="13.5" font-weight="700" fill="#ffe83c">-- W</text>` : ''}
+      ${!modernHome && pv2Show ? `<text id="pv2label" x="8" y="400" font-size="11" fill="#8b949e" letter-spacing="1">FV2</text>
+      <text id="pv2FlowVal" x="8" y="414" font-size="13.5" font-weight="700" fill="#ffe83c">-- W</text>` : ''}
       ${battBadge}
       ${supplyBlock}
       ${backupBlock}
@@ -1983,8 +2020,8 @@ class FFlowCard extends HTMLElement {
       </svg></div>`+
 
       `<div style="display:flex;gap:8px;align-items:center;margin-top:10px">
-        <div style="flex:1;display:flex;align-items:center;gap:4px"><span style="font-size:.42rem;color:#8b949e;letter-spacing:1px;text-transform:uppercase">FV</span><div style="flex:1;display:flex;gap:2px;align-items:flex-end;height:10px" id="pvBlocks"></div></div>
-        <div style="flex:1;display:flex;align-items:center;gap:4px"><span style="font-size:.42rem;color:#8b949e;letter-spacing:1px;text-transform:uppercase">Pot</span><div style="flex:1;background:#21262d;border-radius:20px;height:9px;overflow:hidden;position:relative"><div id="pwrBar" style="position:absolute;inset:0;right:auto;width:0%;border-radius:20px;background:#3fb950;transition:width .4s,background .4s"></div></div></div>
+        <div style="flex:1;display:flex;align-items:center;gap:4px"><span style="font-size:.58rem;color:#8b949e;letter-spacing:1px;text-transform:uppercase">FV</span><div style="flex:1;display:flex;gap:2px;align-items:flex-end;height:10px" id="pvBlocks"></div></div>
+        <div style="flex:1;display:flex;align-items:center;gap:4px"><span style="font-size:.58rem;color:#8b949e;letter-spacing:1px;text-transform:uppercase">Pot</span><div style="flex:1;background:#21262d;border-radius:20px;height:9px;overflow:hidden;position:relative"><div id="pwrBar" style="position:absolute;inset:0;right:auto;width:0%;border-radius:20px;background:#3fb950;transition:width .4s,background .4s"></div></div></div>
       </div>
       <div class="dv"></div>
       <div id="battStatsWrap" style="${showBattStats ? '' : 'display:none'}">
@@ -2003,7 +2040,7 @@ class FFlowCard extends HTMLElement {
           <div class="l" id="bEnduStatLbl" style="margin-bottom:0;white-space:nowrap;line-height:1.4">${this.config.label_endurance || 'AUTONOMIA'}</div>
           <div style="display:flex;align-items:flex-end;gap:10px;flex-shrink:0">
             <div class="v" id="bEnduranceStat" style="font-size:.88rem;line-height:1.2">--</div>
-            <div id="bEnduranceTime" style="font-size:.58rem;color:#8b949e;letter-spacing:.3px;white-space:nowrap;line-height:1.4">Fino a --</div>
+            <div id="bEnduranceTime" style="font-size:.7rem;color:#8b949e;letter-spacing:.3px;white-space:nowrap;line-height:1.4">Fino a --</div>
           </div>
         </div>
       </div>
@@ -2019,8 +2056,8 @@ class FFlowCard extends HTMLElement {
         <div class="pvi"><div class="ico">🏡</div><div class="lbl">Consumo Oggi</div><div class="val" id="invTodayLoad">-- kWh</div></div>
       </div>` : `<div class="pvf">
         <div class="pvi"><div class="ico">☀️</div><div class="lbl">FV Oggi</div><div class="val yw" id="invTodayPv">-- kWh</div></div>
-        <div class="pvi"><div class="ico">🔋</div><div class="lbl">Carica / Scarica</div><div class="val" id="invTodayBattChg">-- kWh</div><div class="val" id="invTodayBattDis" style="font-size:.62rem;color:#8b949e;margin-top:1px">-- kWh</div></div>
-        <div class="pvi"><div class="ico">⚡</div><div class="lbl">Residua</div><div class="val" id="invRemCap">-- Ah</div><div class="val" id="invRemKwh" style="font-size:.62rem;color:#8b949e;margin-top:1px">-- kWh</div></div>
+        <div class="pvi"><div class="ico">🔋</div><div class="lbl">Carica / Scarica</div><div class="val" id="invTodayBattChg">-- kWh</div><div class="val" id="invTodayBattDis" style="font-size:.74rem;color:#8b949e;margin-top:1px">-- kWh</div></div>
+        <div class="pvi"><div class="ico">⚡</div><div class="lbl">Residua</div><div class="val" id="invRemCap">-- Ah</div><div class="val" id="invRemKwh" style="font-size:.74rem;color:#8b949e;margin-top:1px">-- kWh</div></div>
         <div class="pvi"><div class="ico">🏡</div><div class="lbl">Consumo Oggi</div><div class="val" id="invTodayLoad">-- kWh</div></div>
       </div>`}
       ${this._buildConsumersHTML(esc)}
@@ -2434,7 +2471,7 @@ class FFlowCard extends HTMLElement {
         invRemKwhEl.textContent = totalRemKwh !== null ? totalRemKwh.toFixed(2) + ' kWh' : '-- kWh';
         invRemKwhEl.style.color = remColor;
         invRemKwhEl.style.display = '';
-        invRemKwhEl.style.fontSize = '.76rem';
+        invRemKwhEl.style.fontSize = '.88rem';
         invRemKwhEl.style.fontWeight = '700';
         invRemKwhEl.style.marginTop = '0';
       }
@@ -2626,54 +2663,46 @@ class FFlowCard extends HTMLElement {
       const lit = Math.round((pvTotal / pvMax) * 20); const heights = [20, 35, 50, 60, 70, 80, 90, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100]; let html = ''; for (let i = 0; i < 20; i++) html += `<div style="flex:1;background:${i < lit ? 'rgba(255,255,255,0.55)' : '#21262d'};height:${i < lit ? heights[i] : 100}%;opacity:${i < lit ? 1 : 0.35};border-radius:2px;"></div>`; pvBlocks.innerHTML = html;
     }
 
-    // EV
+    // EV (v1.6.0): state from the charger entity, or from the power when no state entity is set
     const evGroup = getEl('evGroup');
     if (evGroup) {
-      if (!this.config._show_ev) {
-        evGroup.style.display = 'none';
-        // Fix #12: removed early return here — was silently skipping any code added after this block
-      } else {
-        evGroup.style.display = '';
-      const isChargingEV = chargerStateStr === 'charging';
-      const isCompleted = chargerStateStr === 'completed' || chargerStateStr === 'finished';
+      const evRaw = chargerStateStr;
+      const hasEvState = !!this.config.charger_state && evRaw && evRaw !== 'unavailable' && evRaw !== 'unknown';
+      const pRaw = this._val(this.config.charger_power, true);
+      let mode;
+      if (hasEvState) {
+        if (/complet|finish|full|termin|piena/.test(evRaw)) mode = 'done';
+        else if (/charg|ricaric|in carica/.test(evRaw) && !/dis|not|non |no_|stop|unplug/.test(evRaw)) mode = 'charging';
+        else if (evRaw === 'on' || evRaw === 'true') mode = chargerPower > 50 ? 'charging' : 'connected';
+        else if (/connect|plug|wait|ready|paus|suspend|collegat|attesa/.test(evRaw) && !/disconn|unplug|scollegat|not_conn/.test(evRaw)) mode = 'connected';
+        else mode = 'idle';
+      } else mode = chargerPower > 50 ? 'charging' : 'idle';
+      const EVM = {
+        charging:  { c: '#29c4f6', t: 'IN CARICA' },
+        done:      { c: '#3fb950', t: 'CARICA COMPLETA' },
+        connected: { c: '#f4d03f', t: 'COLLEGATA' },
+        idle:      { c: '#6e7681', t: hasEvState ? 'SCOLLEGATA' : 'IN ATTESA' },
+      };
+      const m = EVM[mode];
+      evGroup.style.color = m.c;
       const evFlow = getEl('flowHomeEV');
-      const evIcon = getEl('evIconImg');
-      if (evFlow) {
-        if (isChargingEV) {
-          evFlow.setAttribute('opacity', '0.9'); evFlow.setAttribute('stroke', '#2b59ff');
-          // Fix #6: always reset opacity before applying filter (was stuck at 0.3 if previously disconnected)
-          if (evIcon) { evIcon.style.opacity = '1'; evIcon.setAttribute('filter', 'url(#iconGlowOrange)'); }
-        } else if (isCompleted) {
-          evFlow.setAttribute('opacity', '0');
-          if (evIcon) { evIcon.style.opacity = '1'; evIcon.setAttribute('filter', 'url(#iconGlowGreen)'); }
-        } else {
-          evFlow.setAttribute('opacity', '0');
-          if (evIcon) { evIcon.setAttribute('filter', ''); evIcon.style.opacity = '0.3'; }
-        }
-      }
-      if (isChargingEV || isCompleted) {
-        setText('evPowerVal', chargerPower.toFixed(0) + ' W');
-        setText('evCurrentVal', chargerCurrent.toFixed(1) + ' A');
-        setText('evSocVal', chargerSoc.toFixed(0) + ' %');
-        let evEta = '--';
-        if (isChargingEV) {
-          if (chargerEtaSensor !== null && !isNaN(chargerEtaSensor)) evEta = this._fmtTime(chargerEtaSensor / 60);
-          else if (chargerBattCapWh && chargerSoc > 0 && chargerPower > 0) {
-            const remainingWh = chargerBattCapWh * (100 - chargerSoc) / 100;
-            const hours = remainingWh / chargerPower;
-            evEta = this._fmtTime(hours);
-          }
-        } else if (isCompleted) {
-          evEta = 'Completa';
-        }
-        setText('evEtaVal', evEta);
-      } else {
-        setText('evPowerVal', '-- W');
-        setText('evCurrentVal', '-- A');
-        setText('evSocVal', '-- %');
-        setText('evEtaVal', '--');
-      }
-      } // end else (_show_ev)
+      if (evFlow) evFlow.setAttribute('opacity', mode === 'charging' ? '0.9' : '0');
+      setAttr('evCable', 'opacity', mode === 'idle' && hasEvState ? '0' : '.7');
+      setAttr('evCableFlow', 'opacity', mode === 'charging' ? '.9' : '0');
+      setText('evPowerVal', pRaw === null ? '-- W' : (chargerPower >= 1000 ? (chargerPower / 1000).toFixed(2) + ' kW' : chargerPower.toFixed(0) + ' W'));
+      setText('evStateVal', m.t);
+      const socRaw = this._val(this.config.charger_soc);
+      const curRaw = this._val(this.config.charger_current);
+      const socTxt = socRaw === null ? '' : 'SOC ' + socRaw.toFixed(0) + '%';
+      const curTxt = curRaw === null || mode !== 'charging' ? '' : chargerCurrent.toFixed(1) + ' A';
+      setText('evSocVal', [socTxt, curTxt].filter(Boolean).join('  ·  ') || ' ');
+      setAttr('evSocBar', 'width', socRaw === null ? '0' : (Math.max(0, Math.min(100, socRaw)) / 100 * 100).toFixed(1));
+      let evEta = '';
+      if (mode === 'charging') {
+        if (chargerEtaSensor !== null && !isNaN(chargerEtaSensor)) evEta = 'piena tra ' + this._fmtTime(chargerEtaSensor / 60);
+        else if (chargerBattCapWh && socRaw !== null && chargerPower > 0) evEta = 'piena tra ' + this._fmtTime(chargerBattCapWh * (100 - chargerSoc) / 100 / chargerPower);
+      } else if (mode === 'done') evEta = 'Auto carica';
+      setText('evEtaVal', evEta);
     }
   }
 }

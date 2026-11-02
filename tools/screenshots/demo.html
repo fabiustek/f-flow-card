@@ -38,13 +38,13 @@
     'sun.sun': { state: 'above_horizon', attributes: { elevation: 28,
       next_rising: new Date(now + 19 * 3600e3).toISOString(), next_setting: new Date(now + 4 * 3600e3).toISOString() } },
     'sensor.pv_power': st(2570, 'W'), 'sensor.pv1_power': st(1290, 'W'), 'sensor.pv2_power': st(1280, 'W'),
-    'sensor.grid_power': st(61, 'W'), 'sensor.load_power': st(2290, 'W'),
+    'sensor.grid_power': st(61, 'W'), 'sensor.load_power': st(4590, 'W'),
     'sensor.battery_soc': st(82, '%'), 'sensor.battery_power': st(295, 'W'), 'sensor.battery_current': st(5.3, 'A'), 'sensor.battery_voltage': st(54.1, 'V'),
     'sensor.inverter_temp': st(40.9, '°C'), 'sensor.dc_temp': st(46.9, '°C'),
     'sensor.today_pv': st(14.7, 'kWh'), 'sensor.today_batt_chg': st(11.0, 'kWh'), 'sensor.today_batt_dis': st(3.42, 'kWh'),
     'sensor.today_import': st(0.35, 'kWh'), 'sensor.today_export': st(1.12, 'kWh'), 'sensor.today_load': st(9.6, 'kWh'),
     'binary_sensor.grid': st('on'), 'select.ems_mode': st('self_consumption'),
-    'sensor.c_wallbox': st(5, 'W'), 'sensor.c_boiler': st(1.95, 'kW'), 'sensor.c_clima': st(420, 'W'), 'sensor.c_lavatrice': st(5, 'W'),
+    'sensor.c_wallbox': st(2.3, 'kW'), 'sensor.car_soc': st(64, '%'), 'sensor.c_boiler': st(1.95, 'kW'), 'sensor.c_clima': st(420, 'W'), 'sensor.c_lavatrice': st(5, 'W'),
     'sensor.c_studio': st(107, 'W'), 'sensor.c_autoclave': st(2, 'W'), 'sensor.c_cucina': st(1.62, 'kW'), 'sensor.c_frigo': st(85, 'W'),
     'sensor.fan_state': st('medium'), 'sensor.room_temp': st(25, '°C'), 'sensor.fan_pwm': st(55, '%'),
     'sensor.fan1': st(1480, 'rpm'), 'sensor.fan2': st(1475, 'rpm'), 'sensor.fan3': st(1510, 'rpm'),
@@ -62,7 +62,7 @@
     'sensor.c_cucina':    h => (h > 7.6 && h < 7.9) ? 900 : (h > 12 && h < 12.6) ? 1600 : (h > 19.5 && h < 20.4) ? 1700 : 2,
     'sensor.c_frigo':     h => (Math.floor(h * 3) % 2) ? 85 : 4,
   };
-  const kwEntities = { 'sensor.c_boiler': 1, 'sensor.c_cucina': 1 };
+  const kwEntities = { 'sensor.c_boiler': 1, 'sensor.c_cucina': 1, 'sensor.c_wallbox': 1 };
   const hass = {
     states,
     callService: async () => {},
@@ -94,6 +94,7 @@
     grid_status_entity: 'binary_sensor.grid', grid_switch_to_off: 'switch.off_grid', grid_switch_to_on: 'switch.on_grid',
     ems_mode_entity: 'select.ems_mode',
     _show_energy_supply: true, _show_backup_panel: true, _show_battery_stats: false, _daily_tiles_extended: true,
+    _show_ev: true, charger_power: 'sensor.c_wallbox', charger_soc: 'sensor.car_soc', charger_battery_capacity_wh: 43200,
     _show_consumers: true,
     consumers: [
       ['Wallbox', 'c_wallbox', 'mdi:ev-station', '#29c4f6'], ['Boiler', 'c_boiler', 'mdi:water-boiler', '#f85149'],
@@ -115,7 +116,10 @@
       battery_temp1: 'sensor.jk_temp1', battery_temp2: 'sensor.jk_temp2', battery_mos: 'sensor.jk_mos',
       battery_min_cell: 'sensor.jk_cellmin', battery_max_cell: 'sensor.jk_cellmax', total_pv_gen_entity: 'sensor.total_pv' },
   };
+  // phone width: same card in a 360 px wide column (see shoot.js)
+  scenes.phone = base;
   const scene = (location.hash || '#overview').slice(1);
+  if (scene === 'phone') document.getElementById('host').style.width = '340px';
   const card = document.createElement('f-flow-card');
   card.setConfig(scenes[scene] || base);
   document.getElementById('host').appendChild(card);
