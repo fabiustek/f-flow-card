@@ -1,5 +1,16 @@
-// f-flow-card.js – Unified Edition v1.6.0
-const FFC_VERSION = '1.6.0';
+// f-flow-card.js – Unified Edition v1.7.0
+const FFC_VERSION = '1.7.0';
+// Changes v1.7.0:
+//   NEW  – battery_reserve_soc / battery_target_soc: autonomy down to a reserve SOC and charge
+//           time up to a target SOC; the panel label switches AUTONOMIA ↔ TEMPO ALLA RICARICA.
+//   CHG  – Flows redrawn as smooth S-curves with glowing round particles (battery, grid, load, EV).
+//   FIX  – Battery sheen runs upward while charging and downward while discharging (two fixed
+//           SMIL animations toggled instead of mutating from/to at runtime).
+//   CHG  – Wallbox and car smaller, moved away from FV2, info right above the car.
+//   NEW  – FV3 / FV4 shown beside the house under FV1 / FV2; each slope glows with its strings.
+//   NEW  – Ring under the house spins with the house load.
+//   FIX  – Autonomy panel and battery badge left-aligned.
+//   FIX  – Sun→inverter wave and PV blocks were blank after a config change until PV changed.
 // Changes v1.6.0:
 //   FIX  – EV / wallbox: values were shown only with a charger_state of "charging"/"completed";
 //           now power, SOC and current are always shown and, without a state entity, charging is
@@ -543,6 +554,8 @@ class FFlowCardEditor extends HTMLElement {
       textField('inverter_name', 'Nome inverter', 'es. Il mio inverter'),
       divider(),
       capGroupWrap,
+      numberField('battery_reserve_soc', 'SOC minimo per l’autonomia (es. 20: autonomia fino al 20%)', 0, 95, 1, '%'),
+      numberField('battery_target_soc', 'SOC obiettivo per il tempo alla ricarica (es. 100)', 5, 100, 1, '%'),
       divider(),
       numberField('pv_max_power',       'Potenza max impianto FV',    0, 30000, 100, 'W'),
       numberField('inverter_max_power', 'Potenza max inverter',    0, 20000, 100, 'W'),
@@ -984,6 +997,8 @@ class FFlowCard extends HTMLElement {
       grid_switch_to_off: '',
       grid_switch_to_on: '',
       grid_switch_confirm: true,
+      battery_reserve_soc: 0,
+      battery_target_soc: 100,
       _show_ventilation: false,
       vent_title: 'Ventilazione inverter',
       vent_state_entity: '',
@@ -1491,7 +1506,7 @@ class FFlowCard extends HTMLElement {
         detail: { entityId: el.dataset.entity }, bubbles: true, composed: true })));
     });
     // animation state: meters and fans keep their own angle so speed changes are smooth
-    this._spin = { meters: {}, fans: {} };
+    this._spin = { meters: {}, fans: {}, rings: {} };
     this._startAnim();
     if (this._chartEnabled()) this._renderChart();
   }
@@ -1501,7 +1516,7 @@ class FFlowCard extends HTMLElement {
 
   _startAnim() {
     if (this._raf || this._connected === false) return;
-    if (!this.config._show_consumers && !this.config._show_ventilation) return;
+    if (!this.config._show_consumers && !this.config._show_ventilation && this.config.home_icon_style === 'classic') return;
     let last = performance.now();
     const tick = (now) => {
       const dt = Math.min(0.1, (now - last) / 1000); last = now;
@@ -1517,6 +1532,13 @@ class FFlowCard extends HTMLElement {
         el.style.left = (50 + 46 * Math.sin(m.a)).toFixed(2) + '%';
         el.style.opacity = front > 0 ? (0.25 + 0.75 * front).toFixed(2) : '0';
         el.style.transform = 'scaleX(' + Math.max(0.3, front).toFixed(2) + ')';
+      }
+      for (const id in (sp.rings || {})) {
+        // dashed rings: offset in px/s, so the ring turns faster with more power
+        const r = sp.rings[id];
+        r.off = (r.off - r.pps * dt) % 1000;
+        const el = root.getElementById(id);
+        if (el) el.style.strokeDashoffset = r.off.toFixed(1);
       }
       for (const id in sp.fans) {
         const f = sp.fans[id];
@@ -1700,7 +1722,8 @@ class FFlowCard extends HTMLElement {
         <g id="hpGlow${side}" fill="#ffe83c" opacity="0" style="transition:opacity .6s">${h}</g>`;
     };
     return `<g id="homeIconImg" data-modern="1" style="color:#8b949e;transition:color .5s">
-      <ellipse cx="${cx}" cy="473" rx="82" ry="7" fill="currentColor" fill-opacity=".10" stroke="currentColor" stroke-opacity=".35" stroke-width="1.2"/>
+      <ellipse cx="${cx}" cy="473" rx="82" ry="7" fill="currentColor" fill-opacity=".10" stroke="currentColor" stroke-opacity=".3" stroke-width="1.2"/>
+      <ellipse id="homeRing" cx="${cx}" cy="473" rx="82" ry="7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="14 18" filter="url(#gridNeon)"/>
       <polygon points="${pt(Lq.d)} 206,414 314,414" fill="#0f141a"/>
       <rect x="204" y="412" width="112" height="58" rx="3" fill="#0f141a" stroke="currentColor" stroke-width="1.8" filter="url(#gridNeon)"/>
       <circle cx="${cx}" cy="397" r="6" fill="#0f141a" stroke="currentColor" stroke-width="1.4"/>
@@ -1722,6 +1745,8 @@ class FFlowCard extends HTMLElement {
   }
 
   _buildStaticSVG() {
+    // the DOM is rebuilt: force the next update to redraw cached parts (sun wave, PV blocks)
+    this._prevPvTotal = -1; this._prevSunPos = { bx: -1, by: -1 }; this._prevPvBlocksTotal = -1;
     const dual = !!(this.config._show_battery2);
     const showBatt1 = !!(this.config._show_battery !== false);
     const ev   = !!(this.config._show_ev);
@@ -1740,9 +1765,9 @@ class FFlowCard extends HTMLElement {
 
     // Battery status badge under the battery icon (battery centre x ≈ 31 after transform)
     const battBadge = showBatt1 ? `<g id="battBadgeGroup">
-      <rect id="battBadgeRect" x="-6" y="263" width="80" height="19" rx="9.5" fill="rgba(139,148,158,.10)" stroke="#8b949e" stroke-width="1.2"/>
-      <circle id="battBadgeDot" cx="4" cy="272.5" r="3" fill="#8b949e"/>
-      <text class="bd" id="battBadgeText" x="38" y="277" text-anchor="middle" font-size="10.5" font-weight="800" letter-spacing="1.2" fill="#8b949e">RIPOSO</text>
+      <rect id="battBadgeRect" x="-2" y="263" width="76" height="19" rx="9.5" fill="rgba(139,148,158,.10)" stroke="#8b949e" stroke-width="1.2"/>
+      <circle id="battBadgeDot" cx="7" cy="272.5" r="3" fill="#8b949e"/>
+      <text class="bd" id="battBadgeText" x="40" y="277" text-anchor="middle" font-size="10.5" font-weight="800" letter-spacing="1.2" fill="#8b949e">RIPOSO</text>
     </g>` : '';
 
     // Inverter: drawn box (default) or user-supplied picture
@@ -1772,48 +1797,54 @@ class FFlowCard extends HTMLElement {
 
     // Backup panel (left side, above PV string labels)
     const backupBlock = showBackup ? `<g id="backupGroup">
-      <text class="sm" x="8" y="294" font-size="10" fill="#8b949e" letter-spacing="1.2">AUTONOMIA</text>
-      <text id="backupTimeVal" x="8" y="315" font-size="18" font-weight="800" fill="#3fb950">--</text>
-      <text class="sm" id="backupTimeSub" x="8" y="327" font-size="9.5" fill="#3fb950" opacity=".8">rimanente</text>
-      <text class="sm" x="8" y="344" font-size="10" fill="#8b949e" letter-spacing="1.2">ENERGIA RESIDUA</text>
-      <text id="backupRemVal" x="8" y="364" font-size="18" font-weight="800" fill="#3fb950">-- kWh</text>
+      <text class="sm" id="backupTimeLbl" x="-1" y="297" font-size="10" fill="#8b949e" letter-spacing="1.2">AUTONOMIA</text>
+      <text id="backupTimeVal" x="-1" y="317" font-size="18" font-weight="800" fill="#3fb950">--</text>
+      <text class="sm" id="backupTimeSub" x="-1" y="329" font-size="9.5" fill="#3fb950" opacity=".85"></text>
+      <text class="sm" x="-1" y="346" font-size="10" fill="#8b949e" letter-spacing="1.2">ENERGIA RESIDUA</text>
+      <text id="backupRemVal" x="-1" y="366" font-size="18" font-weight="800" fill="#3fb950">-- kWh</text>
     </g>` : '';
 
     const pv1Show = !!this.config.pv1_power, pv2Show = !!this.config.pv2_power;
     const modernHome = this.config.home_icon_style !== 'classic';
 
-    const pv3txt = showPvExtra ? `<text id="pv3label" x="8" y="424" font-size="11" fill="#8b949e" letter-spacing="1">FV3</text><text id="pv3FlowVal" x="8" y="438" font-size="13.5" font-weight="700" fill="#ffe83c">-- W</text>` : '';
-    const pv4txt = showPvExtra ? `<text id="pv4label" x="8" y="456" font-size="11" fill="#8b949e" letter-spacing="1">FV4</text><text id="pv4FlowVal" x="8" y="470" font-size="13.5" font-weight="700" fill="#ffe83c">-- W</text>` : '';
+    const modernHomeX = this.config.home_icon_style !== 'classic';
+    const pv3txt = showPvExtra && modernHomeX ? `<text class="sm" id="pv3label" x="180" y="424" text-anchor="end" font-size="10.5" fill="#8b949e" letter-spacing="1">FV3</text><text id="pv3FlowVal" x="180" y="440" text-anchor="end" font-size="14" font-weight="700" fill="#ffe83c">-- W</text>`
+      : showPvExtra ? `<text id="pv3label" x="8" y="424" font-size="11" fill="#8b949e" letter-spacing="1">FV3</text><text id="pv3FlowVal" x="8" y="438" font-size="13.5" font-weight="700" fill="#ffe83c">-- W</text>` : '';
+    const pv4txt = showPvExtra && modernHomeX ? `<text class="sm" id="pv4label" x="340" y="424" font-size="10.5" fill="#8b949e" letter-spacing="1">FV4</text><text id="pv4FlowVal" x="340" y="440" font-size="14" font-weight="700" fill="#ffe83c">-- W</text>`
+      : showPvExtra ? `<text id="pv4label" x="8" y="456" font-size="11" fill="#8b949e" letter-spacing="1">FV4</text><text id="pv4FlowVal" x="8" y="470" font-size="13.5" font-weight="700" fill="#ffe83c">-- W</text>` : '';
 
     // EV: SVG wallbox + car to the right of the house (x 344–514, y 330–480)
     const carBody = 'M2,34 Q2,24 12,22 L30,20 Q42,6 62,5 L80,5 Q94,6 104,18 L114,22 Q120,24 120,32 L120,38 Q120,40 117,40 L106,40 A11,11 0 0 0 84,40 L36,40 A11,11 0 0 0 14,40 L5,40 Q2,40 2,37 Z';
+    // EV drawing: wallbox at x≈398–417, car at x≈420–514 (scaled), info right above the car
     const evtxt = ev ? `<g id="evGroup" style="color:#6e7681;transition:color .5s">
-      <path id="flowHomeEV" d="M 316,440 H 348" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-dasharray="8 6" opacity="0">
-        <animate attributeName="stroke-dashoffset" from="14" to="0" dur="0.8s" repeatCount="indefinite"/>
+      <path id="flowHomeEV" d="M 316,452 C 350,452 370,452 398,452" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-dasharray="0.1 10" filter="url(#flowGlow)" opacity="0">
+        <animate attributeName="stroke-dashoffset" from="20" to="0" dur="0.8s" repeatCount="indefinite"/>
       </path>
-      <ellipse cx="359" cy="471" rx="13" ry="2.6" fill="currentColor" fill-opacity=".25"/>
-      <rect x="357" y="446" width="4" height="25" rx="1" fill="currentColor" fill-opacity=".55"/>
-      <rect x="347" y="412" width="24" height="36" rx="5" fill="#0f141a" stroke="currentColor" stroke-width="1.8" filter="url(#gridNeon)"/>
-      <rect x="351" y="417" width="16" height="9" rx="1.5" fill="currentColor" fill-opacity=".28"/>
-      <path d="M359.5,418.5 L356.5,422.5 H359 L358,425 L361.5,420.5 H359 Z" fill="currentColor"/>
-      <circle id="evLed" cx="359" cy="436" r="2.6" fill="currentColor"><animate attributeName="opacity" values="1;.25;1" dur="1.2s" repeatCount="indefinite"/></circle>
-      <path id="evCable" d="M367,446 C 376,466 386,464 396,451" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".7"/>
-      <path id="evCableFlow" d="M367,446 C 376,466 386,464 396,451" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-dasharray="2 7" opacity="0">
-        <animate attributeName="stroke-dashoffset" from="9" to="0" dur="0.6s" repeatCount="indefinite"/></path>
-      <g transform="translate(392,420)">
+      <g transform="translate(398,430) scale(.8)">
+        <ellipse cx="12" cy="56" rx="13" ry="2.6" fill="currentColor" fill-opacity=".25"/>
+        <rect x="10" y="34" width="4" height="22" rx="1" fill="currentColor" fill-opacity=".55"/>
+        <rect x="0" y="0" width="24" height="36" rx="5" fill="#0f141a" stroke="currentColor" stroke-width="2" filter="url(#gridNeon)"/>
+        <rect x="4" y="5" width="16" height="9" rx="1.5" fill="currentColor" fill-opacity=".28"/>
+        <path d="M12.5,6.5 L9.5,10.5 H12 L11,13 L14.5,8.5 H12 Z" fill="currentColor"/>
+        <circle id="evLed" cx="12" cy="24" r="2.6" fill="currentColor"><animate attributeName="opacity" values="1;.25;1" dur="1.2s" repeatCount="indefinite"/></circle>
+      </g>
+      <path id="evCable" d="M407,458 C 412,474 418,472 424,462" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".7"/>
+      <path id="evCableFlow" d="M407,458 C 412,474 418,472 424,462" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="2 6" opacity="0">
+        <animate attributeName="stroke-dashoffset" from="8" to="0" dur="0.6s" repeatCount="indefinite"/></path>
+      <g transform="translate(420,438) scale(.78)">
         <ellipse cx="61" cy="49" rx="62" ry="3.5" fill="currentColor" fill-opacity=".14"/>
-        <path d="${carBody}" fill="#0f141a" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" filter="url(#gridNeon)"/>
+        <path d="${carBody}" fill="#0f141a" stroke="currentColor" stroke-width="2" stroke-linejoin="round" filter="url(#gridNeon)"/>
         <path d="M36,19 Q46,9 62,9 L64,9 L64,19 Z M68,9 L80,9 Q92,10 99,19 L68,19 Z" fill="currentColor" fill-opacity=".18" stroke="currentColor" stroke-width="1"/>
         <path d="M112,25 h5 M4,28 h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-        <g fill="#0f141a" stroke="currentColor" stroke-width="1.8"><circle cx="25" cy="40" r="8.5"/><circle cx="95" cy="40" r="8.5"/></g>
+        <g fill="#0f141a" stroke="currentColor" stroke-width="2"><circle cx="25" cy="40" r="8.5"/><circle cx="95" cy="40" r="8.5"/></g>
         <g fill="currentColor"><circle cx="25" cy="40" r="2.6"/><circle cx="95" cy="40" r="2.6"/></g>
       </g>
-      <rect x="402" y="475" width="100" height="4" rx="2" fill="#21262d"/>
-      <rect id="evSocBar" x="402" y="475" width="0" height="4" rx="2" fill="currentColor"/>
-      <text id="evPowerVal" x="458" y="350" text-anchor="middle" font-size="16" font-weight="800" fill="currentColor">-- W</text>
-      <text class="sm" id="evStateVal" x="458" y="366" text-anchor="middle" font-size="10.5" font-weight="700" letter-spacing="1" fill="currentColor">--</text>
-      <text class="md" id="evSocVal" x="458" y="384" text-anchor="middle" font-size="12.5" font-weight="700" fill="#e6edf3">-- %</text>
-      <text class="sm" id="evEtaVal" x="458" y="400" text-anchor="middle" font-size="11.5" font-weight="600" fill="#c9d1d9"></text>
+      <rect x="427" y="482" width="80" height="3.5" rx="1.75" fill="#21262d"/>
+      <rect id="evSocBar" x="427" y="482" width="0" height="3.5" rx="1.75" fill="currentColor"/>
+      <text id="evPowerVal" x="467" y="390" text-anchor="middle" font-size="16" font-weight="800" fill="currentColor">-- W</text>
+      <text class="sm" id="evStateVal" x="467" y="405" text-anchor="middle" font-size="10.5" font-weight="700" letter-spacing="1" fill="currentColor">--</text>
+      <text class="md" id="evSocVal" x="467" y="421" text-anchor="middle" font-size="12.5" font-weight="700" fill="#e6edf3">-- %</text>
+      <text class="sm" id="evEtaVal" x="467" y="434" text-anchor="middle" font-size="11" font-weight="600" fill="#c9d1d9"></text>
     </g>` : '';
 
     // Battery current/power placed OUTSIDE the transformed group, above/below the flow bar (center y=175)
@@ -1832,11 +1863,11 @@ class FFlowCard extends HTMLElement {
 
     // Battery visibility helpers – mirror EV charger pattern
     const battGhostPath = showBatt1
-      ? `<path d="M 59,175 H 132 V 205 H 205" fill="none" stroke="#1e3a5f" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.18"/>`
+      ? `<path d="M 59,175 C 140,175 120,205 205,205" fill="none" stroke="#1e3a5f" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.45"/>`
       : '';
     const battFlowPaths = showBatt1 ? `
-      <path id="flowBattIn"  d="M 59,175 H 132 V 205 H 205" fill="none" stroke="#8b949e" stroke-width="3" stroke-linecap="round" stroke-dasharray="14 10" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="-24" to="0"   dur="4.0s" repeatCount="indefinite"/></path>
-      <path id="flowBattOut" d="M 59,175 H 132 V 205 H 205" fill="none" stroke="#8b949e" stroke-width="3" stroke-linecap="round" stroke-dasharray="14 10" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="0"   to="-24" dur="4.0s" repeatCount="indefinite"/></path>` : '';
+      <path id="flowBattIn"  d="M 59,175 C 140,175 120,205 205,205" fill="none" stroke="#8b949e" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="0.1 12" filter="url(#flowGlow)" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="-24" to="0"   dur="4.0s" repeatCount="indefinite"/></path>
+      <path id="flowBattOut" d="M 59,175 C 140,175 120,205 205,205" fill="none" stroke="#8b949e" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="0.1 12" filter="url(#flowGlow)" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="0"   to="-24" dur="4.0s" repeatCount="indefinite"/></path>` : '';
     const modernBatt = showBatt1 && !dual && this.config.battery_style !== 'classic';
     let mbSegs = '';
     for (let i = 0; i < 10; i++) {
@@ -1849,8 +1880,10 @@ class FFlowCard extends HTMLElement {
         <rect x="8" y="129" width="52" height="113" rx="13" fill="url(#mbShellGrad)" stroke="#3a424d" stroke-width="1.5"/>
         <rect x="11" y="132" width="46" height="107" rx="10" fill="#0b0f14"/>
         ${mbSegs}
-        <g clip-path="url(#mbClip)"><rect id="mbSheen" x="11" y="240" width="46" height="26" fill="url(#mbSheenGrad)" opacity="0">
-          <animate id="mbSheenAnim" attributeName="y" from="240" to="106" dur="1.8s" repeatCount="indefinite"/></rect></g>
+        <g clip-path="url(#mbClip)">
+          <rect id="mbSheenUp" x="11" y="240" width="46" height="26" fill="url(#mbSheenGrad)" opacity="0"><animate attributeName="y" from="240" to="106" dur="1.8s" repeatCount="indefinite"/></rect>
+          <rect id="mbSheenDown" x="11" y="106" width="46" height="26" fill="url(#mbSheenGrad)" opacity="0"><animate attributeName="y" from="106" to="240" dur="1.8s" repeatCount="indefinite"/></rect>
+        </g>
         <rect x="13" y="134" width="8" height="103" rx="4" fill="rgba(255,255,255,.07)" style="pointer-events:none"/>
         <text id="fcBattVal" x="34" y="188" text-anchor="middle" font-size="14.5" font-weight="900" fill="#fff" stroke="rgba(0,0,0,.65)" stroke-width="3" paint-order="stroke">--%</text>
         <g id="battBoltGroup" opacity="0"><polygon points="37,196 29,210 34,210 31,222 40,207 35,207 39,196" fill="#fff" stroke="rgba(0,0,0,.5)" stroke-width="0.8"><animate attributeName="opacity" values="0.55;1;0.55" dur="1.2s" repeatCount="indefinite"/></polygon></g>
@@ -2030,6 +2063,7 @@ class FFlowCard extends HTMLElement {
         <linearGradient id="mbCapGrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#2d333b"/><stop offset="50%" stop-color="#8b949e"/><stop offset="100%" stop-color="#2d333b"/></linearGradient>
         <linearGradient id="mbSheenGrad" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="rgba(255,255,255,0)"/><stop offset="50%" stop-color="rgba(255,255,255,.35)"/><stop offset="100%" stop-color="rgba(255,255,255,0)"/></linearGradient>
         <clipPath id="mbClip"><rect x="11" y="132" width="46" height="107" rx="10"/></clipPath>
+ <filter id="flowGlow" filterUnits="userSpaceOnUse" x="-20" y="0" width="560" height="520"><feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
         <filter id="gridNeon" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="1.6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
         <filter id="battGlowBolt"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
         <filter id="iconGlowOrange" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="10" result="b"/><feFlood flood-color="rgba(255,140,0,0.6)" result="c"/><feComposite in="c" in2="b" operator="in" result="d"/><feMerge><feMergeNode in="d"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
@@ -2062,15 +2096,15 @@ class FFlowCard extends HTMLElement {
       <g id="pvFlowGroup"></g>
 
       ${battGhostPath}
-      <path d="M 399,175 H 361 V 202 H 315" fill="none" stroke="#1e3a5f" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.18"/>
-      <path d="M 260,265 V 358" fill="none" stroke="#1e3a5f" stroke-width="3" stroke-linecap="round" opacity="0.18"/>
+      <path d="M 399,175 C 350,175 375,202 315,202" fill="none" stroke="#1e3a5f" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.45"/>
+      <path d="M 260,265 V 358" fill="none" stroke="#1e3a5f" stroke-width="2.5" stroke-linecap="round" opacity="0.45"/>
 
-      <path id="flowGridIn" d="M 432,175 H 361 V 202 H 315" fill="none" stroke="#FF2929" stroke-width="3" stroke-linecap="round" stroke-dasharray="14 10" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="0" to="-24" dur="0.8s" repeatCount="indefinite"/></path>
-      <path id="flowGridOut" d="M 432,175 H 361 V 202 H 315" fill="none" stroke="#2ecc71" stroke-width="3" stroke-linecap="round" stroke-dasharray="14 10" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="-24" to="0" dur="0.8s" repeatCount="indefinite"/></path>
+      <path id="flowGridIn" d="M 432,175 C 350,175 375,202 315,202" fill="none" stroke="#FF2929" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="0.1 12" filter="url(#flowGlow)" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="0" to="-24" dur="0.8s" repeatCount="indefinite"/></path>
+      <path id="flowGridOut" d="M 432,175 C 350,175 375,202 315,202" fill="none" stroke="#2ecc71" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="0.1 12" filter="url(#flowGlow)" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="-24" to="0" dur="0.8s" repeatCount="indefinite"/></path>
 
       ${battFlowPaths}
 
-      <path id="flowInvLoad" d="M 260,358 V 265" fill="none" stroke="#29c4f6" stroke-width="3" stroke-linecap="round" stroke-dasharray="14 10" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="-24" to="0" dur="0.8s" repeatCount="indefinite"/></path>
+      <path id="flowInvLoad" d="M 260,358 V 265" fill="none" stroke="#29c4f6" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="0.1 12" filter="url(#flowGlow)" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="-24" to="0" dur="0.8s" repeatCount="indefinite"/></path>
 
       <!-- Battery current/power placed above/below flow bar -->
       ${showBatt1 ? (dual ? battTextDual : battTextSingle) : ''}
@@ -2338,10 +2372,16 @@ class FFlowCard extends HTMLElement {
       const win = getEl('homeWindows'); if (win) win.setAttribute('fill', load > 10 ? 'rgba(255,214,102,.55)' : '#1c2128');
       // each slope glows with its own string: full glow at half of the PV array max
       const half = Math.max(100, pvMax / 2);
+      // ring under the house: ~25 px/s per kW of load, stopped below 10 W
+      if (this._spin) {
+        if (!this._spin.rings) this._spin.rings = {};
+        if (!this._spin.rings.homeRing) this._spin.rings.homeRing = { off: 0, pps: 0 };
+        this._spin.rings.homeRing.pps = load > 10 ? Math.min(180, 8 + load / 1000 * 25) : 0;
+      }
       const gl = getEl('hpGlowL'), gr = getEl('hpGlowR');
       const glow = (w) => w > 10 ? (0.25 + 0.65 * Math.min(1, w / half)).toFixed(2) : '0';
-      if (gl) gl.setAttribute('opacity', glow(pv1));
-      if (gr) gr.setAttribute('opacity', glow(pv2));
+      if (gl) gl.setAttribute('opacity', glow(pv1 + pv3));   // left slope: FV1 (+ FV3)
+      if (gr) gr.setAttribute('opacity', glow(pv2 + pv4));   // right slope: FV2 (+ FV4)
     } else if (homeImg) { homeImg.style.opacity = load > 10 ? '1' : '0.7'; homeImg.setAttribute('filter', load > 10 ? 'url(#iconGlowOrange)' : ''); }
 
     // Battery fill & stats
@@ -2384,13 +2424,9 @@ class FFlowCard extends HTMLElement {
           seg.setAttribute('opacity', frac > 0 ? (0.35 + 0.65 * frac).toFixed(2) : '1');
         }
         setAttr('fcBattVal', 'fill', '#fff');
-        const sheen = getEl('mbSheen'), sAnim = getEl('mbSheenAnim');
-        const moving = Math.abs(battPwr1) >= 50;
-        if (sheen) sheen.setAttribute('opacity', moving ? '1' : '0');
-        if (sAnim && moving) {
-          const up = battPwr1 > 0;
-          if (sAnim.getAttribute('from') !== (up ? '240' : '106')) { sAnim.setAttribute('from', up ? '240' : '106'); sAnim.setAttribute('to', up ? '106' : '240'); }
-        }
+        // sheen runs upward while charging (filling) and downward while discharging (draining)
+        setAttr('mbSheenUp', 'opacity', battPwr1 >= 50 ? '1' : '0');
+        setAttr('mbSheenDown', 'opacity', battPwr1 <= -50 ? '1' : '0');
       }
       // Fix #16: bTemp1/bTemp2 written once below in the label override block — skip early write
       // bMinCell, bMaxCell, bBattDis handled by label override block below
@@ -2401,8 +2437,13 @@ class FFlowCard extends HTMLElement {
     // Endurance — works in both Ah mode (needs voltage to get Wh) and kWh mode (direct)
     let endHours = null, endText = '--', endColor = '#8b949e', isETA = false;
     const _socPct = battSoc1;  // use SOC directly for colour
+    // v1.7.0: autonomy down to a reserve SOC, charge time up to a target SOC
+    const socMin = Math.max(0, Math.min(95, Number(this.config.battery_reserve_soc) || 0));
+    const socMax = Math.max(socMin + 5, Math.min(100, Number(this.config.battery_target_soc) || 100));
+    const usable = (soc) => Math.max(0, soc - socMin) / 100;   // fraction above the reserve
+    const missing = (soc) => Math.max(0, socMax - soc) / 100;  // fraction up to the target
     if (dual) {
-      const totalRemWh = (battSoc1 / 100) * fullWh + (battSoc2 / 100) * fullWh2;
+      const totalRemWh = usable(battSoc1) * fullWh + usable(battSoc2) * fullWh2;
       const totalCapWh = fullWh + fullWh2;
       const totalPower = battPwr1 + battPwr2;
       if (totalCapWh > 0) {
@@ -2410,22 +2451,21 @@ class FFlowCard extends HTMLElement {
           endHours = totalRemWh / Math.abs(totalPower);
           endText = this._fmtEndurance(endHours); endColor = this._remCapColor(_socPct);
         } else if (totalPower > 10) {
-          const missingWh = totalCapWh - totalRemWh;
+          const missingWh = missing(battSoc1) * fullWh + missing(battSoc2) * fullWh2;
           endHours = Math.max(0, missingWh / totalPower);
           endText = this._fmtEndurance(endHours); endColor = '#00d7ff'; isETA = true;
         }
       }
     } else {
       // simpler: remWh from SOC × fullWh; if fullWh=0 (not configured), try Ah×V fallback
-      const remWhFinal = fullWh > 0 ? (battSoc1 / 100) * fullWh
-                                    : (fullAh > 0 && battVolt1 > 0 ? remCap1 * battVolt1 : 0);
-      if (battPwr1 < -10 && remWhFinal > 0) {
+      const capWh = fullWh > 0 ? fullWh : (fullAh > 0 && battVolt1 > 0 ? fullAh * battVolt1 : 0);
+      const remWhFinal = usable(battSoc1) * capWh;
+      if (battPwr1 < -10 && capWh > 0) {
         endHours = remWhFinal / Math.abs(battPwr1);
         endText = this._fmtEndurance(endHours); endColor = this._remCapColor(_socPct);
       } else if (battPwr1 > 10) {
-        const capWh = fullWh > 0 ? fullWh : (fullAh > 0 && battVolt1 > 0 ? fullAh * battVolt1 : 0);
         if (capWh > 0) {
-          const missingWh = capWh - remWhFinal;
+          const missingWh = missing(battSoc1) * capWh;
           endHours = Math.max(0, missingWh / Math.abs(battPwr1));
           endText = this._fmtEndurance(endHours); endColor = '#00d7ff'; isETA = true;
         }
@@ -2744,7 +2784,7 @@ class FFlowCard extends HTMLElement {
     const _bEnduStat = getEl('bEnduranceStat');
     if (_bEnduStat) { _bEnduStat.textContent = endText; _bEnduStat.style.color = endColor; }
     const _bEnduStatLbl = getEl('bEnduStatLbl');
-    if (_bEnduStatLbl) _bEnduStatLbl.textContent = isETA ? 'A PIENO TRA' : (this.config.label_endurance || 'AUTONOMIA');
+    if (_bEnduStatLbl) _bEnduStatLbl.textContent = isETA ? 'TEMPO ALLA RICARICA' : (this.config.label_endurance || 'AUTONOMIA');
     const _bEnduTimeEl = getEl('bEnduranceTime');
     if (_bEnduTimeEl) { _bEnduTimeEl.textContent = _tillStr; _bEnduTimeEl.style.color = endHours !== null ? endColor : '#8b949e'; }
 
@@ -2752,7 +2792,10 @@ class FFlowCard extends HTMLElement {
     if (getEl('backupGroup')) {
       setText('backupTimeVal', endHours !== null ? endText : '--');
       setAttr('backupTimeVal', 'fill', endHours !== null ? endColor : '#8b949e');
-      setText('backupTimeSub', endHours === null ? '' : isETA ? 'a pieno' : 'rimanente');
+      // discharging → autonomy down to the reserve; charging → time to the target SOC
+      setText('backupTimeLbl', isETA ? 'TEMPO ALLA RICARICA' : 'AUTONOMIA');
+      setText('backupTimeSub', endHours === null ? (Math.abs(battPwr1) < 10 ? 'batteria a riposo' : '')
+        : isETA ? 'fino al ' + socMax + '%' : 'fino al ' + socMin + '%');
       setAttr('backupTimeSub', 'fill', endHours !== null ? endColor : '#8b949e');
       let remKwh = totalRemKwh;
       if (remKwh === null && fullAh > 0 && battVolt1 > 0) remKwh = (totalRemAh * battVolt1) / 1000;
@@ -2800,7 +2843,7 @@ class FFlowCard extends HTMLElement {
       const socTxt = socRaw === null ? '' : 'SOC ' + socRaw.toFixed(0) + '%';
       const curTxt = curRaw === null || mode !== 'charging' ? '' : chargerCurrent.toFixed(1) + ' A';
       setText('evSocVal', [socTxt, curTxt].filter(Boolean).join('  ·  ') || ' ');
-      setAttr('evSocBar', 'width', socRaw === null ? '0' : (Math.max(0, Math.min(100, socRaw)) / 100 * 100).toFixed(1));
+      setAttr('evSocBar', 'width', socRaw === null ? '0' : (Math.max(0, Math.min(100, socRaw)) / 100 * 80).toFixed(1));
       let evEta = '';
       if (mode === 'charging') {
         if (chargerEtaSensor !== null && !isNaN(chargerEtaSensor)) evEta = 'piena tra ' + this._fmtTime(chargerEtaSensor / 60);
