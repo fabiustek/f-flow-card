@@ -342,7 +342,8 @@ Stati riconosciuti (non importano maiuscole e minuscole):
 Sotto il disegno dei flussi c'è una **barra di schede**, una per ogni sezione attiva: Batteria, Inverter, Utilizzatori, Ventilazione, Statistiche, Video (nell'ordine scelto in **Ordine delle sezioni**).
 
 - **All'apertura della pagina le sezioni sono chiuse**: tocca una scheda per aprirla. Si apre una sezione alla volta; toccando di nuovo la scheda aperta la chiudi.
-- **Animazione**: la scheda attiva è segnata da una **goccia luminosa** blu-viola. Quando cambi scheda la goccia si allunga verso la nuova (il bordo davanti parte subito, quello dietro lo segue) e poi si ricompatta con un piccolo rimbalzo: è un filtro SVG "gooey" mosso da una simulazione a molle. Il contenuto entra scorrendo dal lato della nuova scheda e l'altezza della card si adatta con un'animazione.
+- **Animazione**: la scheda attiva è segnata da una **bolla di vetro liquido** con bordo argentato e alone viola. **A riposo** un riflesso **perlescente** (rosa, viola, azzurro) le gira continuamente intorno. **Quando cambi scheda** la bolla si comporta come una goccia: il bulbo davanti corre verso la nuova scheda schiacciandosi per la velocità, dietro resta una coda che si assottiglia con un collo sottile in mezzo, e qualche contorno sfumato fa da scia; all'arrivo fa un piccolo rimbalzo gelatinoso. È un filtro SVG "gooey" mosso da una simulazione a molle. Il contenuto entra scorrendo dal lato della nuova scheda e l'altezza della card si adatta con un'animazione.
+- Le schede e i titoli delle sezioni usano **icone a linea** (batteria, inverter, spina, ventola, grafico, videocamera) invece delle emoji.
 - Se le schede non stanno in una riga (per esempio su telefono), la barra si scorre col dito.
 
 Nell'editor, in **🎨 Layout e intestazione**:
@@ -744,6 +745,8 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 ### v1.11.1
 - Badge EMS: un po' di spazio a destra, il bordo non tocca più il testo.
 - La linea tra casa e wallbox si vede sempre in grigio, anche quando l'auto non carica (diventa azzurra durante la carica).
+- **Bolla del menu a schede rifatta**: vetro liquido con riflesso perlescente continuo a riposo, passaggio più realistico (bulbo, collo, coda, scie) e rimbalzo all'arrivo.
+- **Icone a linea** al posto delle emoji nelle schede e nei titoli delle sezioni.
 
 ### v1.11.0
 - Nuovo **menu a schede** per le sezioni sotto il disegno: una sezione aperta alla volta, tutte chiuse all'apertura (oppure l'ultima usata o una fissa). La scheda attiva è segnata da una **goccia luminosa** che si allunga e si assesta con una simulazione a molle (filtro SVG "gooey"); il contenuto entra scorrendo dal lato della nuova scheda.
