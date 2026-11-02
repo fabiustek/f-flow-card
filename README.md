@@ -1,3 +1,5 @@
+<img src="docs/brand/icon-256.png" alt="Icona F-Flow Card" width="96" align="right">
+
 # F-Flow Card
 
 **Card per Home Assistant con i flussi energetici in tempo reale**: fotovoltaico, batteria, rete, casa, utilizzatori e ventilazione dell'inverter, tutto in un'unica card animata, con interfaccia in italiano.
@@ -5,7 +7,7 @@
 [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
 [![Release](https://img.shields.io/github/v/release/fabiustek/f-flow-card)](https://github.com/fabiustek/f-flow-card/releases)
 
-Versione attuale: **v1.9.0** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
+Versione attuale: **v1.10.0** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
 
 <p align="center">
   <img src="docs/images/card-overview.png" alt="F-Flow Card con tutte le sezioni attive" width="480">
@@ -264,7 +266,18 @@ Sezione **📈 Statistiche** → **＋ Attiva**. Ci sono tre grafici, ognuno att
 Sezione **📹 Videocamera** → **＋ Attiva**:
 1. **Videocamera**: scegli la tua entità `camera.*`. Il video in diretta usa il lettore di Home Assistant (lo stesso delle card ufficiali: HLS, WebRTC o MJPEG, in base a cosa supporta la videocamera).
 2. Se il video non parte, o per consumare meno dati, attiva **Solo immagine**: la card mostra un'immagine aggiornata ogni 10 secondi.
-3. **Frecce ▲ ▼ ◀ ▶**: per ognuna scegli l'entità che muove la telecamera in quella direzione (pulsanti, script o switch dell'integrazione ONVIF). Facoltativo: **Posizione iniziale** per il pulsante centrale.
+3. **Frecce ▲ ▼ ◀ ▶**, due modi:
+   - **ONVIF diretto (consigliato)**: in **Telecamera ONVIF da muovere** scegli l'entità `camera.*` dell'integrazione ONVIF che si muove (può essere diversa da quella del video). Le frecce chiamano il servizio `onvif.ptz` con `pan: LEFT/RIGHT` o `tilt: UP/DOWN`, `move_mode: ContinuousMove`, con **Velocità** (predefinita 1) e **Durata/ampiezza di ogni passo** (predefinita 0.3). Non servono altre entità. Facoltativo: un **preset** per il pulsante centrale (es. `1`).
+   - **Entità**: in alternativa, per ogni freccia scegli un pulsante, script o switch che muove la telecamera, e per il pulsante centrale **Posizione iniziale**.
+
+Esempio con l'integrazione ONVIF (video da un NVR, movimento sulla telecamera):
+```yaml
+_show_camera: true
+camera_entity: camera.nvr_camera_tetto_sub
+ptz_camera: camera.camera_tetto_profile000
+ptz_speed: 1
+ptz_distance: 0.3
+```
 
 Nella card le frecce compaiono sopra il video, in basso a destra. **Un tocco** manda un comando (un passo di movimento); **tenendo premuto** il comando si ripete ogni mezzo secondo finché non lasci. La card usa `button.press` per i pulsanti, `script.turn_on` / `switch.turn_on` per script e switch. Compaiono solo le frecce configurate.
 
@@ -327,6 +340,8 @@ Le sezioni **Inverter** (riquadri giornalieri), **Utilizzatori** e **Ventilazion
 Il flag **📌** a destra decide come si presenta la sezione quando apri o ricarichi la pagina:
 - **📌 spuntato**: la sezione si apre **sempre aperta** (bloccata aperta).
 - **📌 senza spunta**: puoi aprirla quando vuoi, ma a ogni ricaricamento della pagina la trovi **chiusa**.
+
+**Ordine delle sezioni**: in **🎨 Layout e intestazione** → **Ordine delle sezioni** sposti con **▲ ▼** le parti sotto il disegno dei flussi: statistiche batteria (JK BMS), Inverter, Utilizzatori e grafico, Ventilazione, Statistiche, Videocamera. Le sezioni non attive non compaiono nella card ma tengono il loro posto nell'elenco.
 
 Di partenza tutte le sezioni hanno il flag spuntato, quindi la card si presenta come prima finché non togli la spunta. Il flag e la scelta delle ore del grafico vengono salvati **sul dispositivo** (nel browser o nell'app): sul telefono e sul computer puoi avere impostazioni diverse.
 
@@ -451,6 +466,7 @@ Tutte le opzioni si impostano dall'editor visuale; qui trovi le chiavi YAML corr
 | `_daily_tiles_extended` | `false` | 6 riquadri giornalieri invece di 4 |
 | `_show_battery_stats` | `true` | Riquadri statistiche batteria (JK BMS) |
 | `battery_style` | `modern` | `modern` (a segmenti) o `classic` |
+| `sections_order` | `[bms, inv, cons, vent, stats, cam]` | Ordine delle sezioni sotto il disegno (bms = statistiche batteria, inv = Inverter, cons = Utilizzatori, vent = Ventilazione, stats = Statistiche, cam = Videocamera) |
 | `grid_icon_style` | `modern` | `modern` (traliccio luminoso) o `classic` (immagine) |
 | `home_icon_style` | `modern` | `modern` (casa a due falde) o `classic` (immagine) |
 | `sun` | `sun.sun` | Entità del sole |
@@ -537,6 +553,11 @@ Tutte le opzioni si impostano dall'editor visuale; qui trovi le chiavi YAML corr
 | `camera_mode` | `live` | `live` (video in diretta) o `snapshot` (immagine ogni 10 s) |
 | `ptz_up` / `ptz_down` / `ptz_left` / `ptz_right` | `''` | Entità da attivare per ogni freccia |
 | `ptz_home` | `''` | Entità per la posizione iniziale (pulsante centrale) |
+| `ptz_camera` | `''` | Telecamera ONVIF da muovere con `onvif.ptz` (se impostata, le frecce non hanno bisogno di entità) |
+| `ptz_speed` | `1` | Velocità del movimento ONVIF (0.1–1) |
+| `ptz_distance` | `0.3` | Durata/ampiezza di ogni passo ONVIF (0.1–1) |
+| `ptz_move_mode` | `ContinuousMove` | Modalità di movimento ONVIF |
+| `ptz_home_preset` | `''` | Preset ONVIF per il pulsante centrale |
 
 ### Ventilazione inverter
 
@@ -602,7 +623,23 @@ Nella sezione Etichette la scelta di un'entità alternativa si sblocca solo dopo
 
 A ogni nuova versione viene creata automaticamente una **release** su GitHub e HACS ti propone l'aggiornamento in Home Assistant. Dopo l'aggiornamento ricarica il browser con `Ctrl + Shift + R`.
 
-Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.9.0**.
+Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.10.0**.
+
+### Icona nella notifica di aggiornamento
+
+HACS mostra un'icona accanto agli aggiornamenti **solo per le integrazioni** (la prende dal catalogo ufficiale dei loghi di Home Assistant); per le card della categoria Dashboard non ne passa nessuna. Per questo la card installa la sua icona in `/local/community/f-flow-card/icon.png`, e puoi assegnarla tu all'entità di aggiornamento:
+
+1. In **Impostazioni → Dispositivi e servizi → Entità** cerca "F-Flow" e annota l'ID dell'entità di aggiornamento (di solito `update.f_flow_card_update`).
+2. Aggiungi a `configuration.yaml` (se hai già una sezione `homeassistant:`, aggiungi solo la parte `customize:`):
+   ```yaml
+   homeassistant:
+     customize:
+       update.f_flow_card_update:
+         entity_picture: /local/community/f-flow-card/icon.png
+   ```
+3. Riavvia Home Assistant, oppure in **Strumenti per sviluppatori → YAML** premi **Posizione e personalizzazioni**.
+
+In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Impostazioni** → **Icona** e scegli per esempio `mdi:solar-power-variant`.
 
 ---
 
@@ -645,7 +682,8 @@ Per sapere quale versione stai usando, apri la console del browser (`F12`): comp
 - Controlla che l'entità `camera.*` funzioni in una card "Immagine" di Home Assistant. Se il video in diretta non parte, attiva **Solo immagine** nella sezione Videocamera.
 
 **Le frecce della videocamera non muovono nulla**
-- Ogni freccia deve essere collegata a un'entità che si può "premere" o accendere (pulsante, script, switch). Prova l'entità da **Strumenti per sviluppatori → Azioni**: se lì la telecamera si muove, funziona anche dalla card.
+- In modalità ONVIF diretta, **Telecamera ONVIF da muovere** deve essere l'entità `camera.*` dell'integrazione ONVIF (quella che usi con `onvif.ptz`), non quella dell'NVR. Prova il servizio `onvif.ptz` da **Strumenti per sviluppatori → Azioni** con la stessa entità.
+- In modalità entità, ogni freccia deve essere collegata a un'entità che si può "premere" o accendere (pulsante, script, switch). Prova l'entità da **Strumenti per sviluppatori → Azioni**: se lì la telecamera si muove, funziona anche dalla card.
 
 **Il meteo non si anima**
 - Serve un'entità `weather.*` in **🎨 Layout e intestazione**. Lo stato deve essere uno di quelli standard di Home Assistant (es. `rainy`, `cloudy`); con stati diversi il cielo resta sereno.
@@ -666,6 +704,11 @@ Per sapere quale versione stai usando, apri la console del browser (`F12`): comp
 ---
 
 ## Registro delle modifiche
+
+### v1.10.0
+- **Ordine delle sezioni a scelta**: in **🎨 Layout e intestazione** sposti con ▲ ▼ statistiche batteria, Inverter, Utilizzatori, Ventilazione, Statistiche e Videocamera.
+- **Videocamera con ONVIF diretto**: scegli solo la telecamera ONVIF e le frecce chiamano `onvif.ptz` (pan/tilt, velocità, passo, ContinuousMove), senza creare entità per ogni freccia; preset facoltativo per il pulsante centrale.
+- Nuova **icona della card** (`icon.png`, installata da HACS) da usare nella notifica di aggiornamento di HACS; istruzioni nella sezione [Aggiornamenti](#aggiornamenti).
 
 ### v1.9.0
 - **Cielo di notte** con stelle che brillano e stelle cadenti.
@@ -739,4 +782,4 @@ Per sapere quale versione stai usando, apri la console del browser (`F12`): comp
 
 ---
 
-*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.9.0*
+*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.10.0*
