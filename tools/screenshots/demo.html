@@ -1,0 +1,127 @@
+<!doctype html>
+<!--
+  Demo page used to regenerate the README pictures (see tools/screenshots/shoot.js).
+  It loads the real card from dist/ and feeds it a mocked `hass` object with realistic data.
+  The scene is chosen with the URL hash, e.g. demo.html#ventilation
+-->
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>F-Flow Card demo</title>
+<style>
+  body { margin: 0; padding: 16px; background: #0d1117; font-family: Roboto, Inter, "Segoe UI", Arial, sans-serif; }
+  #host { width: 500px; }
+</style>
+</head>
+<body>
+<div id="host"></div>
+<script>
+  // Minimal stand-in for Home Assistant's <ha-icon>, drawing Material Design Icons paths
+  // injected by shoot.js as window.MDI = { 'mdi:home': 'M10,20V14...' }.
+  customElements.define('ha-icon', class extends HTMLElement {
+    static get observedAttributes() { return ['icon']; }
+    connectedCallback() { this.render(); }
+    attributeChangedCallback() { this.render(); }
+    render() {
+      const d = (window.MDI || {})[this.getAttribute('icon')] || (window.MDI || {})['mdi:power-plug'] || '';
+      this.innerHTML = `<svg viewBox="0 0 24 24" width="24" height="24" style="display:block;margin:auto"><path fill="currentColor" d="${d}"/></svg>`;
+    }
+  });
+</script>
+<script src="../../dist/f-flow-card.js"></script>
+<script>
+  const st = (v, u) => ({ state: String(v), attributes: u ? { unit_of_measurement: u } : {} });
+  const now = Date.now();
+  // Sun: risen 5 h ago, sets in 4 h → sun on the right part of the arc
+  const states = {
+    'sun.sun': { state: 'above_horizon', attributes: { elevation: 28,
+      next_rising: new Date(now + 19 * 3600e3).toISOString(), next_setting: new Date(now + 4 * 3600e3).toISOString() } },
+    'sensor.pv_power': st(2570, 'W'), 'sensor.pv1_power': st(1290, 'W'), 'sensor.pv2_power': st(1280, 'W'),
+    'sensor.grid_power': st(61, 'W'), 'sensor.load_power': st(2290, 'W'),
+    'sensor.battery_soc': st(82, '%'), 'sensor.battery_power': st(295, 'W'), 'sensor.battery_current': st(5.3, 'A'), 'sensor.battery_voltage': st(54.1, 'V'),
+    'sensor.inverter_temp': st(40.9, '°C'), 'sensor.dc_temp': st(46.9, '°C'),
+    'sensor.today_pv': st(14.7, 'kWh'), 'sensor.today_batt_chg': st(11.0, 'kWh'), 'sensor.today_batt_dis': st(3.42, 'kWh'),
+    'sensor.today_import': st(0.35, 'kWh'), 'sensor.today_export': st(1.12, 'kWh'), 'sensor.today_load': st(9.6, 'kWh'),
+    'binary_sensor.grid': st('on'), 'select.ems_mode': st('self_consumption'),
+    'sensor.c_wallbox': st(5, 'W'), 'sensor.c_boiler': st(1.95, 'kW'), 'sensor.c_clima': st(420, 'W'), 'sensor.c_lavatrice': st(5, 'W'),
+    'sensor.c_studio': st(107, 'W'), 'sensor.c_autoclave': st(2, 'W'), 'sensor.c_cucina': st(1.62, 'kW'), 'sensor.c_frigo': st(85, 'W'),
+    'sensor.fan_state': st('medium'), 'sensor.room_temp': st(25, '°C'), 'sensor.fan_pwm': st(55, '%'),
+    'sensor.fan1': st(1480, 'rpm'), 'sensor.fan2': st(1475, 'rpm'), 'sensor.fan3': st(1510, 'rpm'),
+    'sensor.jk_temp1': st(24.5, '°C'), 'sensor.jk_temp2': st(25.1, '°C'), 'sensor.jk_mos': st(29.4, '°C'),
+    'sensor.jk_cellmin': st(3.312, 'V'), 'sensor.jk_cellmax': st(3.328, 'V'), 'sensor.total_pv': st(8421.6, 'kWh'),
+  };
+  // 24 h of fake history for the consumption chart (one point per minute)
+  const profile = {
+    'sensor.c_wallbox':   h => (h > 1 && h < 4) ? 3600 : 5,
+    'sensor.c_boiler':    h => ((h > 9.5 && h < 10.1) || (h > 21 && h < 21.5)) ? 1950 : 1,
+    'sensor.c_clima':     h => (h > 13 && h < 17.5) ? 650 : (h > 22 || h < 6.5) ? 380 : 20,
+    'sensor.c_lavatrice': h => (h > 15 && h < 16.4) ? 450 + 1500 * (h > 15.1 && h < 15.4) : 5,
+    'sensor.c_studio':    h => (h > 8 && h < 18.5) ? 110 : 15,
+    'sensor.c_autoclave': h => (Math.floor(h * 4) % 9 === 0) ? 800 : 2,
+    'sensor.c_cucina':    h => (h > 7.6 && h < 7.9) ? 900 : (h > 12 && h < 12.6) ? 1600 : (h > 19.5 && h < 20.4) ? 1700 : 2,
+    'sensor.c_frigo':     h => (Math.floor(h * 3) % 2) ? 85 : 4,
+  };
+  const kwEntities = { 'sensor.c_boiler': 1, 'sensor.c_cucina': 1 };
+  const hass = {
+    states,
+    callService: async () => {},
+    callWS: async (msg) => {
+      const start = Date.parse(msg.start_time), end = Date.parse(msg.end_time), out = {};
+      for (const id of msg.entity_ids) {
+        const pts = [];
+        for (let t = start; t <= end; t += 60000) {
+          const d = new Date(t), h = d.getHours() + d.getMinutes() / 60;
+          let v;
+          if (id === 'sensor.load_power') v = 260 + Object.values(profile).reduce((a, f) => a + f(h), 0);
+          else v = profile[id] ? profile[id](h) : 0;
+          pts.push({ s: String(kwEntities[id] ? v / 1000 : v), lu: t / 1000 });
+        }
+        out[id] = pts;
+      }
+      return out;
+    },
+  };
+
+  const base = {
+    card_title: 'Flusso Energia', inverter_name: 'Deye',
+    pv_total_power: 'sensor.pv_power', pv1_power: 'sensor.pv1_power', pv2_power: 'sensor.pv2_power',
+    grid_active_power: 'sensor.grid_power', consump: 'sensor.load_power',
+    battery_soc: 'sensor.battery_soc', battery_power: 'sensor.battery_power', battery_current: 'sensor.battery_current', battery_voltage: 'sensor.battery_voltage',
+    inv_temp: 'sensor.inverter_temp', today_pv: 'sensor.today_pv', today_batt_chg: 'sensor.today_batt_chg', batt_dis: 'sensor.today_batt_dis',
+    grid_import_energy: 'sensor.today_import', grid_export_energy: 'sensor.today_export', today_load: 'sensor.today_load',
+    battery_cap_unit: 'kwh', battery_full_wh: 16, pv_max_power: 6000, inverter_max_power: 6000,
+    grid_status_entity: 'binary_sensor.grid', grid_switch_to_off: 'switch.off_grid', grid_switch_to_on: 'switch.on_grid',
+    ems_mode_entity: 'select.ems_mode',
+    _show_energy_supply: true, _show_backup_panel: true, _show_battery_stats: false, _daily_tiles_extended: true,
+    _show_consumers: true,
+    consumers: [
+      ['Wallbox', 'c_wallbox', 'mdi:ev-station', '#29c4f6'], ['Boiler', 'c_boiler', 'mdi:water-boiler', '#f85149'],
+      ['Clima', 'c_clima', 'mdi:snowflake', '#22d3ee'], ['Lavatrice', 'c_lavatrice', 'mdi:washing-machine', '#a78bfa'],
+      ['Studio', 'c_studio', 'mdi:monitor', '#84cc16'], ['Autoclave', 'c_autoclave', 'mdi:water-pump', '#14b8a6'],
+      ['Cucina', 'c_cucina', 'mdi:chef-hat', '#facc15'], ['Frigo', 'c_frigo', 'mdi:fridge', '#ec4899'],
+    ].map(([name, e, icon, color]) => ({ name, entity: 'sensor.' + e, icon, color })),
+    _show_ventilation: true, vent_state_entity: 'sensor.fan_state', vent_ambient_temp: 'sensor.room_temp', vent_pwm: 'sensor.fan_pwm',
+    vent_dc_temp: 'sensor.dc_temp',
+    vent_fans: [{ name: 'FAN1', entity: 'sensor.fan1' }, { name: 'FAN2', entity: 'sensor.fan2' }, { name: 'FAN3', entity: 'sensor.fan3' }],
+  };
+
+  const scenes = {
+    // whole card with every section
+    overview: base,
+    // classic JK BMS stat tiles visible, no extra sections
+    bms: { ...base, _show_battery_stats: true, _daily_tiles_extended: false, _show_backup_panel: false, _show_energy_supply: false,
+      _show_consumers: false, _show_ventilation: false, ems_mode_entity: '',
+      battery_temp1: 'sensor.jk_temp1', battery_temp2: 'sensor.jk_temp2', battery_mos: 'sensor.jk_mos',
+      battery_min_cell: 'sensor.jk_cellmin', battery_max_cell: 'sensor.jk_cellmax', total_pv_gen_entity: 'sensor.total_pv' },
+  };
+  const scene = (location.hash || '#overview').slice(1);
+  const card = document.createElement('f-flow-card');
+  card.setConfig(scenes[scene] || base);
+  document.getElementById('host').appendChild(card);
+  card.hass = hass;
+  window._card = card;
+  window._hass = hass;
+</script>
+</body>
+</html>
