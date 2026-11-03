@@ -7,7 +7,7 @@
 [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
 [![Release](https://img.shields.io/github/v/release/fabiustek/f-flow-card)](https://github.com/fabiustek/f-flow-card/releases)
 
-Versione attuale: **v1.11.1** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
+Versione attuale: **v1.12.0** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/card-overview.png" alt="F-Flow Card con tutte le sezioni attive" width="480">
@@ -41,6 +41,7 @@ Versione attuale: **v1.11.1** · Fork di [k-flow-card](https://github.com/thekha
 - [Esempio completo](#esempio-completo)
 - [Riferimento delle opzioni](#riferimento-delle-opzioni)
 - [Logica dei colori](#logica-dei-colori)
+- [Prestazioni e modalità leggera](#prestazioni-e-modalità-leggera)
 - [Aggiornamenti](#aggiornamenti)
 - [Risoluzione dei problemi](#risoluzione-dei-problemi)
 - [Registro delle modifiche](#registro-delle-modifiche)
@@ -477,6 +478,7 @@ Tutte le opzioni si impostano dall'editor visuale; qui trovi le chiavi YAML corr
 | `inverter_name` | `''` | Nome nel riquadro dell'inverter e nel titolo dei riquadri giornalieri |
 | `inverter_image` | `''` | URL di un'immagine al posto del riquadro INV (es. `/local/inverter.png`) |
 | `ems_mode_entity` | `''` | Modalità EMS: badge nel cielo; se è un `select`/`input_select`, tenendolo premuto si cambia |
+| `performance_mode` | `normal` | `normal`, `light` (modalità leggera) o `auto` (leggera solo su dispositivi lenti / "riduci movimento") |
 | `background_opacity` | `100` | Opacità dello sfondo della card (0–100 %) |
 | `background_blur` | `false` | Sfoca ciò che sta dietro la card (vetro smerigliato) |
 | `weather_entity` | `''` | Entità meteo per le animazioni del cielo |
@@ -647,11 +649,34 @@ Nella sezione Etichette la scelta di un'entità alternativa si sblocca solo dopo
 
 ---
 
+## Prestazioni e modalità leggera
+
+Dalla v1.12.0 la card è molto più leggera, **senza cambiare l'aspetto**:
+- si aggiorna solo quando cambia uno dei **suoi** sensori (Home Assistant le segnala ogni cambiamento della casa), al massimo una volta al secondo;
+- le animazioni usano il motore nativo del browser invece delle vecchie animazioni SVG, che obbligavano a ricalcolare tutta la card a ogni fotogramma;
+- stelle e meteo esistono solo quando servono (prima giravano anche nascosti);
+- quando la card **non si vede** (pagina scorsa, altra scheda del browser, vista nascosta) si mette in pausa, video compreso;
+- la videocamera si collega solo quando la sua sezione è aperta.
+
+Misure su un telefono di fascia bassa simulato (processore 6 volte più lento, 20 aggiornamenti al secondo da Home Assistant):
+
+| Scenario | v1.11.1 | v1.12.0 normale | v1.12.0 leggera |
+|---|---|---|---|
+| Giorno, tutte le sezioni aperte | 4 fps | 40 fps | 58 fps |
+| Giorno con pioggia, menu a schede chiuso | 4 fps | 59 fps | 60 fps |
+| Notte stellata, menu a schede chiuso | 30 fps | 58 fps | 60 fps |
+| Card fuori dallo schermo | 4 fps (consumava come visibile) | 60 fps (quasi nessun consumo) | 60 fps |
+
+**Modalità leggera** — per tablet a muro datati o telefoni lenti. In **🎨 Layout e intestazione** → **Prestazioni**:
+- **Normale** (predefinita): tutte le animazioni.
+- **Leggera**: restano i **flussi animati** (sole, batteria, rete, casa, wallbox); spariscono bagliori, animazioni decorative (stelle che brillano, nuvole e pioggia in movimento, pulsazioni, scia nella batteria, dischi e ventole), la goccia del menu a schede (resta una pillola evidenziata) e lo sfondo sfocato; la card si aggiorna ogni 3 secondi e i grafici ogni 15 minuti.
+- **Automatica**: leggera solo sui dispositivi lenti (pochi processori o poca memoria) o con l'impostazione di sistema "riduci movimento", normale sugli altri. Utile se la stessa plancia si apre da dispositivi diversi.
+
 ## Aggiornamenti
 
 A ogni nuova versione viene creata automaticamente una **release** su GitHub e HACS ti propone l'aggiornamento in Home Assistant. Dopo l'aggiornamento ricarica il browser con `Ctrl + Shift + R`.
 
-Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.11.1**.
+Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.12.0**.
 
 ### Icona nella notifica di aggiornamento
 
@@ -703,6 +728,11 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 - Controlla il sensore **Potenza wallbox**: è l'unico necessario. Senza **Stato wallbox**, la card mostra "IN CARICA" solo quando la potenza supera 50 W, altrimenti "IN ATTESA".
 - Se hai configurato lo stato ma il valore non è tra quelli riconosciuti (vedi [Auto elettrica / Wallbox](#auto-elettrica--wallbox)), la card mostra "SCOLLEGATA": in quel caso lascia vuoto lo stato.
 
+**La dashboard è lenta o il dispositivo scalda**
+- Aggiorna almeno alla v1.12.0, che è molto più leggera a parità di aspetto.
+- Sui dispositivi poco potenti imposta **Prestazioni → Leggera** (o **Automatica**) in **🎨 Layout e intestazione**.
+- La videocamera in diretta è la parte più pesante: se serve solo ogni tanto, usa **Solo immagine**.
+
 **Una sezione si apre sempre chiusa (o sempre aperta)**
 - Dipende dal flag **📌** accanto al titolo della sezione: spuntato = sempre aperta, senza spunta = chiusa a ogni ricaricamento. Il flag è salvato su ogni dispositivo separatamente; in una finestra in incognito non viene ricordato.
 
@@ -741,6 +771,10 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 ---
 
 ## Registro delle modifiche
+
+### v1.12.0
+- **Card molto più leggera a parità di aspetto**: aggiornamenti solo quando cambiano i suoi sensori (massimo uno al secondo), animazioni sul motore nativo del browser, stelle e meteo solo quando servono, pausa automatica quando la card non si vede, videocamera collegata solo con la sezione aperta. Su un telefono lento simulato: da 4 a 40–60 fotogrammi al secondo.
+- Nuova opzione **Prestazioni**: Normale, **Leggera** (per dispositivi poco potenti) o Automatica.
 
 ### v1.11.1
 - Badge EMS: un po' di spazio a destra, il bordo non tocca più il testo.
@@ -828,6 +862,7 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 
 - Il codice è tutto in `dist/f-flow-card.js`: `FFlowCardEditor` (editor visuale) e `FFlowCard` (la card). La parte statica si costruisce in `_buildStaticSVG()` a ogni cambio di configurazione; i valori si aggiornano in `_updateDynamic()` e `_updateExtraSections()` a ogni aggiornamento di `hass`.
 - La versione è nella costante `FFC_VERSION` in cima al file. Quando cambia su `main`, l'azione `.github/workflows/release.yml` crea la release `vX.Y.Z` che HACS usa per gli aggiornamenti.
+- Le prestazioni si misurano con `node tools/perf/bench.js` (Chromium con processore 6× più lento e 20 aggiornamenti al secondo; con un secondo argomento JSON si provano opzioni, es. `'{"performance_mode":"light"}'`).
 - Le immagini del README si rigenerano con:
   ```bash
   node tools/screenshots/shoot.js
@@ -837,4 +872,4 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 
 ---
 
-*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.11.1*
+*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.12.0*
