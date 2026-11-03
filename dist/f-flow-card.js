@@ -3110,6 +3110,7 @@ class FFlowCard extends HTMLElement {
       .ct::after{content:'';flex:1;height:1px;background:#21262d}
       .ffc.lite svg *{filter:none!important}
       .ffc.lite .tgoo{display:none}
+      .ffc.lite #arcSunGlow1,.ffc.lite #arcSunGlow2{display:none}
       .ffc.lite .tab.on{background:rgba(76,98,217,.25);border-color:#a8c1ff;box-shadow:0 0 6px rgba(143,180,255,.45)}
       .ffc.lite .tab{transition:none}
       .ffc.lite .vico{animation:none!important}
