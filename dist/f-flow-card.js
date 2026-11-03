@@ -1,5 +1,18 @@
-// f-flow-card.js – Unified Edition v1.11.1
-const FFC_VERSION = '1.11.1';
+// f-flow-card.js – Unified Edition v1.12.0
+const FFC_VERSION = '1.12.0';
+// Changes v1.12.0 (performance — measured with tools/perf/bench.js, CPU 6× slower, 20 hass updates/s):
+//   PERF – hass updates are ignored unless one of the card's entities changed, and rendering is
+//           throttled to once per second (every 3 s in light mode).
+//   PERF – Weather and star layers are only in the DOM while needed (their SMIL animations used to run
+//           hidden: 150 of 211 animations were invisible).
+//   PERF – Everything pauses while the card is not visible (scrolled away, other tab, hidden view):
+//           SVG animations, the JS loop and the camera stream.
+//   PERF – SVG animations run through the Web Animations API (converted from the SMIL markup at
+//           insertion): Chrome no longer re-styles the whole card on every animation tick.
+//   PERF – JS animation loop at ~30 fps, only for visible meters/fans/ring, stops when nothing moves.
+//   PERF – Camera stream only while its section/tab is open and visible.
+//   NEW  – performance_mode: normal | light | auto. Light keeps the animated flows but drops glows,
+//           decorative animations, sky motion, the gooey tab bubble and the background blur.
 // Changes v1.11.1:
 //   FIX  – EMS badge: right padding so the border no longer touches the text.
 //   FIX  – House → wallbox line: grey track always visible (blue dashes only while charging).
@@ -651,6 +664,26 @@ class FFlowCardEditor extends HTMLElement {
       return wrap;
     })();
 
+    // v1.12.0: performance mode
+    const perfSelect = (() => {
+      const wrap = document.createElement('div');
+      wrap.style.marginBottom = '14px';
+      const lbl = document.createElement('div');
+      lbl.className = 'row-label';
+      lbl.textContent = 'Prestazioni';
+      const sel = document.createElement('select');
+      sel.style.cssText = 'width:100%;padding:8px;border-radius:6px;border:1px solid var(--divider-color,rgba(0,0,0,.3));background:var(--input-fill-color,var(--secondary-background-color));color:var(--primary-text-color);font:inherit;';
+      [['normal', 'Normale (tutte le animazioni)'], ['light', 'Leggera (per dispositivi poco potenti)'], ['auto', 'Automatica (leggera su dispositivi lenti o con "riduci movimento")']].forEach(([v, t]) => {
+        const o = document.createElement('option'); o.value = v; o.textContent = t; if ((cfg.performance_mode || 'normal') === v) o.selected = true; sel.appendChild(o);
+      });
+      sel.addEventListener('change', () => this._set('performance_mode', sel.value));
+      const hint = document.createElement('div');
+      hint.style.cssText = 'font-size:.68rem;color:var(--secondary-text-color);margin-top:3px;line-height:1.4;';
+      hint.textContent = 'Leggera: restano i flussi animati; niente bagliori, cielo e meteo fermi, menu senza goccia, aggiornamenti ogni 3 s.';
+      wrap.appendChild(lbl); wrap.appendChild(sel); wrap.appendChild(hint);
+      return wrap;
+    })();
+
     // v1.11.0: which tab opens when the page loads
     const tabStart = (() => {
       const wrap = document.createElement('div');
@@ -676,6 +709,7 @@ class FFlowCardEditor extends HTMLElement {
       switchRow('grid_switch_confirm', 'Chiedi conferma prima di commutare', 'Tieni premuto l’indicatore o il traliccio per commutare', true),
       picker('ems_mode_entity',    'Modalità EMS / di lavoro (badge nel cielo; se è un select, tieni premuto per cambiarla)', true),
       picker('weather_entity',     'Meteo (animazioni nel cielo: nuvole, pioggia, neve, temporale…)', true),
+      perfSelect,
       numberField('background_opacity', 'Opacità dello sfondo della card (0 = trasparente, 100 = pieno)', 0, 100, 5, '%'),
       switchRow('background_blur', 'Sfoca ciò che sta dietro la card', 'Effetto vetro smerigliato quando lo sfondo è trasparente'),
       textField('inverter_image', 'URL immagine inverter (sostituisce il riquadro INV)', '/local/sigenergy-inverter.png'),
@@ -1140,6 +1174,7 @@ class FFlowCard extends HTMLElement {
       grid_icon_style: 'modern',
       sections_order: ['bms', 'inv', 'cons', 'vent', 'stats', 'cam'],
       sections_layout: 'tabs',
+      performance_mode: 'normal',
       background_opacity: 100,
       background_blur: false,
       tabs_start: 'none',
@@ -1180,10 +1215,148 @@ class FFlowCard extends HTMLElement {
 
   setConfig(config) {
     this.config = { ...FFlowCard.getStubConfig(), ...config };
+    this._watch = null;
     this._buildStaticSVG();
+    // the DOM was rebuilt: draw it right away (the hass gate would otherwise wait for a change)
+    if (this._hass) { this._lastRendered = 0; this._paused ? (this._dirty = true) : this._render(); }
   }
 
-  set hass(hass) { this._hass = hass; this._updateDynamic(); this._updateExtraSections(); }
+  set hass(hass) {
+    const prev = this._hass;
+    this._hass = hass;
+    // perf: HA calls this for every state change in the house; skip when none of our entities changed
+    if (prev && this._lastRendered && !this._watchChanged(prev, hass)) return;
+    this._scheduleRender();
+  }
+  // all entity ids referenced by the config (strings and the consumers / fans lists) + the sun
+  _watchIds() {
+    if (this._watch && this._watchCfg === this.config) return this._watch;
+    const ids = new Set(['sun.sun']);
+    const re = /^[a-z_]+\.[a-z0-9_]+$/;
+    const walk = (v) => {
+      if (typeof v === 'string') { if (re.test(v)) ids.add(v); }
+      else if (Array.isArray(v)) v.forEach(walk);
+      else if (v && typeof v === 'object') Object.values(v).forEach(walk);
+    };
+    walk(this.config);
+    this._watchCfg = this.config;
+    return (this._watch = [...ids]);
+  }
+  _watchChanged(prev, next) {
+    if (!prev || !prev.states || !next || !next.states) return true;
+    return this._watchIds().some(id => prev.states[id] !== next.states[id]);
+  }
+  _scheduleRender() {
+    const gap = this._lite() ? 3000 : 1000;
+    const now = Date.now();
+    if (this._paused) { this._dirty = true; return; }
+    const wait = this._lastRendered ? gap - (now - this._lastRendered) : 0;
+    if (wait <= 0) { this._render(); return; }
+    if (!this._renderTimer) this._renderTimer = setTimeout(() => { this._renderTimer = null; if (this._paused) { this._dirty = true; return; } this._render(); }, wait);
+  }
+  _render() {
+    this._lastRendered = Date.now();
+    this._dirty = false;
+    this._updateDynamic();
+    this._updateExtraSections();
+    this._startAnim();
+  }
+
+
+  // ── perf: SMIL → Web Animations ─────────────────────────────────────────
+  // Chrome re-styles the whole shadow tree on every SMIL tick; the same animations run through the
+  // Web Animations API only touch their own element (measured: 20 → 60 fps on a 6× slower CPU).
+  // The markup keeps <animate>/<animateTransform> (readable, and a fallback without el.animate);
+  // this converts them in place, with identical timing, whenever animated content is inserted.
+  _smilToWaapi(scope) {
+    if (!scope || typeof Element === 'undefined' || !Element.prototype.animate) return;
+    scope.querySelectorAll('animate,animateTransform').forEach(a => {
+      const el = a.parentNode;
+      if (!el || el.tagName === 'linearGradient' || el.tagName === 'radialGradient') return;   // gradients stay SMIL
+      const attr = a.getAttribute('attributeName');
+      const dur = parseFloat(a.getAttribute('dur')) * 1000;
+      if (!isFinite(dur) || dur <= 0) return;
+      const delay = (parseFloat(a.getAttribute('begin') || '0') || 0) * 1000;
+      const vals = a.getAttribute('values') ? a.getAttribute('values').split(';') : [a.getAttribute('from'), a.getAttribute('to')];
+      const kt = a.getAttribute('keyTimes') ? a.getAttribute('keyTimes').split(';').map(Number) : null;
+      let frames;
+      const num = (v) => parseFloat(v);
+      if (a.tagName === 'animateTransform') {
+        const t = a.getAttribute('type');
+        const pair = (v) => String(v).trim().split(/[ ,]+/).map(Number);
+        if (t === 'translate') frames = vals.map(v => { const [x, y] = pair(v); return { transform: `translate(${x}px, ${y || 0}px)` }; });
+        else if (t === 'rotate') { el.style.transformBox = 'view-box'; frames = vals.map(v => { const [d, cx, cy] = pair(v); el.style.transformOrigin = `${cx || 0}px ${cy || 0}px`; return { transform: `rotate(${d}deg)` }; }); }
+        else return;
+      } else if (attr === 'stroke-dashoffset') frames = vals.map(v => ({ strokeDashoffset: String(num(v)) }));
+      else if (attr === 'opacity') frames = vals.map(v => ({ opacity: String(num(v)) }));
+      else if (attr === 'r') {
+        // radius pulse → scale around the circle's own centre (works in Safari too)
+        const r0 = num(el.getAttribute('r')) || num(vals[0]) || 1;
+        el.style.transformBox = 'fill-box'; el.style.transformOrigin = 'center';
+        frames = vals.map(v => ({ transform: `scale(${(num(v) / r0).toFixed(4)})` }));
+      } else if (attr === 'y') {
+        const y0 = num(el.getAttribute('y')) || 0;
+        frames = vals.map(v => ({ transform: `translate(0px, ${num(v) - y0}px)` }));
+      } else return;
+      if (kt && kt.length === frames.length) frames.forEach((f, i) => { f.offset = kt[i]; });
+      try {
+        const anim = el.animate(frames, { duration: dur, delay, iterations: Infinity, easing: 'linear' });
+        (el._ffcAnims || (el._ffcAnims = [])).push(anim);
+        if (this._paused) anim.pause();
+        a.remove();
+      } catch (e) { /* keep the SMIL animation */ }
+    });
+  }
+  // change the speed of a (converted or SMIL) animation; seconds
+  _setAnimDur(el, secs) {
+    if (!el) return;
+    if (el._ffcAnims) el._ffcAnims.forEach(an => { const d = secs * 1000; if (Math.abs(an.effect.getTiming().duration - d) > 1) an.effect.updateTiming({ duration: d }); });
+    else { const a = el.querySelector('animate'); if (a) a.setAttribute('dur', secs + 's'); }
+  }
+
+  // ── perf: pause everything while the card is not visible (scrolled away, other tab, hidden view) ──
+  _lite() {
+    const m = this.config.performance_mode || 'normal';
+    if (m === 'light') return true;
+    if (m === 'auto') {
+      try {
+        if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return true;
+        const cores = navigator.hardwareConcurrency || 8, mem = navigator.deviceMemory || 8;
+        return cores <= 4 || mem <= 2;
+      } catch (e) { return false; }
+    }
+    return false;
+  }
+  _setPaused(p) {
+    if (p === !!this._paused) return;
+    this._paused = p;
+    const root = this.shadowRoot;
+    root.querySelectorAll('svg').forEach(svg => { try { p ? svg.pauseAnimations() : svg.unpauseAnimations(); } catch (e) { /* not an outer svg */ } });
+    try { (root.getAnimations ? root.getAnimations() : []).forEach(an => p ? an.pause() : an.play()); } catch (e) { /* older browser */ }
+    const host = root.querySelector('.ffc'); if (host) host.classList.toggle('paused', p);
+    if (p) {
+      if (this._raf) { cancelAnimationFrame(this._raf); this._raf = null; }
+      this._stopCamera();
+    } else {
+      this._startAnim();
+      if (this._dirty || !this._lastRendered) this._render();
+      else this._updateCamera();
+    }
+  }
+  _visibleNow() { return this._inView !== false && !(typeof document !== 'undefined' && document.hidden); }
+  _observeVisibility() {
+    if (!this._io && window.IntersectionObserver) {
+      this._io = new IntersectionObserver((entries) => {
+        this._inView = entries.some(e => e.isIntersecting);
+        this._setPaused(!this._visibleNow());
+      }, { rootMargin: '120px' });
+      this._io.observe(this);
+    }
+    if (!this._visHandler) {
+      this._visHandler = () => this._setPaused(!this._visibleNow());
+      document.addEventListener('visibilitychange', this._visHandler);
+    }
+  }
 
   _val(eid, toWatts = false) {
     if (!eid) return null;
@@ -1320,7 +1493,12 @@ class FFlowCard extends HTMLElement {
   }
 
   _buildPvWaveHTML(bx,by,pvT){
-    if(pvT<=10)return'';const fl=this._flowLevel(pvT,'solar');const sY=by+7;const pD='M '+bx.toFixed(1)+','+sY.toFixed(1)+' C '+bx.toFixed(1)+',85 260,5 260,155';const col='rgba(255,232,60,.95)',gc='rgba(255,190,20,.55)';const dD=(fl.dur*.8).toFixed(2),dL=(8+fl.size*1.5).toFixed(1),gL=(6+fl.size*1.2).toFixed(1),dT=(parseFloat(dL)+parseFloat(gL)).toFixed(1);let h='';h+='<path d="'+pD+'" fill="none" stroke="'+gc+'" stroke-width="6" stroke-dasharray="'+dL+' '+gL+'" stroke-linecap="round" opacity="0.25" filter="url(#arcSunF2)"><animate attributeName="stroke-dashoffset" from="'+dT+'" to="0" dur="'+dD+'s" repeatCount="indefinite" calcMode="linear"/></path>';h+='<path d="'+pD+'" fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="1.8" stroke-dasharray="'+dL+' '+gL+'" stroke-linecap="round"><animate attributeName="stroke-dashoffset" from="'+dT+'" to="0" dur="'+dD+'s" repeatCount="indefinite" calcMode="linear"/></path>';h+='<path d="'+pD+'" fill="none" stroke="'+col+'" stroke-width="1.0" stroke-dasharray="'+dL+' '+gL+'" stroke-linecap="round" opacity="0.85"><animate attributeName="stroke-dashoffset" from="'+dT+'" to="0" dur="'+dD+'s" repeatCount="indefinite" calcMode="linear"/></path>';const wD=[{amp:6,dur:fl.dur*.9,ox:0,op:.9,sc:'rgba(255,255,255,0.92)',dLen:'3.0',dGap:'40.0'},{amp:10,dur:fl.dur*1.1,ox:3,op:.6,sc:col,dLen:'4.5',dGap:'50.0'}];const wc=Math.min(2,Math.max(1,Math.round(fl.count/5)));for(let wi=0;wi<wc;wi++){const w=wD[wi];const sC=Math.round(fl.count*.5),sD=w.dur.toFixed(2),sCy=(parseFloat(w.dLen)+parseFloat(w.dGap)).toFixed(1);for(let si=0;si<sC;si++){const fr=si/sC,ph=fr*Math.PI*2,sY2=(w.amp*Math.sin(ph+wi*1.1)).toFixed(1),sX=(w.ox+w.amp*.3*Math.cos(ph*.5)).toFixed(1),sDe=(fr*w.dur%w.dur).toFixed(3),sO=(w.op*(.5+.5*Math.abs(Math.sin(ph)))*.6).toFixed(2);h+='<g transform="translate('+sX+','+sY2+')"><path d="'+pD+'" fill="none" stroke="'+w.sc+'" stroke-width="1.2" stroke-dasharray="'+w.dLen+' '+w.dGap+'" stroke-linecap="round" opacity="'+sO+'"><animate attributeName="stroke-dashoffset" from="'+sCy+'" to="0" dur="'+sD+'s" begin="-'+sDe+'s" repeatCount="indefinite" calcMode="linear"/></path></g>';}}return h;
+    if(pvT<=10)return'';
+    if(this._lite()){
+      // light mode: one animated dashed line from the sun to the inverter
+      const fl=this._flowLevel(pvT,'solar');const sY=by+7;const pD='M '+bx.toFixed(1)+','+sY.toFixed(1)+' C '+bx.toFixed(1)+',85 260,5 260,155';
+      return '<path d="'+pD+'" fill="none" stroke="#ffe83c" stroke-width="1.8" stroke-dasharray="10 8" stroke-linecap="round"><animate attributeName="stroke-dashoffset" from="18" to="0" dur="'+(fl.dur*.8).toFixed(2)+'s" repeatCount="indefinite"/></path>';
+    }const fl=this._flowLevel(pvT,'solar');const sY=by+7;const pD='M '+bx.toFixed(1)+','+sY.toFixed(1)+' C '+bx.toFixed(1)+',85 260,5 260,155';const col='rgba(255,232,60,.95)',gc='rgba(255,190,20,.55)';const dD=(fl.dur*.8).toFixed(2),dL=(8+fl.size*1.5).toFixed(1),gL=(6+fl.size*1.2).toFixed(1),dT=(parseFloat(dL)+parseFloat(gL)).toFixed(1);let h='';h+='<path d="'+pD+'" fill="none" stroke="'+gc+'" stroke-width="6" stroke-dasharray="'+dL+' '+gL+'" stroke-linecap="round" opacity="0.25" filter="url(#arcSunF2)"><animate attributeName="stroke-dashoffset" from="'+dT+'" to="0" dur="'+dD+'s" repeatCount="indefinite" calcMode="linear"/></path>';h+='<path d="'+pD+'" fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="1.8" stroke-dasharray="'+dL+' '+gL+'" stroke-linecap="round"><animate attributeName="stroke-dashoffset" from="'+dT+'" to="0" dur="'+dD+'s" repeatCount="indefinite" calcMode="linear"/></path>';h+='<path d="'+pD+'" fill="none" stroke="'+col+'" stroke-width="1.0" stroke-dasharray="'+dL+' '+gL+'" stroke-linecap="round" opacity="0.85"><animate attributeName="stroke-dashoffset" from="'+dT+'" to="0" dur="'+dD+'s" repeatCount="indefinite" calcMode="linear"/></path>';const wD=[{amp:6,dur:fl.dur*.9,ox:0,op:.9,sc:'rgba(255,255,255,0.92)',dLen:'3.0',dGap:'40.0'},{amp:10,dur:fl.dur*1.1,ox:3,op:.6,sc:col,dLen:'4.5',dGap:'50.0'}];const wc=Math.min(2,Math.max(1,Math.round(fl.count/5)));for(let wi=0;wi<wc;wi++){const w=wD[wi];const sC=this._lite()?0:Math.round(fl.count*.5),sD=w.dur.toFixed(2),sCy=(parseFloat(w.dLen)+parseFloat(w.dGap)).toFixed(1);for(let si=0;si<sC;si++){const fr=si/sC,ph=fr*Math.PI*2,sY2=(w.amp*Math.sin(ph+wi*1.1)).toFixed(1),sX=(w.ox+w.amp*.3*Math.cos(ph*.5)).toFixed(1),sDe=(fr*w.dur%w.dur).toFixed(3),sO=(w.op*(.5+.5*Math.abs(Math.sin(ph)))*.6).toFixed(2);h+='<g transform="translate('+sX+','+sY2+')"><path d="'+pD+'" fill="none" stroke="'+w.sc+'" stroke-width="1.2" stroke-dasharray="'+w.dLen+' '+w.dGap+'" stroke-linecap="round" opacity="'+sO+'"><animate attributeName="stroke-dashoffset" from="'+sCy+'" to="0" dur="'+sD+'s" begin="-'+sDe+'s" repeatCount="indefinite" calcMode="linear"/></path></g>';}}return h;
   }
 
   // ── v1.3.0: consumers (Utilizzatori) ─────────────────────────────
@@ -1366,7 +1544,6 @@ class FFlowCard extends HTMLElement {
           <linearGradient id="iriG" x1="0" y1="0" x2="1" y2="1">
             <stop offset="0" stop-color="#ff8ad8"/><stop offset=".3" stop-color="#c4a7ff"/><stop offset=".55" stop-color="#7cc4ff"/>
             <stop offset=".8" stop-color="#9ff5ff"/><stop offset="1" stop-color="#ffffff"/>
-            <animateTransform attributeName="gradientTransform" type="rotate" values="0 .5 .5;360 .5 .5" dur="6s" repeatCount="indefinite"/>
           </linearGradient>
           <filter id="iriF" x="-30%" y="-80%" width="160%" height="260%"><feGaussianBlur stdDeviation="1.6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
         </defs>
@@ -1450,12 +1627,14 @@ class FFlowCard extends HTMLElement {
     } else wrap.style.height = next ? '' : '0px';
     if (next === 'cons') this._renderChart();
     if (next === 'stats') this._renderStats();
-    if (next === 'cam') this._updateCamera();
+    this._updateCamera();   // starts the stream when its tab opens, stops it otherwise
+    this._startAnim();      // meters / fans of the opened panel
     this._gooTarget(instant);
   }
 
   // spring-driven gooey indicator: blob A (stiff) leads, blob B (soft) follows → droplet stretch
   _gooTarget(instant) {
+    if (this._lite()) return;
     const root = this.shadowRoot;
     const track = root.getElementById('tTrack'), svg = root.getElementById('tGoo');
     if (!track || !svg) return;
@@ -1575,6 +1754,7 @@ class FFlowCard extends HTMLElement {
         sec.classList.toggle('open', this._secOpen[key]);
         if (this._secOpen[key] && key === 'cons') this._renderChart();
         if (this._secOpen[key] && key === 'stats') this._renderStats();
+        this._updateCamera(); this._startAnim();
       });
       cb.addEventListener('change', () => {
         this._lsSet('pin:' + key, cb.checked ? '1' : '0');
@@ -1657,7 +1837,7 @@ class FFlowCard extends HTMLElement {
     const key = ids.join('|') + '#' + this._chartHours();
     const now = Date.now();
     if (this._histLoading) return;
-    if (this._hist && this._hist.key === key && now - this._hist.fetched < 5 * 60000) return;
+    if (this._hist && this._hist.key === key && now - this._hist.fetched < (this._lite() ? 15 : 5) * 60000) return;
     if (!ids.length) return;
     this._histLoading = true;
     const hours = this._chartHours();
@@ -1870,7 +2050,7 @@ class FFlowCard extends HTMLElement {
     const key = ids.join('|');
     const now = Date.now();
     if (this._statsLoading || !ids.length) return;
-    if (this._stats && this._stats.key === key && now - this._stats.fetched < 5 * 60000) return;
+    if (this._stats && this._stats.key === key && now - this._stats.fetched < (this._lite() ? 15 : 5) * 60000) return;
     this._statsLoading = true;
     const start = now - 24 * 3600000;
     this._hass.callWS({
@@ -2190,11 +2370,18 @@ class FFlowCard extends HTMLElement {
     this._hass.callService(domain, service, { entity_id: eid });
   }
 
+  _stopCamera() {
+    const view = this.shadowRoot && this.shadowRoot.getElementById('camView');
+    if (view && this._camEl) { view.innerHTML = ''; }
+    this._camEl = null; this._camToken = null;
+  }
   _updateCamera() {
     if (!this._cameraEnabled() || !this._hass) return;
     const root = this.shadowRoot;
     const view = root.getElementById('camView'), off = root.getElementById('camOff');
     if (!view) return;
+    // perf: no stream while the section is closed / its tab is not selected / the card is not visible
+    if (this._paused || view.offsetParent === null) { this._stopCamera(); return; }
     const eid = this.config.camera_entity;
     const st = this._hass.states[eid];
     const ok = st && st.state !== 'unavailable';
@@ -2292,14 +2479,23 @@ class FFlowCard extends HTMLElement {
         <animate attributeName="opacity" values="0;0;1;0;1;0;0" keyTimes="0;.7;.72;.74;.76;.8;1" dur="5s" repeatCount="indefinite"/></path>
       <rect x="-16" y="0" width="536" height="100" fill="#fff" opacity="0">
         <animate attributeName="opacity" values="0;0;.22;0;.15;0;0" keyTimes="0;.7;.72;.74;.76;.8;1" dur="5s" repeatCount="indefinite"/></rect>`;
+    // perf: the layers are only put in the DOM when they are needed (see _updateSky) — SMIL
+    // animations keep running even inside hidden groups, so hidden layers used to cost a lot
+    const lite = this._lite();
+    const strip = (h) => lite ? h.replace(/<animate(Transform)?\b[^>]*\/>|<animate(Transform)?\b[^>]*>[\s\S]*?<\/animate(Transform)?>/g, '') : h;
+    this._skyParts = { skyStars: strip(stars), wxFog: lite ? '' : fog, wxClouds: strip(clouds), wxRain: lite ? '' : rain, wxSnow: lite ? '' : snow, wxWind: lite ? '' : wind, wxBolt: lite ? '' : bolt };
+    if (lite) {
+      // light mode: clouds parked at fixed spots instead of drifting
+      this._skyParts.wxClouds = this._skyParts.wxClouds.replace(/<g class="wxCloud c(\d)" opacity="0"><g>/g, (m, i) => `<g class="wxCloud c${i}" opacity="0"><g transform="translate(${[40, 300, 150, 420][i]} 0)">`);
+    }
     return `<g clip-path="url(#skyClip)">
-      <g id="skyStars" opacity="0" style="transition:opacity 2s">${stars}</g>
-      <g id="wxFog" style="display:none">${fog}</g>
-      <g id="wxClouds">${clouds}</g>
-      <g id="wxRain" style="display:none">${rain}</g>
-      <g id="wxSnow" style="display:none">${snow}</g>
-      <g id="wxWind" style="display:none">${wind}</g>
-      <g id="wxBolt" style="display:none">${bolt}</g>
+      <g id="skyStars" opacity="0" style="transition:opacity 2s"></g>
+      <g id="wxFog"></g>
+      <g id="wxClouds"></g>
+      <g id="wxRain"></g>
+      <g id="wxSnow"></g>
+      <g id="wxWind"></g>
+      <g id="wxBolt"></g>
     </g>`;
   }
 
@@ -2313,9 +2509,18 @@ class FFlowCard extends HTMLElement {
     const cloudy = { 'partlycloudy': 2, 'cloudy': 4, 'rainy': 4, 'pouring': 4, 'snowy': 3, 'snowy-rainy': 4, 'lightning': 4, 'lightning-rainy': 4, 'hail': 4, 'fog': 2, 'windy': 1, 'windy-variant': 3, 'exceptional': 3 };
     const nClouds = cloudy[wx] || 0;
     const dark = /rain|pouring|lightning|hail|snowy-rainy/.test(wx);
-    const show = (id, on) => { const e = g(id); if (e) e.style.display = on ? '' : 'none'; };
+    // perf: fill a layer only while it is needed, empty it otherwise
+    const parts = this._skyParts || {};
+    const show = (id, on) => {
+      const e = g(id); if (!e) return;
+      const has = e.childElementCount > 0;
+      if (on && !has && parts[id]) { e.innerHTML = parts[id]; this._smilToWaapi(e); }
+      else if (!on && has) e.innerHTML = '';
+    };
     // stars: at night, hidden (or faint) when the sky is overcast
     const starOp = !sun.night ? 0 : nClouds >= 4 ? 0.12 : nClouds >= 2 ? 0.55 : 1;
+    show('skyStars', starOp > 0);
+    show('wxClouds', nClouds > 0);
     g('skyStars').setAttribute('opacity', String(starOp));
     root.querySelectorAll('.wxCloud').forEach((c, i) => {
       c.setAttribute('opacity', i < nClouds ? (dark ? '.95' : sun.night ? '.55' : '.8') : '0');
@@ -2400,22 +2605,34 @@ class FFlowCard extends HTMLElement {
     if (this._statsEnabled()) this._renderStats();
   }
 
-  connectedCallback() { this._connected = true; this._startAnim(); }
-  disconnectedCallback() { this._connected = false; if (this._raf) cancelAnimationFrame(this._raf); this._raf = null; }
+  connectedCallback() { this._connected = true; this._observeVisibility(); this._startAnim(); }
+  disconnectedCallback() {
+    this._connected = false;
+    if (this._raf) cancelAnimationFrame(this._raf); this._raf = null;
+    if (this._io) { this._io.disconnect(); this._io = null; }
+    if (this._visHandler) { document.removeEventListener('visibilitychange', this._visHandler); this._visHandler = null; }
+    if (this._renderTimer) { clearTimeout(this._renderTimer); this._renderTimer = null; }
+    this._stopCamera();
+  }
 
   _startAnim() {
-    if (this._raf || this._connected === false) return;
+    if (this._raf || this._connected === false || this._paused || this._lite()) return;
     if (!this.config._show_consumers && !this.config._show_ventilation && this.config.home_icon_style === 'classic') return;
     let last = performance.now();
+    const shown = (el) => el && el.offsetParent !== null;   // inside a closed section / hidden tab → skip
     const tick = (now) => {
+      // perf: ~30 fps is plenty for meter discs, fans and the ring
+      if (now - last < 32) { this._raf = requestAnimationFrame(tick); return; }
       const dt = Math.min(0.1, (now - last) / 1000); last = now;
       const sp = this._spin || { meters: {}, fans: {} };
       const root = this.shadowRoot;
+      let moving = false;
       for (const id in sp.meters) {
         const m = sp.meters[id];
         m.a = (m.a + m.rps * dt * Math.PI * 2) % (Math.PI * 2);
         const el = root.getElementById(id);
-        if (!el) continue;
+        if (!m.rps || !shown(el)) continue;
+        moving = true;
         // Ferraris disc seen edge-on: the mark crosses the window on the front half, hidden on the back
         const front = Math.cos(m.a);
         el.style.left = (50 + 46 * Math.sin(m.a)).toFixed(2) + '%';
@@ -2425,16 +2642,22 @@ class FFlowCard extends HTMLElement {
       for (const id in (sp.rings || {})) {
         // dashed rings: offset in px/s, so the ring turns faster with more power
         const r = sp.rings[id];
+        if (!r.pps) continue;
         r.off = (r.off - r.pps * dt) % 1000;
         const el = root.getElementById(id);
-        if (el) el.style.strokeDashoffset = r.off.toFixed(1);
+        if (el) { el.style.strokeDashoffset = r.off.toFixed(1); moving = true; }
       }
       for (const id in sp.fans) {
         const f = sp.fans[id];
-        f.a = (f.a + f.rps * dt * 360) % 360;
+        if (!f.rps) continue;
         const el = root.getElementById(id);
-        if (el) el.setAttribute('transform', 'rotate(' + f.a.toFixed(1) + ')');
+        if (!shown(el && el.ownerSVGElement)) continue;
+        f.a = (f.a + f.rps * dt * 360) % 360;
+        el.setAttribute('transform', 'rotate(' + f.a.toFixed(1) + ')');
+        moving = true;
       }
+      // nothing visible is moving: stop; the next update or a section opening restarts the loop
+      if (!moving) { this._raf = null; return; }
       this._raf = requestAnimationFrame(tick);
     };
     this._raf = requestAnimationFrame(tick);
@@ -2709,7 +2932,7 @@ class FFlowCard extends HTMLElement {
     const bgPct = this.config.background_opacity === undefined || this.config.background_opacity === '' ? 100 : Number(this.config.background_opacity);
     const bgA = Math.max(0, Math.min(100, isFinite(bgPct) ? bgPct : 100)) / 100;
     const bgCss = `rgba(22,27,34,${bgA.toFixed(2)})`;
-    const bgBlur = this.config.background_blur && bgA < 1 ? 'backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);' : '';
+    const bgBlur = this.config.background_blur && bgA < 1 && !this._lite() ? 'backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);' : '';
     const invImage    = this.config.inverter_image ? esc(this.config.inverter_image) : '';
     const showSupply  = !!(this.config._show_energy_supply);
     const showBackup  = !!(this.config._show_backup_panel);
@@ -2885,6 +3108,12 @@ class FFlowCard extends HTMLElement {
       .dv{height:1px;background:#21262d;margin:8px 0}
       .ct{font-size:.68rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#8b949e;margin-bottom:10px;display:flex;align-items:center;gap:7px}
       .ct::after{content:'';flex:1;height:1px;background:#21262d}
+      .ffc.lite svg *{filter:none!important}
+      .ffc.lite .tgoo{display:none}
+      .ffc.lite #arcSunGlow1,.ffc.lite #arcSunGlow2{display:none}
+      .ffc.lite .tab.on{background:rgba(76,98,217,.25);border-color:#a8c1ff;box-shadow:0 0 6px rgba(143,180,255,.45)}
+      .ffc.lite .tab{transition:none}
+      .ffc.lite .vico{animation:none!important}
       .tabs{position:relative;margin:2px -6px 4px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
       .tabs::-webkit-scrollbar{display:none}
       .tabs{-webkit-mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 22px),transparent);mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 22px),transparent)}
@@ -3020,7 +3249,7 @@ class FFlowCard extends HTMLElement {
       .vk .l{font-size:.6rem;color:#8b949e;letter-spacing:1px;text-transform:uppercase;margin-top:1px}
       .vfi{display:flex;align-items:center;justify-content:center;gap:3px;color:#8b949e}
     </style>
-    <div class="ffc" style="position:relative;background:${bgCss};${bgBlur}border:1px solid rgba(48,54,61,${Math.max(0.25, bgA).toFixed(2)});border-radius:12px;padding:13px;box-shadow:0 4px 20px rgba(0,0,0,${(0.4 * bgA).toFixed(2)});width:100%;box-sizing:border-box;">
+    <div class="ffc${this._lite() ? ' lite' : ''}" style="position:relative;background:${bgCss};${bgBlur}border:1px solid rgba(48,54,61,${Math.max(0.25, bgA).toFixed(2)});border-radius:12px;padding:13px;box-shadow:0 4px 20px rgba(0,0,0,${(0.4 * bgA).toFixed(2)});width:100%;box-sizing:border-box;">
       ${this._gridSwitchEnabled() ? `<div class="gmodal" id="gridModal">
         <div class="gbox">
           <svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -3209,6 +3438,12 @@ class FFlowCard extends HTMLElement {
     this._bindEms();
     this._bindSections();
     this._bindTabs();
+    if (this._lite()) {
+      const keep = '#flowBattIn,#flowBattOut,#flowGridIn,#flowGridOut,#flowInvLoad,#flowHomeEV,#pvFlowGroup';
+      this.shadowRoot.querySelectorAll('animate,animateTransform,animateMotion').forEach(a => { if (!a.closest(keep)) a.remove(); });
+    }
+    this._smilToWaapi(this.shadowRoot);
+    if (this._paused) this._setPaused(true);   // keep a rebuilt DOM paused while hidden
     this._bindChartHours();
     this._bindCamera();
   }
@@ -3314,14 +3549,14 @@ class FFlowCard extends HTMLElement {
     if (pvTotal !== this._prevPvTotal || sun.bx !== this._prevSunPos.bx || sun.by !== this._prevSunPos.by) {
       this._prevPvTotal = pvTotal; this._prevSunPos = { bx: sun.bx, by: sun.by };
       const pvGroup = getEl('pvFlowGroup');
-      if (pvGroup) pvGroup.innerHTML = this._buildPvWaveHTML(sun.bx, sun.by, pvTotal);
+      if (pvGroup) { pvGroup.innerHTML = this._buildPvWaveHTML(sun.bx, sun.by, pvTotal); this._smilToWaapi(pvGroup); }
     }
 
     const flowDur = (w) => Math.max(0.5, 3.0 - (Math.min(Math.abs(w), 8000) / 8000) * 2.5).toFixed(2) + 's';
     const setFlow = (id, show, watts, durStr, color) => {
       const el = getEl(id); if (!el) return;
       el.setAttribute('opacity', show ? '1' : '0'); el.style.display = show ? '' : 'none';
-      if (show && durStr !== undefined) { const anim = el.querySelector('animate'); if (anim) anim.setAttribute('dur', durStr); }
+      if (show && durStr !== undefined) this._setAnimDur(el, parseFloat(durStr));
       if (color !== undefined) el.setAttribute('stroke', color);
     };
 
@@ -3379,7 +3614,10 @@ class FFlowCard extends HTMLElement {
       if (wires) {
         wires.setAttribute('opacity', Math.abs(gridActive) > 10 ? '1' : '0');
         // dots run toward the tower when importing, away from it when exporting
-        wires.querySelectorAll('animate').forEach(a => { a.setAttribute('from', gridActive > 10 ? '-34' : '0'); a.setAttribute('to', gridActive > 10 ? '0' : '-34'); });
+        wires.querySelectorAll('path').forEach(pth => {
+          if (pth._ffcAnims) pth._ffcAnims.forEach(an => { an.playbackRate = gridActive > 10 ? -1 : 1; });
+          else pth.querySelectorAll('animate').forEach(a => { a.setAttribute('from', gridActive > 10 ? '-34' : '0'); a.setAttribute('to', gridActive > 10 ? '0' : '-34'); });
+        });
       }
     } else if (gridImg) { gridImg.style.opacity = Math.abs(gridActive) < 10 ? '0.4' : '1'; gridImg.setAttribute('filter', Math.abs(gridActive) >= 50 ? 'url(#iconGlowOrange)' : ''); }
     const homeImg = getEl('homeIconImg');
