@@ -1,5 +1,16 @@
-// f-flow-card.js – Unified Edition v1.14.0
-const FFC_VERSION = '1.14.0';
+// f-flow-card.js – Unified Edition v1.14.1
+const FFC_VERSION = '1.14.1';
+// Changes v1.14.1:
+//   FIX  – Tab bar scrolls with the mouse wheel and by dragging on desktop (it had no scrollbar).
+//   FIX  – Ricarica EV: OCPP availability is informational only and no longer blocks the command
+//           (with JuiceBox it is off while the car is plugged in); blocked only if the charge switch
+//           is unavailable in HA.
+//   FIX  – Ricarica EV: the surplus split value is the home-battery share (0% = all to the car).
+//   NEW  – Ricarica EV: bubble bar redrawn after the owner's reference video: dense glossy bubbles,
+//           continuous SOC colour ramp (red → orange → amber → lime → green → aqua) with a horizontal
+//           gradient, soft front, fill-up intro with counting % when the tab opens (not in light mode).
+//   PERF – Ricarica EV: reveal by transforms, twinkles on composited layers, DOM written only on change,
+//           widths from a ResizeObserver (no forced layout on each update).
 // Changes v1.14.0:
 //   NEW  – "Ricarica EV" section/tab for an (OCPP) wallbox: status in Italian, SOC-coloured bubble bar,
 //           session KPIs, protected start/stop (hold 1 s + confirm, one single command, button locked
@@ -960,7 +971,7 @@ class FFlowCardEditor extends HTMLElement {
     shell.appendChild(makeSection('evc', '⚡', 'Ricarica EV', [
       textField('evc_car_name', 'Nome dell’auto (es. BYD Dolphin Surf)', ''),
       picker('evc_charge_switch', 'Comando ricarica (es. switch.juicebox_charge_control)', true),
-      picker('evc_availability', 'Disponibilità wallbox (es. switch.juicebox_availability)', true),
+      picker('evc_availability', 'Disponibilità OCPP, solo informativa (es. switch.juicebox_availability)', true),
       picker('evc_status', 'Stato del connettore OCPP (es. sensor.juicebox_status_connector)', true),
       numberField('evc_confirm_timeout', 'Attesa massima della conferma dalla wallbox', 10, 300, 5, 's'),
       divider(),
@@ -975,7 +986,7 @@ class FFlowCardEditor extends HTMLElement {
       divider(),
       picker('evc_pv_auto', 'Carica intelligente FV (es. input_boolean.wb_pv_auto)', true),
       picker('evc_pause_enabled', 'Pausa sotto 6 A (es. input_boolean.wb_pause_enabled)', true),
-      picker('evc_share', 'Ripartizione surplus auto / casa (es. input_number.wb_battery_share_pct)', true),
+      picker('evc_share', 'Quota del surplus all’accumulo di casa, 0% = tutto all’auto (es. input_number.wb_battery_share_pct)', true),
       picker('evc_max_current', 'Corrente massima manuale (es. number.juicebox_maximum_current)', true),
       picker('evc_offered_current', 'Corrente offerta dalla wallbox (es. sensor.juicebox_current_offered)', true),
       numberField('evc_phases', 'Fasi (1 = monofase, 3 = trifase), per passare da A a W', 1, 3, 2),
@@ -1857,7 +1868,7 @@ class FFlowCard extends HTMLElement {
       // Ricarica EV
       evc_car_name: 'Nome mostrato sotto lo stato della ricarica (es. BYD Dolphin Surf). Facoltativo.',
       evc_charge_switch: 'Switch che avvia e ferma la ricarica (es. switch.juicebox_charge_control). Per proteggere la wallbox: si tiene premuto il pulsante 1 secondo, si conferma, la card manda UN solo comando (turn_on per avviare, turn_off per fermare) e blocca il pulsante finché lo switch non resta stabile nello stato richiesto (conferma della box) o finché scade l’attesa massima.',
-      evc_availability: 'Switch o sensore che dice se la wallbox è disponibile. Quando è spento il comando di ricarica è bloccato.',
+      evc_availability: 'Facoltativo e solo informativo: mostra lo stato di disponibilità OCPP tra le informazioni della wallbox. Non blocca il comando: con JuiceBox spesso è spento quando l’auto è collegata. Il comando viene bloccato solo se Comando ricarica è non disponibile in Home Assistant.',
       evc_status: 'Stato del connettore secondo OCPP (Available, Preparing, Charging, SuspendedEV, SuspendedEVSE, Finishing, Faulted…), mostrato in italiano. Se vuoto, lo stato si ricava dalla potenza.',
       evc_confirm_timeout: 'Dopo un comando di avvio o stop, per quanti secondi al massimo la card aspetta la conferma della wallbox prima di sbloccare il pulsante (predefinito 60).',
       evc_power: 'Potenza della ricarica in W o kW. Meglio un sensore che si aggiorna spesso (es. sensor.consumi_wallbox). Serve per il grafico della sessione e l’elenco delle ultime ricariche.',
@@ -1870,7 +1881,7 @@ class FFlowCard extends HTMLElement {
       evc_consumption: 'Consumo medio dell’auto in kWh ogni 100 km (es. 14): con l’energia della sessione calcola i km di autonomia aggiunti.',
       evc_pv_auto: 'Interruttore della carica intelligente: la corrente segue la produzione fotovoltaica (comandata dal tuo script). Mentre è acceso il cursore della corrente manuale è bloccato.',
       evc_pause_enabled: 'Interruttore che permette di mettere in pausa la ricarica quando il fotovoltaico non basta per i 6 A minimi.',
-      evc_share: 'input_number con la percentuale del surplus da dare all’auto (il resto va all’accumulo di casa). Nella card è una barra divisa in due da trascinare.',
+      evc_share: 'input_number con la percentuale del surplus che va all’accumulo di casa (il resto va all’auto): 0% = tutto all’auto, 100% = tutto alla batteria di casa. Nella card è una barra divisa in due da trascinare.',
       evc_max_current: 'number della corrente massima di ricarica in A. Nella card è un cursore con A e W; il valore viene inviato solo quando lasci il cursore, per non intasare la wallbox.',
       evc_offered_current: 'Corrente che la wallbox sta offrendo all’auto in questo momento (A), mostrata accanto al cursore.',
       evc_phases: 'Numero di fasi della ricarica: 1 per monofase, 3 per trifase. Serve per passare da ampere a watt.',
@@ -1966,7 +1977,39 @@ class FFlowCard extends HTMLElement {
     const track = root.getElementById('tTrack');
     if (!track) return;
     const keys = [...root.querySelectorAll('.tab[data-k]')].map(b => b.dataset.k);
-    root.querySelectorAll('.tab[data-k]').forEach(b => b.addEventListener('click', () => this._tabSelect(b.dataset.k)));
+    root.querySelectorAll('.tab[data-k]').forEach(b => b.addEventListener('click', (e) => {
+      if (this._tabDragged) { this._tabDragged = false; e.preventDefault(); return; }
+      this._tabSelect(b.dataset.k);
+    }));
+    // desktop: the bar has no visible scrollbar, so scroll it with the mouse wheel and by dragging
+    const sc = root.getElementById('tScroll');
+    if (sc) {
+      sc.addEventListener('wheel', (e) => {
+        const max = sc.scrollWidth - sc.clientWidth;
+        if (max <= 0 || e.ctrlKey) return;
+        const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+        if ((d < 0 && sc.scrollLeft <= 0) || (d > 0 && sc.scrollLeft >= max - 1)) return; // at the end: let the page scroll
+        e.preventDefault();
+        sc.scrollLeft += d * (e.deltaMode === 1 ? 16 : 1);
+      }, { passive: false });
+      let drag = null;
+      sc.addEventListener('pointerdown', (e) => {
+        if (e.pointerType !== 'mouse' || e.button !== 0 || sc.scrollWidth <= sc.clientWidth) return;
+        drag = { x: e.clientX, left: sc.scrollLeft, moved: false, id: e.pointerId };
+        this._tabDragged = false;
+      });
+      sc.addEventListener('pointermove', (e) => {
+        if (!drag || e.pointerId !== drag.id) return;
+        const dx = e.clientX - drag.x;
+        if (!drag.moved && Math.abs(dx) > 5) { drag.moved = true; sc.classList.add('drag'); try { sc.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ } }
+        if (drag.moved) sc.scrollLeft = drag.left - dx;
+      });
+      const end = () => { if (drag && drag.moved) { this._tabDragged = true; setTimeout(() => { this._tabDragged = false; }, 50); } drag = null; sc.classList.remove('drag'); };
+      sc.addEventListener('pointerup', end);
+      sc.addEventListener('pointercancel', end);
+      const grab = () => sc.classList.toggle('can', sc.scrollWidth > sc.clientWidth + 1);
+      grab(); if (window.ResizeObserver) { this._tabsRO && this._tabsRO.disconnect(); this._tabsRO = new ResizeObserver(grab); this._tabsRO.observe(sc); }
+    }
     // which tab is open: kept across re-renders; on load closed, last used or a fixed one
     if (this._tabOpen === undefined) {
       const start = this.config.tabs_start || 'none';
@@ -2013,7 +2056,7 @@ class FFlowCard extends HTMLElement {
     if (next === 'cons') this._renderChart();
     if (next === 'stats') this._renderStats();
     this._updateCamera();   // starts the stream when its tab opens, stops it otherwise
-    if (next === 'evc') { this._evcDrawn = false; this._updateEvc(); }
+    if (next === 'evc') { this._evcDrawn = false; this._evcIntroDue = true; this._updateEvc(); }
     this._startAnim();      // meters / fans of the opened panel
     this._gooTarget(instant);
   }
@@ -2141,7 +2184,7 @@ class FFlowCard extends HTMLElement {
         if (this._secOpen[key] && key === 'cons') this._renderChart();
         if (this._secOpen[key] && key === 'stats') this._renderStats();
         this._updateCamera(); this._startAnim();
-        if (this._secOpen[key] && key === 'evc') { this._evcDrawn = false; this._updateEvc(); }
+        if (this._secOpen[key] && key === 'evc') { this._evcDrawn = false; this._evcIntroDue = true; this._updateEvc(); }
       });
       cb.addEventListener('change', () => {
         this._lsSet('pin:' + key, cb.checked ? '1' : '0');
@@ -2942,7 +2985,20 @@ class FFlowCard extends HTMLElement {
       faulted: ['Errore', '#f85149'],
     };
   }
-  _evcSocColor(soc) { return soc === null ? '#6e7681' : soc < 20 ? '#f85149' : soc < 40 ? '#f39c4b' : '#3fb950'; }
+  // continuous SOC colour ramp: red → orange → amber → lime → green → aqua
+  static get EVC_RAMP() { return [[0, [255, 59, 48]], [10, [255, 84, 48]], [25, [255, 150, 40]], [45, [255, 206, 58]], [62, [190, 230, 74]], [80, [64, 220, 112]], [100, [44, 224, 200]]]; }
+  _evcRampRGB(soc) {
+    const R = FFlowCard.EVC_RAMP, v = Math.max(0, Math.min(100, soc));
+    for (let i = 1; i < R.length; i++) {
+      if (v <= R[i][0]) {
+        const [a, ca] = R[i - 1], [b, cb] = R[i], t = (v - a) / (b - a || 1);
+        return ca.map((x, k) => Math.round(x + (cb[k] - x) * t));
+      }
+    }
+    return R[R.length - 1][1];
+  }
+  _evcRamp(soc) { const c = this._evcRampRGB(soc); return `rgb(${c[0]},${c[1]},${c[2]})`; }
+  _evcSocColor(soc) { return soc === null ? '#6e7681' : this._evcRamp(soc); }
 
   _buildEvcHTML(esc) {
     if (!this._evcEnabled()) return '';
@@ -2974,9 +3030,10 @@ class FFlowCard extends HTMLElement {
         ${c.evc_pv_auto ? tog('evcPv', '☀️', 'Carica intelligente FV', 'La corrente segue la produzione fotovoltaica') : ''}
         ${c.evc_pause_enabled ? tog('evcPause', '⏸', 'Pausa sotto 6 A', 'Se il fotovoltaico non basta per 6 A, la carica va in pausa') : ''}
         ${c.evc_share ? `<div class="eshare"><div class="eshr"><span>🔀 Ripartizione surplus</span><b id="evcShareTxt">--</b></div>
-          <div class="esplit"><div id="evcShareCar"></div><div id="evcShareHome"></div></div>
+          <div class="esplit"><div id="evcShareHome"></div><div id="evcShareCar"></div></div>
           <input type="range" id="evcShare" class="erange">
-          <div class="es">Quanta parte del surplus va all’auto e quanta all’accumulo di casa</div></div>` : ''}
+          <div class="eshl"><span>🚗 tutto all’auto</span><span>tutto alla casa 🏠</span></div>
+          <div class="es">Quota del surplus che va all’accumulo di casa: 0% = tutto all’auto, 100% = tutto alla batteria di casa</div></div>` : ''}
       </div>` : ''}
       ${c.evc_max_current ? `<div class="esec"><div class="est"><span>Corrente massima</span><span class="eunit" id="evcUnit"><span data-u="A">A</span><span data-u="W">W</span></span></div>
         <div class="ecur"><div class="ebig" id="evcCurVal">--</div><div class="es" id="evcCurInfo" style="text-align:right"></div></div>
@@ -3083,7 +3140,7 @@ class FFlowCard extends HTMLElement {
     }
     const unit = root.getElementById('evcUnit');
     if (unit) unit.querySelectorAll('[data-u]').forEach(u => u.addEventListener('click', () => { this._lsSet('evcUnit', u.dataset.u); this._updateEvc(); }));
-    this._evcBubbleSoc = null;
+    this._evcBubbleSoc = null; this._evcIntroDue = true; cancelAnimationFrame(this._evcIntroRaf); this._evcIntroRaf = null;
     this._updateEvc();
   }
   // re-check the pending command when nothing else triggers an update
@@ -3095,19 +3152,25 @@ class FFlowCard extends HTMLElement {
 
   _evcVolt() { const v = this._val(this.config.evc_voltage); return v && v > 50 ? v : 230; }
   _evcAtoW(a) { return a * this._evcVolt() * (Number(this.config.evc_phases) || 1); }
+  // write only when the value changes: re-setting the same text still invalidates style/layout
+  static _setH(el, h) { if (el && el._ffcH !== (h = String(h))) { el._ffcH = h; el.innerHTML = h; } }
+  static _setT(el, t) { if (el && el._ffcT !== (t = String(t))) { el._ffcT = t; el.textContent = t; } }
   _evcShareView(v) {
     const root = this.shadowRoot;
-    const set = (id, t) => { const e = root.getElementById(id); if (e) e.textContent = t; };
-    set('evcShareTxt', `${Math.round(v)}% auto · ${Math.round(100 - v)}% casa`);
+    const set = (id, t) => { const e = root.getElementById(id); if (e) FFlowCard._setT(e, t); };
+    // the entity is the share for the home battery: 0% = all the surplus to the car
+    const mn = Number(this._evcShareMin) || 0, mx = Number(this._evcShareMax) || 100;
+    const home = Math.max(0, Math.min(100, (v - mn) / ((mx - mn) || 100) * 100));
+    set('evcShareTxt', `${Math.round(home)}% casa · ${Math.round(100 - home)}% auto`);
     const a = root.getElementById('evcShareCar'), b = root.getElementById('evcShareHome');
-    if (a) a.style.width = v + '%'; if (b) b.style.width = (100 - v) + '%';
+    if (b) b.style.width = home + '%'; if (a) a.style.width = (100 - home) + '%';
   }
   _evcCurView(a) {
     const root = this.shadowRoot, el = root.getElementById('evcCurVal');
     if (!el) return;
     const w = this._evcAtoW(a), unitW = this._lsGet('evcUnit') === 'W';
     const fw = w >= 1000 ? (w / 1000).toFixed(2) + ' kW' : Math.round(w) + ' W';
-    el.innerHTML = unitW ? `${fw.replace(/ (k?W)/, '<small>$1</small>')} <span>≈ ${a} A</span>` : `${a}<small>A</small> <span>≈ ${fw}</span>`;
+    FFlowCard._setH(el, unitW ? `${fw.replace(/ (k?W)/, '<small>$1</small>')} <span>≈ ${a} A</span>` : `${a}<small>A</small> <span>≈ ${fw}</span>`);
   }
 
   _evcSessionSecs(st) {
@@ -3119,34 +3182,96 @@ class FFlowCard extends HTMLElement {
   }
   _evcFmtDur(sec) { if (sec === null || !isFinite(sec)) return '--'; const h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60); return h + ':' + String(m).padStart(2, '0'); }
 
-  _evcBubbles(soc, col) {
-    const svg = this.shadowRoot.getElementById('evcBub');
-    if (!svg) return;
-    const key = Math.round(soc || 0) + col + (this._lite() ? 'L' : '');
-    if (this._evcBubbleSoc === key) return;
-    this._evcBubbleSoc = key;
-    const W = 460, H = 64, fill = Math.max(0, Math.min(100, soc || 0)) / 100;
-    let seed = 11; const r = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
-    const n = Math.round(30 + 160 * fill);
-    const groups = ['', '', ''];
-    for (let i = 0; i < n; i++) {
-      const x = 3 + r() * Math.max(4, W * fill - 6), y = 3 + r() * (H - 6), rad = 1.4 + r() * 5.2, op = (0.35 + r() * 0.6).toFixed(2);
-      groups[i % 3] += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${rad.toFixed(1)}" fill="url(#evcBubG)" opacity="${op}"/>`;
+  // Bubble bar: a dense field of glossy bubbles over the whole bar, revealed up to the SOC by two
+  // counter-translated wrappers (transform only → compositor) with a soft masked front. The colour is
+  // a horizontal gradient from the SOC colour (left) to a "younger" one at the front. Twinkles are
+  // separate <svg> layers faded through CSS opacity, so the bubbles are never repainted per frame.
+  _evcBubbles(soc) {
+    const box = this.shadowRoot.getElementById('evcBub');
+    if (!box) return;
+    // width from a ResizeObserver (no forced layout on every update); 0 while the tab is hidden
+    if (!this._evcRO || this._evcROel !== box) {
+      if (this._evcRO) this._evcRO.disconnect();
+      this._evcROel = box; this._evcBarW = box.clientWidth;
+      if (window.ResizeObserver) {
+        this._evcRO = new ResizeObserver(([en]) => {
+          const w = Math.round(en.contentRect.width);
+          if (w !== this._evcBarW) { this._evcBarW = w; if (w) { this._evcIntroDue = this._evcIntroDue || !this._evcBubbleSoc; this._updateEvc(); } }
+        });
+        this._evcRO.observe(box);
+      }
     }
-    // Each twinkle group is its own <svg> layer animated through CSS opacity: the compositor fades it
-    // without repainting ~150 gradient circles per frame (an SMIL/attribute animation repaints them all).
-    const lite = this._lite();
-    const grad = (i) => `<defs><radialGradient id="evcBubG${i}"><stop offset="0" stop-color="${col}" stop-opacity="1"/><stop offset=".55" stop-color="${col}" stop-opacity=".85"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></radialGradient></defs>`;
-    const layer = (inner) => `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${inner}</svg>`;
-    svg.innerHTML = groups.map((g, i) => layer(grad(i) + g.replace(/url\(#evcBubG\)/g, `url(#evcBubG${i})`))).join('')
-      + (fill > 0 && fill < 1 ? layer(`<rect x="${(W * fill).toFixed(1)}" y="2" width="1.5" height="${H - 4}" fill="${col}" opacity=".6"/>`) : '');
-    if (!lite && svg.animate) {
-      [...svg.children].slice(0, 3).forEach((el, i) => {
-        el.style.willChange = 'opacity';
-        const dur = (2.4 + i * 0.9) * 1000;
-        const a = el.animate([{ opacity: 1 }, { opacity: 0.45 }, { opacity: 1 }], { duration: dur, iterations: Infinity, delay: -i * 1000 });
-        if (this._paused) a.pause();
-      });
+    const W = Math.round(this._evcBarW || 0), H = 64;
+    if (!W) { this._evcBubbleSoc = null; return; }        // hidden: draw when shown
+    const lite = this._lite(), s = soc === null ? 0 : Math.max(0, Math.min(100, soc));
+    const key = W + '|' + (lite ? 'L' : '');
+    if (this._evcBubbleSoc !== key) {
+      this._evcBubbleSoc = key;
+      let seed = 7; const r = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+      // jittered hex packing: bubbles almost touching, like a glass full of beads
+      const gap = 9.8, rows = Math.floor((H - 4) / (gap * 0.87)), base = [], hl = [], tw = ['', '', ''];
+      for (let j = 0; j < rows; j++) {
+        const y = 4 + j * gap * 0.87 + gap * 0.3;
+        for (let x = 3 + (j % 2) * gap / 2; x < W - 2; x += gap) {
+          const cx = x + (r() - 0.5) * 2.6, cy = y + (r() - 0.5) * 2.4, small = r() < 0.18;
+          const rad = small ? 1.5 + r() * 1.3 : 3.5 + r() * 1.5;
+          base.push(`<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${rad.toFixed(1)}"/>`);
+          hl.push(`<circle cx="${(cx - rad * 0.32).toFixed(1)}" cy="${(cy - rad * 0.34).toFixed(1)}" r="${(rad * 0.42).toFixed(1)}"/>`);
+          if (!lite && !small && r() < 0.16) tw[Math.floor(r() * 3)] += `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${(rad * 0.95).toFixed(1)}"/>`;
+        }
+      }
+      const svg = (inner, cls) => `<svg class="${cls}" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">${inner}</svg>`;
+      box.innerHTML = (`<div class="evfo" id="evcFo"><div class="evfi" id="evcFi">`
+        + svg(`<defs><linearGradient id="evcCol" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="${W}" y2="0"><stop id="evcC0" offset="0"/><stop id="evcC1" offset="1"/></linearGradient></defs>
+            <rect x="0" y="0" width="${W}" height="${H}" fill="url(#evcCol)" opacity=".28"/>
+            <g fill="url(#evcCol)">${base.join('')}</g><g fill="#fff" opacity=".5">${hl.join('')}</g>`, 'evb')
+        + tw.map(t => svg(`<g fill="#fff">${t}</g>`, 'evt')).join('')
+        + `</div></div>`);
+      if (!lite && box.animate) {
+        box.querySelectorAll('.evt').forEach((el, i) => {
+          el.style.opacity = '0';
+          const a = el.animate([{ opacity: 0 }, { opacity: 0.55 }, { opacity: 0 }], { duration: 1700 + i * 650, iterations: Infinity, delay: -i * 500, easing: 'ease-in-out' });
+          if (this._paused) a.pause();
+        });
+      }
+      this._evcShownSoc = null;
+    }
+    // intro: fill from 0 to the SOC when the tab/section is opened (not in light mode)
+    if (this._evcIntroDue && !lite && !this._paused && soc !== null && window.requestAnimationFrame) {
+      this._evcIntroDue = false;
+      cancelAnimationFrame(this._evcIntroRaf);
+      const t0 = performance.now(), dur = 600 + s * 14;
+      const step = (now) => {
+        const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+        this._evcFillTo(s * e, true);
+        this._evcIntroRaf = k < 1 ? requestAnimationFrame(step) : null;
+        if (!this._evcIntroRaf) this._evcFillTo(this._evcTargetSoc != null ? this._evcTargetSoc : s);
+      };
+      this._evcTargetSoc = s;
+      this._evcFillTo(0, true);
+      this._evcIntroRaf = requestAnimationFrame(step);
+      return;
+    }
+    this._evcIntroDue = false;
+    this._evcTargetSoc = s;
+    if (!this._evcIntroRaf && this._evcShownSoc !== Math.round(s * 2) / 2) this._evcFillTo(s);
+  }
+  _evcFillTo(v, counting) {
+    const root = this.shadowRoot, fo = root.getElementById('evcFo'), fi = root.getElementById('evcFi');
+    if (!fo || !fi) return;
+    this._evcShownSoc = counting ? null : Math.round(v * 2) / 2;
+    const hide = 100 - v;
+    fo.style.transform = `translateX(${-hide}%)`;
+    fi.style.transform = `translateX(${hide}%)`;
+    fo.classList.toggle('full', v >= 99.5);
+    const W = Number((root.querySelector('#evcBub .evb') || {}).getAttribute && root.querySelector('#evcBub .evb').getAttribute('width')) || 460;
+    const g = root.getElementById('evcCol'); if (g) g.setAttribute('x2', Math.max(20, W * v / 100).toFixed(0));
+    const c0 = root.getElementById('evcC0'), c1 = root.getElementById('evcC1');
+    if (c0) c0.setAttribute('stop-color', this._evcRamp(v));
+    if (c1) c1.setAttribute('stop-color', this._evcRamp(Math.max(0, v - 18 - v * 0.12)));
+    if (counting) {
+      const so = root.getElementById('evcSoc'); if (so) FFlowCard._setT(so, Math.round(v));
+      const sw = root.querySelector('.evsoc'); if (sw) sw.style.color = this._evcRamp(v);
     }
   }
 
@@ -3155,25 +3280,31 @@ class FFlowCard extends HTMLElement {
     const root = this.shadowRoot, c = this.config;
     if (!root.getElementById('evcHero')) return;
     const g = (id) => root.getElementById(id);
-    const setV = (id, v, u) => { const e = g(id); if (e) e.innerHTML = (v === null || v === undefined ? '--' : v) + (u ? `<small>${u}</small>` : ''); };
+    const setV = (id, v, u) => { const e = g(id); if (e) FFlowCard._setH(e, (v === null || v === undefined ? '--' : v) + (u ? `<small>${u}</small>` : '')); };
     const pW = this._val(this._evcPowerId(), true), cur = this._val(c.evc_current), volt = this._val(c.evc_voltage);
     const soc = this._val(this._evcSocId()), temp = this._val(c.evc_temp);
     const eS = this._val(c.evc_session_energy), tS = this._evcSessionSecs(this._evcSt(c.evc_session_time));
     // status
     const stRaw = this._evcSt(c.evc_status);
     const key = stRaw ? String(stRaw.state).toLowerCase().replace(/[\s_-]/g, '') : '';
+    // OCPP "availability" does not tell if the box is reachable (with JuiceBox it is often off while the
+    // car is plugged in): informational only. The command is blocked only when the charge switch itself
+    // is unavailable/unknown in Home Assistant.
     const avail = this._evcSt(c.evc_availability);
-    this._evcUnavailable = !!(avail && avail.state === 'off');
+    const swNow = c.evc_charge_switch && this._hass.states[c.evc_charge_switch];
+    this._evcUnavailable = !swNow || ['unavailable', 'unknown'].includes(String(swNow.state).toLowerCase());
     let [lbl, col] = FFlowCard.EVC_STATUS[key] || (stRaw ? [String(stRaw.state), '#c9d1d9'] : (pW !== null && pW > 50 ? ['In carica', '#3fb950'] : ['--', '#8b949e']));
-    if (this._evcUnavailable) [lbl, col] = ['Wallbox non disponibile', '#6e7681'];
+    if (this._evcUnavailable && !stRaw) [lbl, col] = ['Wallbox non raggiungibile', '#6e7681'];
     const charging = key === 'charging' || (!stRaw && pW !== null && pW > 50);
     const hero = g('evcHero'); if (hero) hero.style.setProperty('--ec', col);
-    const se = g('evcState'); if (se) { se.textContent = '● ' + lbl.toUpperCase(); se.style.color = col; }
+    const se = g('evcState'); if (se) { FFlowCard._setT(se, '● ' + lbl.toUpperCase()); se.style.color = col; }
     const socCol = this._evcSocColor(soc);
-    const so = g('evcSoc'); if (so) { so.textContent = soc === null ? '--' : Math.round(soc); }
-    const sw = root.querySelector('.evsoc'); if (sw) sw.style.color = socCol;
+    if (!this._evcIntroRaf) {
+      const so = g('evcSoc'); if (so) { FFlowCard._setT(so, soc === null ? '--' : Math.round(soc)); }
+      const sw = root.querySelector('.evsoc'); if (sw) sw.style.color = socCol;
+    }
     const bolt = g('evcBolt'); if (bolt) bolt.style.visibility = charging ? 'visible' : 'hidden';
-    this._evcBubbles(soc, socCol);
+    this._evcBubbles(soc);
     setV('evcPow', pW === null ? null : (pW / 1000).toFixed(2), 'kW');
     setV('evcCur', cur === null ? null : cur.toFixed(1), 'A');
     setV('evcTime', this._evcFmtDur(tS), 'h');
@@ -3202,14 +3333,14 @@ class FFlowCard extends HTMLElement {
       const on = swSt && swSt.state === 'on';
       btn.disabled = !!pend || this._evcUnavailable || !swSt;
       btn.classList.toggle('stop', !!on && !pend);
-      g('evcBtnTxt').textContent = pend ? 'ATTESA' : on ? 'FERMA' : 'AVVIA';
+      FFlowCard._setT(g('evcBtnTxt'), pend ? 'ATTESA' : on ? 'FERMA' : 'AVVIA');
       const lock = g('evcLock');
       if (lock) {
         let msg = '';
         if (pend) msg = `⏳ ${pend.target === 'on' ? 'Avvio' : 'Stop'} inviato: in attesa di conferma dalla wallbox… (pulsante bloccato)`;
-        else if (this._evcUnavailable) msg = '⛔ Wallbox non disponibile: comando bloccato';
+        else if (this._evcUnavailable) msg = '⛔ Comando ricarica non raggiungibile in Home Assistant: comando bloccato';
         else if (this._evcMsg && Date.now() - this._evcMsgAt < 30000) msg = '⚠️ ' + this._evcMsg;
-        lock.style.display = msg ? '' : 'none'; lock.textContent = msg;
+        lock.style.display = msg ? '' : 'none'; FFlowCard._setT(lock, msg);
       }
     }
     // toggles
@@ -3222,6 +3353,7 @@ class FFlowCard extends HTMLElement {
     if (sh && shSt && document.activeElement !== sh && this.shadowRoot.activeElement !== sh) {
       const a = shSt.attributes || {};
       sh.min = a.min !== undefined ? a.min : 0; sh.max = a.max !== undefined ? a.max : 100; sh.step = a.step || 1;
+      this._evcShareMin = sh.min; this._evcShareMax = sh.max;
       let v = parseFloat(shSt.state);
       const sent = this._evcShareSent;
       if (sent && v !== sent.v && Date.now() - sent.at < 10000) v = sent.v; else this._evcShareSent = null;
@@ -3242,21 +3374,21 @@ class FFlowCard extends HTMLElement {
         cr.value = v; this._evcCurView(v);
       }
       const off = this._val(c.evc_offered_current);
-      const info = g('evcCurInfo'); if (info) info.innerHTML = `min ${cr.min} A · max ${cr.max} A` + (off !== null ? `<br>offerta dalla box: ${off} A` : '');
-      const note = g('evcCurNote'); if (note) note.textContent = locked ? '🔒 Comandata dalla carica intelligente FV: spegnila per regolare a mano.' : 'Il valore viene inviato quando lasci il cursore.';
+      const info = g('evcCurInfo'); if (info) FFlowCard._setH(info, `min ${cr.min} A · max ${cr.max} A` + (off !== null ? `<br>offerta dalla box: ${off} A` : ''));
+      const note = g('evcCurNote'); if (note) FFlowCard._setT(note, locked ? '🔒 Comandata dalla carica intelligente FV: spegnila per regolare a mano.' : 'Il valore viene inviato quando lasci il cursore.');
       const unit = g('evcUnit'); if (unit) unit.querySelectorAll('[data-u]').forEach(u => u.classList.toggle('on', u.dataset.u === (this._lsGet('evcUnit') || 'A')));
     }
     // wallbox info chips
     const info = g('evcInfo');
     if (info) {
       const chips = [];
-      if (avail) chips.push(avail.state === 'on' ? '🟢 Disponibile' : '⛔ Non disponibile');
+      if (avail) chips.push('Disponibilità OCPP: ' + (avail.state === 'on' ? 'attiva' : avail.state === 'off' ? 'disattiva' : avail.state));
       if (stRaw) chips.push('Connettore: ' + lbl);
       const err = this._evcSt(c.evc_error);
       if (err && !/^(noerror|none|ok|0)$/i.test(String(err.state).replace(/[\s_-]/g, ''))) chips.push('⚠️ Errore: ' + err.state);
       const offA = this._val(c.evc_offered_current);
       if (offA !== null) { const w = this._evcAtoW(offA); chips.push(`Offerta: ${offA} A · ${(w / 1000).toFixed(1)} kW`); }
-      info.innerHTML = chips.map(t => `<span class="echip">${this._esc(t)}</span>`).join('') || '<span class="es">Nessun dato</span>';
+      FFlowCard._setH(info, chips.map(t => `<span class="echip">${this._esc(t)}</span>`).join('') || '<span class="es">Nessun dato</span>');
     }
     ['evcUnlock', 'evcReset'].forEach(id => { const b = g(id); if (b) b.disabled = !!(this._evcActLock && this._evcActLock[id] > Date.now()); });
     this._maybeLoadEvc();
@@ -3267,7 +3399,7 @@ class FFlowCard extends HTMLElement {
     const pid = this._evcPowerId();
     if (!pid || !this._hass || typeof this._hass.callWS !== 'function') return;
     const panel = this.shadowRoot.getElementById('evcChart');
-    if (!panel || panel.getBoundingClientRect().width === 0) return;   // only while the tab / section is open
+    if (!panel || !this._evcBarW) return;   // only while the tab / section is open (bar width from the ResizeObserver)
     const now = Date.now();
     if (this._evcLoading || (this._evcData && now - this._evcData.fetched < (this._lite() ? 15 : 5) * 60000)) { if (this._evcData && !this._evcDrawn) this._renderEvc(); return; }
     this._evcLoading = true;
@@ -3976,7 +4108,11 @@ class FFlowCard extends HTMLElement {
       .evsoc small{font-size:.8rem;color:#8b949e;font-weight:700}
       .evsoc #evcBolt{font-size:1.1rem;margin-right:2px}
       .evbar{position:relative;height:64px;margin:10px 0 9px;border-radius:12px;background:#0b0f14;border:1px solid #21262d;overflow:hidden}
-      .evbar svg{position:absolute;inset:0;width:100%;height:100%}
+      .evbar{box-shadow:inset 0 0 14px rgba(0,0,0,.55)}
+      .evfo,.evfi{position:absolute;inset:0;will-change:transform}
+      .evfo{overflow:hidden;-webkit-mask-image:linear-gradient(to left,transparent 0,#000 30px);mask-image:linear-gradient(to left,transparent 0,#000 30px)}
+      .evfo.full{-webkit-mask-image:none;mask-image:none}
+      .evfi svg{position:absolute;left:0;top:0}
       .ekpi{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
       .ek{background:#0d1117;border:1px solid #21262d;border-radius:9px;padding:6px 3px;text-align:center;min-width:0}
       .ek .v{font-size:.9rem;font-weight:800;color:#e6edf3;white-space:nowrap}.ek .v small{font-size:.62rem;color:#8b949e;margin-left:1px}
@@ -4004,7 +4140,8 @@ class FFlowCard extends HTMLElement {
       .eshare{padding-top:7px;border-top:1px solid #21262d}
       .eshr{display:flex;justify-content:space-between;font-size:.78rem;color:#e6edf3}.eshr b{font-weight:700}
       .esplit{display:flex;height:10px;border-radius:5px;overflow:hidden;margin:6px 0 2px;background:#21262d}
-      .esplit div:first-child{background:#29c4f6;transition:width .2s}.esplit div:last-child{background:#3fb950;transition:width .2s}
+      #evcShareCar{background:#29c4f6;transition:width .2s}#evcShareHome{background:#3fb950;transition:width .2s}
+      .eshl{display:flex;justify-content:space-between;font-size:.62rem;color:#8b949e;margin-top:2px}
       .erange{width:100%;margin:6px 0 4px;accent-color:#3fb950;cursor:pointer}
       .erange:disabled{opacity:.45;cursor:not-allowed}
       .ecur{display:flex;justify-content:space-between;align-items:flex-end;gap:8px}
@@ -4034,6 +4171,7 @@ class FFlowCard extends HTMLElement {
       .ffc.lite .vico{animation:none!important}
       .tabs{position:relative;margin:2px -6px 4px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
       .tabs::-webkit-scrollbar{display:none}
+      .tabs.can{cursor:grab}.tabs.drag{cursor:grabbing;user-select:none}.tabs.drag .tab{pointer-events:none}
       .tabs{-webkit-mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 22px),transparent);mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 22px),transparent)}
       .ttrack{position:relative;display:inline-flex;gap:5px;padding:8px 6px;min-width:100%;box-sizing:border-box;justify-content:center}
       .tgoo{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
