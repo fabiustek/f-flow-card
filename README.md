@@ -400,7 +400,7 @@ Stati riconosciuti (non importano maiuscole e minuscole):
 
 Una scheda dedicata alla **ricarica dell'auto** con una wallbox **OCPP** (pensata per JuiceBox con l'integrazione OCPP, funziona con qualsiasi wallbox che esponga entità simili). Dall'alto in basso:
 
-- **Stato e batteria dell'auto**: stato del connettore tradotto in italiano (Scollegata, Collegata, In carica, In pausa, Completata, Errore…), nome dell'auto e una **barra a bolle** sottile che si riempie fino al SOC. Le bolle sono **vive**, come un liquido che frizza: ognuna nasce, si gonfia, ondeggia, si sposta un po' e scoppia, poi ne nasce un'altra; il fronte è sfumato. Il colore cambia **in modo continuo** con il livello: **rosso** sotto il 10%, **arancione** verso il 25%, **giallo** a metà, **verde** verso l'80% e **acquamarina** al 100%, con una leggera sfumatura lungo la barra. Il ⚡% ha lo stesso colore. **Quando apri la scheda** la barra si riempie da 0 al SOC e il numero conta in su. L'animazione si ferma quando la scheda è chiusa o la card non si vede, rallenta da sola sui dispositivi lenti e in modalità leggera la barra è ferma.
+- **Stato e batteria dell'auto**: stato del connettore tradotto in italiano (Scollegata, Collegata, In carica, In pausa, Completata, Errore…), nome dell'auto e una **barra a liquido** sottile, come un **tubo di vetro** che si riempie fino al SOC: in alto c'è il riflesso del vetro, dentro un liquido torbido che si muove lentamente con bollicine fini che salgono, e il bordo del liquido ondeggia appena. Quando l'auto carica il liquido è più vivace (in proporzione alla potenza di carica), quando non assorbe è calmo. Il colore cambia **in modo continuo** con il livello: **rosso** sotto il 10%, **arancione** verso il 25%, **giallo** a metà, **verde** verso l'80% e **acquamarina** al 100%. Il ⚡% ha lo stesso colore. **Quando apri la scheda** il tubo si riempie da 0 al SOC e il numero conta in su. L'animazione si ferma quando la scheda è chiusa o la card non si vede, rallenta da sola sui dispositivi lenti e in modalità leggera è ferma.
 - **8 riquadri**: potenza, corrente, durata della sessione, tempo al 100%, energia della sessione, **km aggiunti** (energia ÷ consumo dell'auto), tensione e temperatura della wallbox.
 - **Comando ricarica** protetto (vedi sotto), con accanto il badge della **disponibilità della box**: **Box disponibile** (verde) quando nessuna auto è collegata, **Box occupata · auto collegata** (arancione) quando c'è l'auto.
 - **Modalità di ricarica**: interruttori **Carica intelligente FV** e **Pausa sotto 6 A**, e il cursore **Ripartizione surplus**: il valore è la quota del surplus che va alla **batteria di casa** (0% = tutto all'auto, 100% = tutto all'accumulo di casa). Nella barra il verde a sinistra è la casa, l'azzurro a destra l'auto.
@@ -828,7 +828,7 @@ Nella sezione Etichette la scelta di un'entità alternativa si sblocca solo dopo
 | **Statistiche** | FV1 arancione · FV2 blu · FV3 viola · FV4 verde · consumi verde → giallo → rosso · batteria blu carica / arancione scarica |
 | **Autosufficienza / autoconsumo** | autosufficienza verde ≥70% · arancione ≥40% · rosso sotto; autoconsumo giallo |
 | **Wallbox e auto** | azzurro in carica · verde carica completa · giallo collegata · grigio scollegata / in attesa |
-| **Ricarica EV (bolle e ⚡%)** | sfumatura continua: rosso (0–10%) → arancione (25%) → giallo (45%) → lime (60%) → verde (80%) → acquamarina (100%); comando: verde AVVIA · arancione FERMA · grigio in attesa / non disponibile |
+| **Ricarica EV (liquido e ⚡%)** | sfumatura continua: rosso (0–10%) → arancione (25%) → giallo (45%) → lime (60%) → verde (80%) → acquamarina (100%); comando: verde AVVIA · arancione FERMA · grigio in attesa / non disponibile |
 
 ---
 
@@ -992,6 +992,7 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 - **Tensione delle stringhe** accanto alla potenza di FV1…FV4; i nomi delle falde (es. *Lato piazza*, *Lato ingresso*) restano configurabili con `pv1_name` / `pv2_name`.
 - **Ricarica EV**: nella parte Wallbox tolta la voce *Connettore*, già indicata in alto.
 - **Etichette**: due **campi liberi** (testo + entità a scelta) come riquadri in più tra le statistiche batteria.
+- **Ricarica EV**: la barra a bolle diventa un **liquido nel vetro** (riflesso del vetro, liquido torbido in movimento, bollicine fini), più vivace mentre l'auto carica.
 
 ### v1.14.3
 - **Ricarica EV**: barra a bolle rifatta e **animata** come nel video di riferimento: le bolle nascono, ondeggiano, si spostano e scoppiano di continuo. La barra è più sottile, rallenta da sola sui dispositivi lenti e resta ferma in modalità leggera.
