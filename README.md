@@ -7,7 +7,7 @@
 [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
 [![Release](https://img.shields.io/github/v/release/fabiustek/f-flow-card)](https://github.com/fabiustek/f-flow-card/releases)
 
-Versione attuale: **v1.15.0** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
+Versione attuale: **v1.15.1** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/card-overview.png" alt="F-Flow Card con tutte le sezioni attive" width="480">
@@ -859,7 +859,7 @@ Misure su un telefono di fascia bassa simulato (processore 6 volte più lento, 2
 
 A ogni nuova versione viene creata automaticamente una **release** su GitHub e HACS ti propone l'aggiornamento in Home Assistant. Dopo l'aggiornamento ricarica il browser con `Ctrl + Shift + R`.
 
-Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.15.0**.
+Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.15.1**.
 
 ### Icona nella notifica di aggiornamento
 
@@ -985,14 +985,17 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 
 ## Registro delle modifiche
 
+### v1.15.1
+- **Ricarica EV**: la barra a bolle diventa un **liquido nel vetro** (riflesso del vetro, liquido torbido in movimento, bollicine fini), più vivace mentre l'auto carica; nella parte Wallbox tolta la voce *Connettore*, già indicata in alto.
+- **Fonti energia** centrato a piramide, con autosufficienza e autoconsumo su due colonne.
+- **Tensione delle stringhe** sulla stessa riga della potenza (es. "1.29 kW 161 V"): non si sovrappone più alle falde.
+- **Etichette**: due **campi liberi** (testo + entità a scelta) come riquadri in più tra le statistiche batteria.
+
 ### v1.15.0
-- **Autosufficienza e autoconsumo** di oggi sotto la barra **Fonti energia** (blocco centrato), calcolati dalle entità che hai già (o da tuoi sensori in %).
+- **Autosufficienza e autoconsumo** di oggi sotto la barra **Fonti energia**, calcolati dalle entità che hai già (o da tuoi sensori in %).
 - **Tensione e frequenza** di rete sotto la potenza prelevata/ceduta e della casa accanto al consumo.
 - **Effetto calore sulle falde**: i pannelli in produzione tremolano come una superficie rovente, con onde gialle che risalgono la falda, in proporzione alla potenza di ogni falda (`roof_heat`, disattivabile).
-- **Tensione delle stringhe** accanto alla potenza di FV1…FV4; i nomi delle falde (es. *Lato piazza*, *Lato ingresso*) restano configurabili con `pv1_name` / `pv2_name`.
-- **Ricarica EV**: nella parte Wallbox tolta la voce *Connettore*, già indicata in alto.
-- **Etichette**: due **campi liberi** (testo + entità a scelta) come riquadri in più tra le statistiche batteria.
-- **Ricarica EV**: la barra a bolle diventa un **liquido nel vetro** (riflesso del vetro, liquido torbido in movimento, bollicine fini), più vivace mentre l'auto carica.
+- **Tensione delle stringhe** sotto la potenza di FV1…FV4; i nomi delle falde (es. *Lato piazza*, *Lato ingresso*) restano configurabili con `pv1_name` / `pv2_name`.
 
 ### v1.14.3
 - **Ricarica EV**: barra a bolle rifatta e **animata** come nel video di riferimento: le bolle nascono, ondeggiano, si spostano e scoppiano di continuo. La barra è più sottile, rallenta da sola sui dispositivi lenti e resta ferma in modalità leggera.
@@ -1121,4 +1124,4 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 
 ---
 
-*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.15.0*
+*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.15.1*

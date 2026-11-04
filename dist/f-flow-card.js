@@ -1,12 +1,16 @@
-// f-flow-card.js – Unified Edition v1.15.0
-const FFC_VERSION = '1.15.0';
+// f-flow-card.js – Unified Edition v1.15.1
+const FFC_VERSION = '1.15.1';
+// Changes v1.15.1:
+//   NEW  – Ricarica EV: the bubble bar becomes a "liquid in glass" canvas (glass reflection, cloudy
+//           liquid, fine rising bubbles; livelier with the charging power). Connector chip removed.
+//   NEW  – Labels: two free tiles (label_custom1/2 + label_entity_custom1/2) in the battery stats.
+//   FIX  – "Fonti energia" block centred like a pyramid (self-sufficiency/consumption in two columns);
+//           string voltage on the same line as the string power, so it never overlaps the slopes.
 // Changes v1.15.0:
 //   NEW  – Autosufficienza / autoconsumo of today under "Fonti energia" (_show_self_stats, on by default),
 //           computed from today's energies or taken from self_sufficiency_entity / self_consumption_entity.
 //   NEW  – grid_voltage / grid_frequency under the grid power; load_voltage / load_frequency next to the
 //           house consumption; pv1_voltage…pv4_voltage under each string power. All optional.
-//   NEW  – Ricarica EV: the bubble bar becomes a "liquid in glass" canvas (glass reflection, cloudy
-//           liquid, fine rising bubbles; livelier with the charging power). Connector chip removed.
 //   NEW  – roof_heat (on by default): hot-surface shimmer + rising heat waves on each producing slope,
 //           proportional to its string power; not in light mode, stopped while hidden.
 // Changes v1.14.3:
