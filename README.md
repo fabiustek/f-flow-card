@@ -7,7 +7,7 @@
 [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
 [![Release](https://img.shields.io/github/v/release/fabiustek/f-flow-card)](https://github.com/fabiustek/f-flow-card/releases)
 
-Versione attuale: **v1.14.2** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
+Versione attuale: **v1.15.0** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/card-overview.png" alt="F-Flow Card con tutte le sezioni attive" width="480">
@@ -26,6 +26,7 @@ Versione attuale: **v1.14.2** · Fork di [k-flow-card](https://github.com/thekha
   - [Aprire i grafici di un'entità dalla card](#aprire-i-grafici-di-unentità-dalla-card)
 - [Le sezioni della card](#le-sezioni-della-card)
   - [Flussi di energia](#flussi-di-energia)
+  - [Tensioni, frequenza, autosufficienza e autoconsumo](#tensioni-frequenza-autosufficienza-e-autoconsumo)
   - [Casa a due falde](#casa-a-due-falde)
   - [Commutazione IN RETE / FUORI RETE](#commutazione-in-rete--fuori-rete)
   - [Riquadri giornalieri](#riquadri-giornalieri)
@@ -59,7 +60,7 @@ Versione attuale: **v1.14.2** · Fork di [k-flow-card](https://github.com/thekha
 - **Meteo animato** nel cielo: nuvole, pioggia, temporale, neve, nebbia e vento dalla tua entità `weather.*`
 - **Batteria a segmenti** colorata in base al SOC, con scia che sale in carica e scende in scarica
 - **Traliccio luminoso**: rosso quando prelevi, verde quando immetti, barrato quando sei fuori rete
-- **Casa a due falde** con FV1 a sinistra e FV2 a destra, ognuna illuminata dalla propria produzione
+- **Casa a due falde** con FV1 a sinistra e FV2 a destra, ognuna illuminata dalla propria produzione, con un **effetto calore** sui pannelli proporzionale alla potenza
 - **Commutazione IN RETE / FUORI RETE** dalla card: tieni premuto, conferma, fatto
 - **Utilizzatori** con icona, colore e un disco stile contatore Ferraris che gira in base al consumo
 - **Grafico dei consumi** delle ultime 24 ore: chi ha consumato e quando
@@ -149,7 +150,8 @@ Sull'indicatore della rete e sul badge EMS il **tocco breve** apre la scheda, me
   - a riposo mostra "batteria a riposo". Sotto c'è l'**energia residua** in kWh.
 - **Flussi**: curve morbide con linee tratteggiate sottili e luminose che scorrono nella direzione dell'energia, più veloci quando la potenza sale. Il flusso della batteria è sempre blu, come la batteria.
 - **Inverter** al centro: temperatura e percentuale di carico. Si può sostituire con una foto (`inverter_image`).
-- **Rete** a destra: potenza istantanea, energia prelevata (▼) e immessa (▲) oggi. Sotto, la barra **Fonti energia** mostra in proporzione solare, carica, scarica e rete.
+- **Rete** a destra: potenza istantanea, energia prelevata (▼) e immessa (▲) oggi e, se configurate, **tensione e frequenza di rete** sotto la potenza. Sotto, la barra **Fonti energia** mostra in proporzione solare, carica, scarica e rete, con sotto l'**autosufficienza** e l'**autoconsumo** di oggi.
+- **Casa**: consumo istantaneo sotto la casa e, se configurate, **tensione e frequenza erogate** accanto. Sotto la potenza di ogni stringa può comparire la sua **tensione**.
 - **Barre FV / POT**: produzione rispetto alla potenza massima dell'impianto e potenza della batteria rispetto a quella dell'inverter.
 
 Nella sezione **🎨 Layout e intestazione** puoi cambiare titolo, attivare la barra delle fonti, il pannello autonomia, l'immagine dell'inverter e tornare alle icone classiche (batteria, rete, casa).
@@ -167,9 +169,44 @@ Nella sezione **🎨 Layout e intestazione** puoi cambiare titolo, attivare la b
 
 Esempio: SOC 45%, soglia 20%, batteria da 16 kWh, scarica a 1533 W → 25% di 16 kWh = 4 kWh utilizzabili → **2h 36m**.
 
+### Tensioni, frequenza, autosufficienza e autoconsumo
+
+<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/flow.png" alt="Tensioni delle stringhe, tensione e frequenza di casa e rete, autosufficienza e autoconsumo" width="480"></p>
+
+Tutti facoltativi: se non configuri un'entità, quella scritta non compare.
+
+**Autosufficienza e autoconsumo** (sotto la barra **Fonti energia**):
+- **Autosufficienza**: quanta parte del consumo di oggi **non** è arrivata dalla rete = (consumo oggi − prelievo oggi) ÷ consumo oggi. Verde dal 70%, arancione dal 40%, rosso sotto.
+- **Autoconsumo**: quanta parte della produzione FV di oggi è stata **usata** (in casa o in batteria) invece di essere immessa = (produzione FV oggi − immissione oggi) ÷ produzione FV oggi.
+- La card li calcola da sola con le entità che hai già: **Produzione FV oggi** e **Consumo oggi** (sezione ☀️ Altri dati fotovoltaico), **Energia prelevata** ed **Energia immessa** (sezione 🔌 Rete). Se hai già sensori in % puoi usarli in **🔌 Rete** → **Autosufficienza %** / **Autoconsumo %**.
+- Si spengono in **🎨 Layout e intestazione** → **Autosufficienza e autoconsumo** (servono la barra fonti energia attiva).
+
+**Tensione e frequenza**:
+1. Sezione **🔌 Rete** → **Tensione di rete** e **Frequenza di rete**: compaiono sotto la potenza prelevata/ceduta, es. "231 V · 49.98 Hz".
+2. Sezione **☀️ Altri dati fotovoltaico** → **Tensione erogata alla casa** e **Frequenza erogata alla casa**: compaiono accanto al consumo sotto la casa.
+
+**Tensione e nome delle stringhe** (sezione **☀️ Fotovoltaico**):
+1. **Tensione FV1** / **Tensione FV2** (e FV3/FV4 nelle stringhe aggiuntive): in piccolo sotto la potenza della stringa.
+2. **Nome della falda** (`pv1_name`, `pv2_name`): per esempio **Lato piazza** e **Lato ingresso** al posto di FV1 e FV2. Il nome compare sul disegno e nelle statistiche.
+
+Esempio per Deye (controlla i nomi esatti in **Strumenti per sviluppatori → Stati**):
+
+```yaml
+pv1_name: Lato piazza
+pv2_name: Lato ingresso
+pv1_voltage: sensor.deye_pv1_voltage
+pv2_voltage: sensor.deye_pv2_voltage
+grid_voltage: sensor.deye_grid_voltage
+grid_frequency: sensor.deye_grid_frequency
+load_voltage: sensor.deye_load_voltage
+load_frequency: sensor.deye_load_frequency
+```
+
 ### Casa a due falde
 
 La casa ha due falde di pannelli: **FV1 sulla sinistra** e **FV2 sulla destra**. Quando una stringa produce, la sua **falda diventa gialla** (come il flusso dal sole all'inverter) e i pannelli si illuminano tanto più quanto più produce; nome e potenza sono scritti in alto, accanto alla falda. Sotto la casa c'è il consumo istantaneo, e l'**anello alla base gira più veloce quanto più la casa consuma** (fermo sotto i 10 W). La casa (con il flusso che arriva dall'inverter, l'anello e il valore del consumo) prende il **colore delle fonti che la alimentano, mescolate in proporzione**: **giallo** per il solare, **blu** per la batteria, **rosso** per la rete. Per esempio, se la casa prende il 60% dal solare e il 40% dalla rete diventa arancione; metà solare e metà batteria dà un verde chiaro. La quota solare è la produzione FV che resta dopo la carica della batteria e l'immissione in rete. Le finestre si accendono quando c'è consumo.
+
+**Effetto calore sulle falde** (dalla v1.15.0, attivo di partenza): quando una falda produce, i suoi pannelli **tremolano come l'aria sopra l'asfalto d'estate** e onde di luce gialla risalgono lentamente la falda dalla gronda al colmo, come il calore che sale. Il colore resta il giallo dei pannelli. L'effetto è **proporzionale alla produzione di ogni falda**: più la stringa produce, più il tremolio è forte e le onde sono luminose e veloci; a 0 W sparisce. Si spegne in **🎨 Layout e intestazione** → **Effetto calore sulle falde** (`roof_heat: false`); in modalità leggera non c'è e si ferma quando la card non si vede.
 
 **Stringhe aggiuntive FV3 e FV4**: attivale nella sezione **☀️ Stringhe FV aggiuntive** (＋ Attiva). **FV3** compare sotto FV1, sul lato della falda sinistra; **FV4** sotto FV2, sul lato della falda destra. Ogni falda si illumina con la somma delle sue stringhe (sinistra FV1 + FV3, destra FV2 + FV4). Con l'icona casa classica, FV3 e FV4 restano nella colonna di sinistra.
 
@@ -363,14 +400,14 @@ Stati riconosciuti (non importano maiuscole e minuscole):
 
 Una scheda dedicata alla **ricarica dell'auto** con una wallbox **OCPP** (pensata per JuiceBox con l'integrazione OCPP, funziona con qualsiasi wallbox che esponga entità simili). Dall'alto in basso:
 
-- **Stato e batteria dell'auto**: stato del connettore tradotto in italiano (Scollegata, Collegata, In carica, In pausa, Completata, Errore…), nome dell'auto e una **barra a bolle** fitte e lucide che si riempie fino al SOC, con il fronte sfumato. Il colore cambia **in modo continuo** con il livello: **rosso** sotto il 10%, **arancione** verso il 25%, **giallo** a metà, **verde** verso l'80% e **acquamarina** al 100%; lungo la barra sfuma verso il colore di un livello più basso. Il ⚡% ha lo stesso colore. **Quando apri la scheda** la barra si riempie da 0 al SOC e il numero conta in su (in modalità leggera compare subito, senza animazione).
+- **Stato e batteria dell'auto**: stato del connettore tradotto in italiano (Scollegata, Collegata, In carica, In pausa, Completata, Errore…), nome dell'auto e una **barra a bolle** sottile che si riempie fino al SOC. Le bolle sono **vive**, come un liquido che frizza: ognuna nasce, si gonfia, ondeggia, si sposta un po' e scoppia, poi ne nasce un'altra; il fronte è sfumato. Il colore cambia **in modo continuo** con il livello: **rosso** sotto il 10%, **arancione** verso il 25%, **giallo** a metà, **verde** verso l'80% e **acquamarina** al 100%, con una leggera sfumatura lungo la barra. Il ⚡% ha lo stesso colore. **Quando apri la scheda** la barra si riempie da 0 al SOC e il numero conta in su. L'animazione si ferma quando la scheda è chiusa o la card non si vede, rallenta da sola sui dispositivi lenti e in modalità leggera la barra è ferma.
 - **8 riquadri**: potenza, corrente, durata della sessione, tempo al 100%, energia della sessione, **km aggiunti** (energia ÷ consumo dell'auto), tensione e temperatura della wallbox.
-- **Comando ricarica** protetto (vedi sotto).
+- **Comando ricarica** protetto (vedi sotto), con accanto il badge della **disponibilità della box**: **Box disponibile** (verde) quando nessuna auto è collegata, **Box occupata · auto collegata** (arancione) quando c'è l'auto.
 - **Modalità di ricarica**: interruttori **Carica intelligente FV** e **Pausa sotto 6 A**, e il cursore **Ripartizione surplus**: il valore è la quota del surplus che va alla **batteria di casa** (0% = tutto all'auto, 100% = tutto all'accumulo di casa). Nella barra il verde a sinistra è la casa, l'azzurro a destra l'auto.
 - **Corrente massima** con il cursore e il selettore **A / W** (i watt sono calcolati come A × tensione × fasi). Mentre la carica intelligente FV è accesa il cursore è **bloccato** 🔒, perché la corrente la decide l'automazione: spegnila per regolare a mano.
 - **Sessione in corso**: grafico della potenza con la linea tratteggiata del SOC dell'auto, SOC iniziale → attuale, energia e potenza media.
 - **Ultime ricariche** degli ultimi 7 giorni, ricavate dallo storico della potenza: giorno, orario, energia, durata e SOC da → a.
-- **Wallbox**: disponibilità OCPP (solo informativa), stato del connettore, corrente offerta, eventuale codice di errore (nascosto se è `NoError`) e i pulsanti **Sblocca cavo** e **Riavvia wallbox**.
+- **Wallbox**: stato del connettore, corrente offerta, eventuale codice di errore (nascosto se è `NoError`) e i pulsanti **Sblocca cavo** e **Riavvia wallbox**.
 
 #### Comando protetto: un solo comando alla wallbox
 
@@ -390,7 +427,7 @@ Alcune wallbox si bloccano se ricevono più comandi di fila. Per questo il pulsa
 Nell'editor apri **⚡ Ricarica EV** → **＋ Attiva**, poi:
 1. **Nome dell'auto** (facoltativo), es. `BYD Dolphin Surf`.
 2. **Comando ricarica**: l'interruttore che avvia e ferma la carica, es. `switch.juicebox_charge_control`.
-3. **Stato del connettore OCPP** (es. `sensor.juicebox_status_connector`) e, se vuoi, **Disponibilità OCPP** (es. `switch.juicebox_availability`): è solo informativa e non blocca il comando, perché con JuiceBox di solito è spenta quando l'auto è collegata.
+3. **Stato del connettore OCPP** (es. `sensor.juicebox_status_connector`) e, se vuoi, **Disponibilità box** (es. `switch.juicebox_availability`): acceso = box libera, spento = auto collegata. Compare come badge accanto al pulsante e non blocca il comando.
 4. **Attesa massima della conferma**: quanti secondi aspettare la risposta della wallbox (10–300, predefinito 60).
 5. **Potenza di ricarica**: il sensore più affidabile che hai (es. `sensor.consumi_wallbox`). Se lo lasci vuoto usa **Potenza wallbox** della sezione 🚗.
 6. Corrente, tensione, temperatura, energia e durata della sessione (tutti facoltativi). La durata può essere in secondi, minuti, ore o `h:mm:ss`.
@@ -605,6 +642,7 @@ Tutte le opzioni si impostano dall'editor visuale; qui trovi le chiavi YAML corr
 | `sections_order` | `[bms, inv, cons, evc, vent, stats, cam]` | Ordine delle sezioni sotto il disegno (bms = statistiche batteria, inv = Inverter, cons = Utilizzatori, evc = Ricarica EV, vent = Ventilazione, stats = Statistiche, cam = Videocamera) |
 | `grid_icon_style` | `modern` | `modern` (traliccio luminoso) o `classic` (immagine) |
 | `home_icon_style` | `modern` | `modern` (casa a due falde) o `classic` (immagine) |
+| `roof_heat` | `true` | Effetto calore (superficie rovente) sulle falde in produzione, proporzionale alla potenza di ogni falda |
 | `sun` | `sun.sun` | Entità del sole |
 
 ### Fotovoltaico e casa
@@ -612,7 +650,8 @@ Tutte le opzioni si impostano dall'editor visuale; qui trovi le chiavi YAML corr
 | Chiave | Predefinito | Descrizione |
 |---|---|---|
 | `pv1_power` / `pv2_power` | sensori GoodWe | Potenza delle stringhe FV1 (falda sinistra) e FV2 (falda destra) |
-| `pv1_name` … `pv4_name` | `''` | Nome libero delle falde/stringhe; se vuoto `FV1`, `FV2`… |
+| `pv1_name` … `pv4_name` | `''` | Nome libero delle falde/stringhe (es. `Lato piazza`); se vuoto `FV1`, `FV2`… |
+| `pv1_voltage` … `pv4_voltage` | `''` | Tensione delle stringhe (V), sotto la potenza |
 | `_show_pv_extra` | `false` | Mostra le stringhe FV3 e FV4 |
 | `pv3_power` / `pv4_power` | `''` | Potenza delle stringhe FV3 (sotto FV1, falda sinistra) e FV4 (sotto FV2, falda destra) |
 | `pv_total_power` | `sensor.goodwe_pv_power` | Potenza FV totale (se vuota: somma delle stringhe) |
@@ -621,6 +660,7 @@ Tutte le opzioni si impostano dall'editor visuale; qui trovi le chiavi YAML corr
 | `inv_temp` | `sensor.goodwe_inverter_temperature_module` | Temperatura dell'inverter |
 | `consump` | `sensor.goodwe_house_consumption` | Consumo della casa (W) |
 | `today_load` | `sensor.goodwe_today_load` | Consumo di oggi (kWh) |
+| `load_voltage` / `load_frequency` | `''` | Tensione (V) e frequenza (Hz) erogate alla casa, accanto al consumo |
 
 ### Rete
 
@@ -631,6 +671,9 @@ Tutte le opzioni si impostano dall'editor visuale; qui trovi le chiavi YAML corr
 | `invert_grid_power` | `false` | Inverte il segno (se positivo = immissione) |
 | `grid_import_energy` | `sensor.goodwe_today_energy_import` | Energia prelevata oggi (kWh) |
 | `grid_export_energy` | `''` | Energia immessa oggi (kWh) |
+| `grid_voltage` / `grid_frequency` | `''` | Tensione (V) e frequenza (Hz) di rete, sotto la potenza |
+| `_show_self_stats` | `true` | Autosufficienza e autoconsumo di oggi sotto la barra fonti energia |
+| `self_sufficiency_entity` / `self_consumption_entity` | `''` | Sensori in % da usare al posto del calcolo della card |
 | `grid_status_entity` | `''` | Stato IN RETE / FUORI RETE |
 | `grid_switch_to_off` | `''` | Entità da attivare per passare fuori rete |
 | `grid_switch_to_on` | `''` | Entità da attivare per tornare in rete |
@@ -729,7 +772,7 @@ Tutte le opzioni si impostano dall'editor visuale; qui trovi le chiavi YAML corr
 | `_show_evc` | `false` | Mostra la scheda Ricarica EV |
 | `evc_car_name` | `''` | Nome dell'auto sotto lo stato |
 | `evc_charge_switch` | `''` | Interruttore della funzione di ricarica (on = attiva): la card lo accende/spegne con un solo comando, tieni premuto + conferma. Se è `unavailable` il comando è bloccato |
-| `evc_availability` | `''` | Disponibilità OCPP, solo informativa (mostrata tra le informazioni della wallbox, non blocca nulla) |
+| `evc_availability` | `''` | Disponibilità della box: `on` = libera (nessuna auto), `off` = auto collegata. Badge accanto al pulsante, non blocca il comando |
 | `evc_status` | `''` | Stato del connettore OCPP (`Available`, `Preparing`, `Charging`, `SuspendedEV`, `SuspendedEVSE`, `Finishing`, `Faulted`…) |
 | `evc_confirm_timeout` | `60` | Secondi di attesa della conferma prima di sbloccare il pulsante |
 | `evc_power` | `''` | Potenza di ricarica (W o kW); se vuoto usa `charger_power` |
@@ -779,6 +822,7 @@ Nella sezione Etichette la scelta di un'entità alternativa si sblocca solo dopo
 | **Ventilazione** | da grigio (idle) ad azzurro, blu, indaco, viola, fino a magenta (critical) |
 | **Flusso batteria** | sempre blu; la direzione dei trattini indica carica o scarica |
 | **Statistiche** | FV1 arancione · FV2 blu · FV3 viola · FV4 verde · consumi verde → giallo → rosso · batteria blu carica / arancione scarica |
+| **Autosufficienza / autoconsumo** | autosufficienza verde ≥70% · arancione ≥40% · rosso sotto; autoconsumo giallo |
 | **Wallbox e auto** | azzurro in carica · verde carica completa · giallo collegata · grigio scollegata / in attesa |
 | **Ricarica EV (bolle e ⚡%)** | sfumatura continua: rosso (0–10%) → arancione (25%) → giallo (45%) → lime (60%) → verde (80%) → acquamarina (100%); comando: verde AVVIA · arancione FERMA · grigio in attesa / non disponibile |
 
@@ -804,14 +848,14 @@ Misure su un telefono di fascia bassa simulato (processore 6 volte più lento, 2
 
 **Modalità leggera** — per tablet a muro datati o telefoni lenti. In **🎨 Layout e intestazione** → **Prestazioni**:
 - **Normale** (predefinita): tutte le animazioni.
-- **Leggera**: restano i **flussi animati** (sole, batteria, rete, casa, wallbox); spariscono bagliori, animazioni decorative (stelle che brillano, nuvole e pioggia in movimento, pulsazioni, scia nella batteria, dischi e ventole), la goccia del menu a schede (resta una pillola evidenziata) e lo sfondo sfocato; la card si aggiorna ogni 3 secondi e i grafici ogni 15 minuti.
+- **Leggera**: restano i **flussi animati** (sole, batteria, rete, casa, wallbox); spariscono bagliori, animazioni decorative (stelle che brillano, nuvole e pioggia in movimento, pulsazioni, scia nella batteria, dischi e ventole, effetto calore sulle falde), la goccia del menu a schede (resta una pillola evidenziata) e lo sfondo sfocato; la card si aggiorna ogni 3 secondi e i grafici ogni 15 minuti.
 - **Automatica**: leggera solo sui dispositivi lenti (pochi processori o poca memoria) o con l'impostazione di sistema "riduci movimento", normale sugli altri. Utile se la stessa plancia si apre da dispositivi diversi.
 
 ## Aggiornamenti
 
 A ogni nuova versione viene creata automaticamente una **release** su GitHub e HACS ti propone l'aggiornamento in Home Assistant. Dopo l'aggiornamento ricarica il browser con `Ctrl + Shift + R`.
 
-Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.14.2**.
+Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.15.0**.
 
 ### Icona nella notifica di aggiornamento
 
@@ -873,7 +917,7 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 - **A 100%** resta `--` se manca la **Capacità batteria auto** nella sezione 🚗 Auto elettrica / Wallbox (es. `43200` per 43,2 kWh) o se l'auto non sta caricando.
 
 **Ricarica EV: il pulsante è grigio e non si preme**
-- L'entità **Comando ricarica** è `unavailable` o `unknown` in Home Assistant: l'integrazione OCPP non comunica con la wallbox. La **Disponibilità OCPP** non blocca più il comando (dalla v1.14.1).
+- L'entità **Comando ricarica** è `unavailable` o `unknown` in Home Assistant: l'integrazione OCPP non comunica con la wallbox. La **Disponibilità box** non blocca il comando: è solo il badge accanto al pulsante.
 
 **Ricarica EV: la ripartizione sembra al contrario**
 - Il valore di **Quota del surplus all'accumulo di casa** è la parte che va alla **casa**: 0% = tutto all'auto. Se la tua automazione usa il significato opposto, il cursore si comporta al contrario.
@@ -904,6 +948,9 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 **Le icone degli utilizzatori non si vedono**
 - Usa nomi di icone `mdi:` validi (es. `mdi:washing-machine`); nell'editor puoi cercarle per nome.
 
+**Autosufficienza o autoconsumo non compaiono o mostrano `--`**
+- Servono la barra **Fonti energia** attiva e le energie di oggi: **Consumo oggi** + **Energia prelevata** per l'autosufficienza, **Produzione FV oggi** + **Energia immessa** per l'autoconsumo. A inizio giornata (energie quasi a zero) mostrano `--`.
+
 **L'autonomia mostra `--`**
 - Serve la capacità della batteria nella sezione **⚙️ Generale** e un sensore di potenza della batteria valido. Se la batteria è a riposo non c'è una stima ("batteria a riposo").
 
@@ -933,6 +980,16 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 ---
 
 ## Registro delle modifiche
+
+### v1.15.0
+- **Autosufficienza e autoconsumo** di oggi sotto la barra **Fonti energia**, calcolati dalle entità che hai già (o da tuoi sensori in %).
+- **Tensione e frequenza** di rete sotto la potenza prelevata/ceduta e della casa accanto al consumo.
+- **Effetto calore sulle falde**: i pannelli in produzione tremolano come una superficie rovente, con onde gialle che risalgono la falda, in proporzione alla potenza di ogni falda (`roof_heat`, disattivabile).
+- **Tensione delle stringhe** sotto la potenza di FV1…FV4; i nomi delle falde (es. *Lato piazza*, *Lato ingresso*) restano configurabili con `pv1_name` / `pv2_name`.
+
+### v1.14.3
+- **Ricarica EV**: barra a bolle rifatta e **animata** come nel video di riferimento: le bolle nascono, ondeggiano, si spostano e scoppiano di continuo. La barra è più sottile, rallenta da sola sui dispositivi lenti e resta ferma in modalità leggera.
+- **Ricarica EV**: badge **Box disponibile / Box occupata · auto collegata** accanto al pulsante di ricarica, da `evc_availability` (acceso = box libera).
 
 ### v1.14.2
 - **Ricarica EV**: sotto 1 kW la potenza è in W (5 W prima appariva come 0.00 kW); tensione `--` quando la wallbox non misura (0 V); energia della sessione convertita se il sensore è in Wh.
@@ -1057,4 +1114,4 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 
 ---
 
-*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.14.2*
+*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.15.0*
