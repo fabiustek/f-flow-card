@@ -31,6 +31,17 @@
         <text x="8" y="14" font-size="9" fill="#fff" font-family="monospace">CAM 1 · TETTO   ${new Date().toLocaleString('it-IT')}</text></svg>`;
     }
   });
+  // Stand-in for HA's <ha-selector> (entity / icon pickers) so the editor can be photographed
+  customElements.define('ha-selector', class extends HTMLElement {
+    set value(v) { this._v = v; this.render(); } get value() { return this._v; }
+    set selector(v) { this._s = v; this.render(); }
+    connectedCallback() { this.render(); }
+    render() {
+      const icon = this._s && this._s.icon;
+      const v = this._v || (icon ? 'Icona' : 'Seleziona un’entità');
+      this.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-radius:6px;background:#2b2f36;color:${this._v ? '#e1e1e1' : '#9aa0a6'};font-size:.9rem;border-bottom:1px solid #5f6368">${v}<span style="opacity:.6">▾</span></div>`;
+    }
+  });
   customElements.define('ha-icon', class extends HTMLElement {
     static get observedAttributes() { return ['icon']; }
     connectedCallback() { this.render(); }
@@ -153,8 +164,16 @@
   };
   // phone width: same card in a 360 px wide column (see shoot.js)
   scenes.phone = base;
+  scenes.editor = base;
   const scene = (location.hash || '#overview').slice(1);
   if (scene === 'phone') document.getElementById('host').style.width = '340px';
+  if (scene === 'editor') {
+    // HA-like dark theme variables for the editor
+    Object.assign(document.body.style, { '--primary-color': '#03a9f4', '--primary-text-color': '#e1e1e1', '--secondary-text-color': '#9aa0a6',
+      '--divider-color': 'rgba(225,225,225,.14)', '--secondary-background-color': '#282b30', '--card-background-color': '#1c1c1c', '--input-fill-color': '#2b2f36' });
+    for (const [k, v] of Object.entries({ '--primary-color': '#03a9f4', '--primary-text-color': '#e1e1e1', '--secondary-text-color': '#9aa0a6', '--divider-color': 'rgba(225,225,225,.14)', '--secondary-background-color': '#282b30', '--card-background-color': '#1c1c1c', '--input-fill-color': '#2b2f36' })) document.body.style.setProperty(k, v);
+    document.body.style.background = '#111';
+  }
   if (scene === 'night') {
     states['sun.sun'] = { state: 'below_horizon', attributes: { elevation: -18,
       next_rising: new Date(now + 9 * 3600e3).toISOString(), next_setting: new Date(now + 22 * 3600e3).toISOString() } };
@@ -168,6 +187,16 @@
   document.getElementById('host').appendChild(card);
   card.hass = hass;
   window._card = card;
+  if (scene === 'editor') {
+    const host = document.getElementById('host');
+    host.innerHTML = '';
+    host.style.cssText = 'width:500px;background:#1c1c1c;border-radius:12px;padding:12px;color:#e1e1e1;font-family:Roboto,Inter,sans-serif';
+    const ed = document.createElement('f-flow-card-editor');
+    host.appendChild(ed);
+    ed.setConfig({ ...base, more_info: ['grid_active_power', 'grid_import_energy'] });
+    ed.hass = hass;
+    window._editor = ed;
+  }
   window._hass = hass;
 </script>
 </body>
