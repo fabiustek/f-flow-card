@@ -104,6 +104,23 @@ const MDI = JSON.parse(fs.readFileSync(path.join(__dirname, 'icons.json'), 'utf8
   await page.waitForTimeout(1800);
   await shot('sky-storm.png', '.hdr', '#arcSetLabel');
 
+  // editor: "Rete" section with one help box open and the "apri al tocco" boxes
+  await open('editor');
+  await page.evaluate(() => {
+    const ed = window._editor;
+    ed._sectionOpen = { grid: true };
+    ed._helpOpen = new Set(['invert_grid_power', 'section:grid']);
+    ed._render();
+  });
+  await page.waitForTimeout(200);
+  {
+    const host = await page.$('#host');
+    const sec = await page.evaluateHandle(() => [...window._editor.querySelectorAll('.section')].find(s => s.textContent.includes('Rete')));
+    const sb = await sec.asElement().boundingBox();
+    await page.screenshot({ path: path.join(OUT, 'editor-help.png'), clip: { x: sb.x - 4, y: sb.y - 4, width: sb.width + 8, height: sb.height + 8 } });
+    console.log('✓ editor-help.png');
+  }
+
   await open('bms');
   await shot('card-bms.png');
 

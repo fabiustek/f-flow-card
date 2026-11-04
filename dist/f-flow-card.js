@@ -1,5 +1,11 @@
-// f-flow-card.js – Unified Edition v1.12.0
-const FFC_VERSION = '1.12.0';
+// f-flow-card.js – Unified Edition v1.13.0
+const FFC_VERSION = '1.13.0';
+// Changes v1.13.0:
+//   NEW  – Editor help: a "?" next to every field, switch and section opens an explanation of what to
+//           enter (tap; also shown as tooltip on hover).
+//   NEW  – section_names / section_icons: custom name and mdi icon for each tab / stacked section title.
+//   NEW  – more_info: "📈 apri al tocco" next to the entities shown in the card; tapping that value in
+//           the card opens Home Assistant's more-info dialog (graphs). Per consumer / fan as well.
 // Changes v1.12.0 (performance — measured with tools/perf/bench.js, CPU 6× slower, 20 hass updates/s):
 //   PERF – hass updates are ignored unless one of the card's entities changed, and rendering is
 //           throttled to once per second (every 3 s in light mode).
@@ -334,11 +340,64 @@ class FFlowCardEditor extends HTMLElement {
         ha-selector, ha-textfield { width: 100%; display: block; }
         ha-textfield { --mdc-shape-small: 6px; }
         .divider { height: 1px; background: var(--divider-color, rgba(0,0,0,.08)); margin: 4px 0 14px; }
+        .ffc-help { display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; margin-left:6px; border-radius:50%;
+          border:1px solid var(--primary-color,#03a9f4); color:var(--primary-color,#03a9f4); font-size:.66rem; font-weight:700; cursor:pointer;
+          vertical-align:middle; user-select:none; text-transform:none; letter-spacing:0; line-height:1; flex-shrink:0; }
+        .ffc-help:hover { background:var(--primary-color,#03a9f4); color:#fff; }
+        .ffc-help-box { font-size:.74rem; line-height:1.45; color:var(--primary-text-color); background:var(--secondary-background-color,rgba(0,0,0,.05));
+          border-left:3px solid var(--primary-color,#03a9f4); border-radius:6px; padding:7px 10px; margin:4px 0 8px; font-weight:400; text-transform:none; letter-spacing:0; }
+        .ffc-mi { float:right; display:inline-flex; align-items:center; gap:4px; font-size:.68rem; font-weight:500; color:var(--secondary-text-color); cursor:pointer; margin-left:8px; }
+        .ffc-mi input { margin:0; accent-color:var(--primary-color,#03a9f4); cursor:pointer; }
       </style>
     `;
 
     const shell = document.createElement('div');
     shell.innerHTML = style;
+
+    // v1.13.0: "?" help next to a label; the explanation opens below (tap) and shows as tooltip (hover)
+    if (!this._helpOpen) this._helpOpen = new Set();
+    const HELP = FFlowCard.HELP;
+    const addHelp = (lblEl, key) => {
+      const txt = HELP[key];
+      if (!txt) return null;
+      const b = document.createElement('span');
+      b.className = 'ffc-help';
+      b.textContent = '?';
+      b.title = txt;
+      b.setAttribute('role', 'button');
+      b.setAttribute('aria-label', 'Aiuto');
+      const box = document.createElement('div');
+      box.className = 'ffc-help-box';
+      box.textContent = txt;
+      box.style.display = this._helpOpen.has(key) ? 'block' : 'none';
+      b.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        const open = box.style.display === 'none';
+        box.style.display = open ? 'block' : 'none';
+        open ? this._helpOpen.add(key) : this._helpOpen.delete(key);
+      });
+      lblEl.appendChild(b);
+      return box;
+    };
+    // v1.13.0: "📈 apri al tocco" next to entities that appear in the card
+    const addMoreInfo = (lblEl, key) => {
+      if (!FFlowCard.MORE_INFO[key]) return;
+      const lab = document.createElement('label');
+      lab.className = 'ffc-mi';
+      lab.title = 'Se spuntato, toccando questo valore nella card si apre la scheda dell’entità con i grafici (more-info di Home Assistant)';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      const list = Array.isArray(cfg.more_info) ? cfg.more_info : [];
+      cb.checked = list.includes(key);
+      cb.addEventListener('click', (e) => e.stopPropagation());
+      cb.addEventListener('change', () => {
+        const cur = Array.isArray(this._config.more_info) ? this._config.more_info : [];
+        this._set('more_info', cb.checked ? [...new Set([...cur, key])] : cur.filter(k => k !== key));
+      });
+      lab.appendChild(cb);
+      lab.appendChild(document.createTextNode('📈 apri al tocco'));
+      lblEl.appendChild(lab);
+    };
 
     const makeSection = (sectionId, icon, title, rows, opts = {}) => {
       if (this._sectionOpen[sectionId] === undefined) this._sectionOpen[sectionId] = (sectionId === 'general');
@@ -372,6 +431,25 @@ class FFlowCardEditor extends HTMLElement {
       const titleSpan = document.createElement('span');
       titleSpan.textContent = `${icon} ${title}`;
       hdr.appendChild(titleSpan);
+      const secHelpTxt = FFlowCard.SECTION_HELP[sectionId];
+      let secHelpBox = null;
+      if (secHelpTxt) {
+        const hb = document.createElement('span');
+        hb.className = 'ffc-help'; hb.textContent = '?'; hb.title = secHelpTxt;
+        const hk = 'section:' + sectionId;
+        secHelpBox = document.createElement('div');
+        secHelpBox.className = 'ffc-help-box';
+        secHelpBox.style.cssText = 'margin:8px 14px 0;';
+        secHelpBox.textContent = secHelpTxt;
+        secHelpBox.style.display = this._helpOpen.has(hk) ? 'block' : 'none';
+        hb.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const open = secHelpBox.style.display === 'none';
+          secHelpBox.style.display = open ? 'block' : 'none';
+          open ? this._helpOpen.add(hk) : this._helpOpen.delete(hk);
+        });
+        hdr.appendChild(hb);
+      }
       // Click anywhere on header (except toggle-chip) to collapse/expand
       hdr.addEventListener('click', () => {
         this._sectionOpen[sectionId] = !this._sectionOpen[sectionId];
@@ -388,6 +466,7 @@ class FFlowCardEditor extends HTMLElement {
         hdr.appendChild(chip);
       }
       sec.appendChild(hdr);
+      if (secHelpBox) sec.appendChild(secHelpBox);
       // Body visible when section is open AND content not suppressed by toggle
       const bodyVisible = isOpen && !opts.hidden;
       if (bodyVisible) {
@@ -411,6 +490,8 @@ class FFlowCardEditor extends HTMLElement {
         sm.textContent = 'facoltativo';
         lbl.appendChild(sm);
       }
+      const helpBox = addHelp(lbl, key);
+      addMoreInfo(lbl, key);
       const inputWrap = document.createElement('div');
       inputWrap.className = 'row-input';
       const sel = document.createElement('ha-selector');
@@ -425,6 +506,7 @@ class FFlowCardEditor extends HTMLElement {
       });
       inputWrap.appendChild(sel);
       wrap.appendChild(lbl);
+      if (helpBox) wrap.appendChild(helpBox);
       wrap.appendChild(inputWrap);
       return wrap;
     };
@@ -449,7 +531,8 @@ class FFlowCardEditor extends HTMLElement {
       fieldBox.addEventListener('focusout', () => { fieldBox.style.borderColor = 'var(--divider-color, rgba(0,0,0,.42))'; });
       const lbl = document.createElement('div');
       lbl.textContent = label;
-      lbl.style.cssText = `font-size:.72rem; color:var(--secondary-text-color); margin-bottom:2px; line-height:1;`;
+      lbl.style.cssText = `font-size:.72rem; color:var(--secondary-text-color); margin-bottom:2px; line-height:1.3;`;
+      const helpBox = addHelp(lbl, key);
       const input = document.createElement('input');
       input.type = 'text';
       input.placeholder = placeholder;
@@ -466,6 +549,7 @@ class FFlowCardEditor extends HTMLElement {
       fieldBox.appendChild(lbl);
       fieldBox.appendChild(input);
       wrap.appendChild(fieldBox);
+      if (helpBox) wrap.appendChild(helpBox);
       return wrap;
     };
 
@@ -488,7 +572,8 @@ class FFlowCardEditor extends HTMLElement {
       fieldBox.addEventListener('focusout', () => { fieldBox.style.borderColor = 'var(--divider-color, rgba(0,0,0,.42))'; });
       const lbl = document.createElement('div');
       lbl.textContent = unit ? `${label}  (${unit})` : label;
-      lbl.style.cssText = `font-size:.72rem; color:var(--secondary-text-color); margin-bottom:2px; line-height:1;`;
+      lbl.style.cssText = `font-size:.72rem; color:var(--secondary-text-color); margin-bottom:2px; line-height:1.3;`;
+      const helpBox = addHelp(lbl, key);
       const input = document.createElement('input');
       input.type = 'number';
       input.min = String(min); input.max = String(max); input.step = String(step);
@@ -520,6 +605,7 @@ class FFlowCardEditor extends HTMLElement {
       fieldBox.appendChild(lbl);
       fieldBox.appendChild(input);
       wrap.appendChild(fieldBox);
+      if (helpBox) wrap.appendChild(helpBox);
       return wrap;
     };
 
@@ -535,7 +621,9 @@ class FFlowCardEditor extends HTMLElement {
       lbl.className = 'row-label';
       lbl.style.marginBottom = '2px';
       lbl.textContent = labelText;
+      const helpBox = addHelp(lbl, key);
       left.appendChild(lbl);
+      if (helpBox) left.appendChild(helpBox);
       if (hintText) {
         const hint = document.createElement('div');
         hint.style.cssText = 'font-size:.68rem;color:var(--secondary-text-color);line-height:1.4;';
@@ -614,7 +702,9 @@ class FFlowCardEditor extends HTMLElement {
     const capGroupLbl = document.createElement('div');
     capGroupLbl.className = 'row-label';
     capGroupLbl.textContent = 'Capacità batteria';
+    const capHb = addHelp(capGroupLbl, 'battery_capacity');
     capGroupWrap.appendChild(capGroupLbl);
+    if (capHb) capGroupWrap.appendChild(capHb);
     capGroupWrap.appendChild(battCapRadio);
 
     shell.appendChild(makeSection('general', '⚙️', 'Generale', [
@@ -634,8 +724,10 @@ class FFlowCardEditor extends HTMLElement {
       wrap.style.marginBottom = '14px';
       const lbl = document.createElement('div');
       lbl.className = 'row-label';
-      lbl.textContent = 'Ordine delle sezioni (sotto il disegno dei flussi)';
+      lbl.textContent = 'Sezioni sotto il disegno: ordine, nome e icona';
+      const ohb = addHelp(lbl, 'sections_order');
       wrap.appendChild(lbl);
+      if (ohb) wrap.appendChild(ohb);
       const names = Object.fromEntries(FFlowCard.SECTIONS);
       const order = FFlowCard.sectionOrder(cfg);
       order.forEach((k, i) => {
@@ -645,6 +737,23 @@ class FFlowCardEditor extends HTMLElement {
         t.style.flex = '1';
         t.textContent = (i + 1) + '. ' + names[k];
         row.appendChild(t);
+        // v1.13.0: custom tab / title name and mdi icon for this section
+        const extra = document.createElement('div');
+        extra.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:-2px 0 8px 14px;';
+        const nm = document.createElement('input');
+        nm.type = 'text';
+        nm.placeholder = 'Nome: ' + FFlowCard.TAB_LABELS[k];
+        nm.value = (cfg.section_names && cfg.section_names[k]) || '';
+        nm.style.cssText = 'width:100%;box-sizing:border-box;padding:7px 9px;border-radius:6px;border:1px solid var(--divider-color,rgba(0,0,0,.3));background:var(--input-fill-color,var(--secondary-background-color));color:var(--primary-text-color);font:inherit;font-size:.82rem;';
+        nm.addEventListener('change', () => this._set('section_names', { ...(this._config.section_names || {}), [k]: nm.value.trim() }));
+        nm.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') nm.blur(); });
+        const ic = document.createElement('ha-selector');
+        ic.hass = this._hass;
+        ic.selector = { icon: {} };
+        ic.required = false;
+        ic.value = (cfg.section_icons && cfg.section_icons[k]) || '';
+        ic.addEventListener('value-changed', (ev) => { ev.stopPropagation(); this._set('section_icons', { ...(this._config.section_icons || {}), [k]: ev.detail.value || '' }); });
+        extra.appendChild(nm); extra.appendChild(ic);
         const mk = (label, title, dis, fn) => {
           const b = document.createElement('button');
           b.textContent = label; b.title = title; b.disabled = dis;
@@ -656,6 +765,7 @@ class FFlowCardEditor extends HTMLElement {
         mk('▲', 'Sposta su', i === 0, () => move(-1));
         mk('▼', 'Sposta giù', i === order.length - 1, () => move(1));
         wrap.appendChild(row);
+        wrap.appendChild(extra);
       });
       const hint = document.createElement('div');
       hint.style.cssText = 'font-size:.68rem;color:var(--secondary-text-color);margin-top:2px;';
@@ -671,6 +781,7 @@ class FFlowCardEditor extends HTMLElement {
       const lbl = document.createElement('div');
       lbl.className = 'row-label';
       lbl.textContent = 'Prestazioni';
+      const phb = addHelp(lbl, 'performance_mode');
       const sel = document.createElement('select');
       sel.style.cssText = 'width:100%;padding:8px;border-radius:6px;border:1px solid var(--divider-color,rgba(0,0,0,.3));background:var(--input-fill-color,var(--secondary-background-color));color:var(--primary-text-color);font:inherit;';
       [['normal', 'Normale (tutte le animazioni)'], ['light', 'Leggera (per dispositivi poco potenti)'], ['auto', 'Automatica (leggera su dispositivi lenti o con "riduci movimento")']].forEach(([v, t]) => {
@@ -680,7 +791,7 @@ class FFlowCardEditor extends HTMLElement {
       const hint = document.createElement('div');
       hint.style.cssText = 'font-size:.68rem;color:var(--secondary-text-color);margin-top:3px;line-height:1.4;';
       hint.textContent = 'Leggera: restano i flussi animati; niente bagliori, cielo e meteo fermi, menu senza goccia, aggiornamenti ogni 3 s.';
-      wrap.appendChild(lbl); wrap.appendChild(sel); wrap.appendChild(hint);
+      wrap.appendChild(lbl); if (phb) wrap.appendChild(phb); wrap.appendChild(sel); wrap.appendChild(hint);
       return wrap;
     })();
 
@@ -691,13 +802,14 @@ class FFlowCardEditor extends HTMLElement {
       const lbl = document.createElement('div');
       lbl.className = 'row-label';
       lbl.textContent = 'Menu a schede: all’apertura della pagina';
+      const thb = addHelp(lbl, 'tabs_start');
       const sel = document.createElement('select');
       sel.style.cssText = 'width:100%;padding:8px;border-radius:6px;border:1px solid var(--divider-color,rgba(0,0,0,.3));background:var(--input-fill-color,var(--secondary-background-color));color:var(--primary-text-color);font:inherit;';
       [['none', 'Tutte chiuse'], ['last', 'Riapri l’ultima scheda usata'], ...FFlowCard.SECTIONS.map(([k, n]) => [k, 'Apri sempre: ' + n])].forEach(([v, t]) => {
         const o = document.createElement('option'); o.value = v; o.textContent = t; if ((cfg.tabs_start || 'none') === v) o.selected = true; sel.appendChild(o);
       });
       sel.addEventListener('change', () => this._set('tabs_start', sel.value));
-      wrap.appendChild(lbl); wrap.appendChild(sel);
+      wrap.appendChild(lbl); if (thb) wrap.appendChild(thb); wrap.appendChild(sel);
       return wrap;
     })();
 
@@ -764,7 +876,9 @@ class FFlowCardEditor extends HTMLElement {
           row.style.cssText = 'margin-bottom:10px;';
           const lbl = document.createElement('div');
           lbl.className = 'row-label'; lbl.textContent = f.label;
+          const fhb = addHelp(lbl, listKey + '.' + f.key);
           row.appendChild(lbl);
+          if (fhb) row.appendChild(fhb);
           if (f.type === 'entity' || f.type === 'icon') {
             const sel = document.createElement('ha-selector');
             sel.hass = this._hass;
@@ -777,7 +891,7 @@ class FFlowCardEditor extends HTMLElement {
             const lab = document.createElement('label');
             lab.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:.82rem;cursor:pointer;color:var(--primary-text-color);';
             const cb = document.createElement('input');
-            cb.type = 'checkbox'; cb.checked = item[f.key] !== false;
+            cb.type = 'checkbox'; cb.checked = f.def === false ? !!item[f.key] : item[f.key] !== false;
             cb.style.accentColor = 'var(--primary-color,#03a9f4)';
             cb.addEventListener('change', () => upd(f.key, cb.checked));
             lab.appendChild(cb); lab.appendChild(document.createTextNode(f.text || 'Sì'));
@@ -831,6 +945,7 @@ class FFlowCardEditor extends HTMLElement {
         { key: 'color', label: 'Colore', type: 'color' },
         { key: 'threshold', label: 'Soglia "acceso" in W (predefinita 50)', type: 'number', placeholder: '50' },
         { key: 'chart', label: 'Grafico', type: 'bool', text: 'Mostra nel grafico dei consumi (togli la spunta per il totale casa)' },
+        { key: 'more_info', label: 'Tocco nella card', type: 'bool', text: '📈 Apri la scheda dell’entità toccando il riquadro' },
       ], (n) => ({ name: '', entity: '', icon: 'mdi:power-plug', color: FFlowCard.PALETTE[n % FFlowCard.PALETTE.length] }), '＋ Aggiungi utilizzatore'),
     ], { toggleKey: '_show_consumers', toggleOn: showConsumers, hidden: !showConsumers }));
 
@@ -874,6 +989,7 @@ class FFlowCardEditor extends HTMLElement {
       listEditor('vent_fans', [
         { key: 'name', label: 'Nome', type: 'text', placeholder: 'es. FAN1' },
         { key: 'entity', label: 'Sensore giri (rpm)', type: 'entity' },
+        { key: 'more_info', label: 'Tocco nella card', type: 'bool', def: false, text: '📈 Apri la scheda dell’entità toccando la ventola' },
       ], (n) => ({ name: 'FAN' + (n + 1), entity: '' }), '＋ Aggiungi ventola'),
     ], { toggleKey: '_show_ventilation', toggleOn: showVent, hidden: !showVent }));
 
@@ -934,6 +1050,7 @@ class FFlowCardEditor extends HTMLElement {
       const entityLabel = document.createElement('div');
       entityLabel.style.cssText = 'font-size:.72rem;color:var(--secondary-text-color);padding:0 2px 3px;line-height:1;display:flex;align-items:center;gap:6px;';
       entityLabel.textContent = active ? 'Entità (sostituisce quella predefinita)' : 'Entità — modifica l’etichetta per sbloccare';
+      const ehb = addHelp(entityLabel, entityKey);
       // State preview badge — shows current entity state text (e.g. "charging", "on grid backup mode")
       const currentEntityId = cfg[entityKey];
       if (active && currentEntityId && this._hass && this._hass.states[currentEntityId]) {
@@ -965,6 +1082,7 @@ class FFlowCardEditor extends HTMLElement {
         this._set(entityKey, ev.detail.value || '');
       });
       entityRow.appendChild(entityLabel);
+      if (ehb) entityRow.appendChild(ehb);
       entityRow.appendChild(sel);
       const wrapper = document.createElement('div');
       wrapper.appendChild(frag);
@@ -1175,6 +1293,9 @@ class FFlowCard extends HTMLElement {
       sections_order: ['bms', 'inv', 'cons', 'vent', 'stats', 'cam'],
       sections_layout: 'tabs',
       performance_mode: 'normal',
+      section_names: {},
+      section_icons: {},
+      more_info: [],
       background_opacity: 100,
       background_blur: false,
       tabs_start: 'none',
@@ -1523,8 +1644,7 @@ class FFlowCard extends HTMLElement {
     if (!this._tabsMode()) return keys.map(k => strip(chunks[k])).join('<div class="dv"></div>');
     // v1.11.0: tab menu with a gooey, spring-driven indicator; one panel open at a time
     if (!keys.length) return '';
-    const L = { bms: 'Batteria', inv: 'Inverter', cons: 'Utilizzatori', vent: 'Ventilazione', stats: 'Statistiche', cam: 'Video' };
-    const tabs = keys.map(k => `<button class="tab" data-k="${k}"><span class="ti">${this._secIcon(k)}</span><span>${L[k]}</span></button>`).join('');
+    const tabs = keys.map(k => `<button class="tab" data-k="${k}"><span class="ti">${this._secIcon(k)}</span><span>${this._secName(k)}</span></button>`).join('');
     const panels = keys.map(k => `<div class="tpanel" data-k="${k}" hidden>${strip(chunks[k])}</div>`).join('');
     return `<div class="tabs" id="tScroll"><div class="ttrack" id="tTrack">
         <svg class="tgoo" id="tGoo" width="10" height="10"><defs>
@@ -1561,6 +1681,190 @@ class FFlowCard extends HTMLElement {
   }
   _tabsMode() { return this.config.sections_layout !== 'stack'; }
 
+  // ── v1.13.0: help texts shown by the "?" next to each editor field (Italian, user-facing) ──
+  static get HELP() {
+    return {
+      // Generale
+      inverter_name: 'Nome che compare nel riquadro dell’inverter e nel titolo dei riquadri giornalieri (es. "Deye" diventa "Deye Inverter"). Se lo lasci vuoto la card scrive "INV".',
+      battery_capacity: 'Capacità totale della batteria, serve per calcolare autonomia, tempo alla ricarica ed energia residua. Scegli l’unità che conosci: Ah (ampere-ora, es. 314 per un pacco LiFePO4 da 314 Ah) oppure kWh (es. 16 per 16 kWh). In modalità Ah serve anche il sensore della tensione batteria.',
+      battery_reserve_soc: 'Percentuale sotto la quale l’inverter non scarica la batteria (es. 20). L’autonomia viene calcolata solo sull’energia sopra questa soglia: con SOC 45% e soglia 20%, conta il 25% della capacità. Con 0 arriva fino a batteria vuota.',
+      battery_target_soc: 'Percentuale a cui la batteria smette di caricarsi (di solito 100, oppure 90 se limiti la carica). Serve per il "tempo alla ricarica" mostrato mentre la batteria si carica.',
+      pv_max_power: 'Potenza massima del tuo impianto fotovoltaico in watt (es. 6000 per 6 kWp). Serve a scalare la barra "FV" in basso e l’intensità della luce sulle falde della casa.',
+      inverter_max_power: 'Potenza massima dell’inverter in watt (es. 6000). Serve per la percentuale di carico sotto la temperatura dell’inverter (consumo casa ÷ questa potenza) e per la barra "POT".',
+      // Layout
+      card_title: 'Testo in alto a sinistra della card. Se vuoto: "Flusso Energia".',
+      grid_status_entity: 'Entità che dice se l’impianto è collegato alla rete, mostrata come indicatore IN RETE / FUORI RETE in alto. Va bene un binary_sensor (on = in rete) o un sensore di testo con valori tipo "on grid" / "off grid". Serve anche per il comando di commutazione.',
+      grid_switch_to_off: 'Entità da attivare per staccare l’impianto dalla rete (switch, pulsante o script, es. switch.studio_off_grid). Con lo stato rete impostato, tenendo premuto l’indicatore IN RETE o il traliccio la card chiede conferma e la attiva.',
+      grid_switch_to_on: 'Entità da attivare per riattaccare l’impianto alla rete (switch, pulsante o script, es. switch.studio_on_grid). Si usa tenendo premuto l’indicatore FUORI RETE o il traliccio.',
+      grid_switch_confirm: 'Se attivo, prima di commutare IN RETE / FUORI RETE la card mostra una finestra di conferma. Consigliato: un tocco per sbaglio non stacca l’impianto.',
+      ems_mode_entity: 'Modalità di lavoro dell’inverter (EMS), mostrata come piccolo badge nel cielo. Per Deye è di solito un select "Work mode" (es. Zero Export To CT). Se è un select o input_select, tenendo premuto il badge puoi sceglierne un’altra.',
+      weather_entity: 'Entità meteo (weather.*, es. quella di Met.no). Il cielo della card si anima di conseguenza: nuvole, pioggia, neve, temporale, nebbia, vento. Facoltativa.',
+      performance_mode: 'Normale: tutte le animazioni. Leggera: per tablet o telefoni poco potenti, restano i flussi animati ma spariscono bagliori, animazioni decorative, movimento del cielo e goccia del menu; aggiornamento ogni 3 s. Automatica: leggera solo su dispositivi lenti o con "riduci movimento" attivo nel sistema.',
+      background_opacity: 'Quanto è pieno lo sfondo della card: 100 = pieno, 0 = trasparente (si vede lo sfondo della plancia). Valori intermedi come 60 danno un effetto vetro.',
+      background_blur: 'Sfoca ciò che sta dietro la card (effetto vetro smerigliato). Si nota solo con opacità sotto 100. Su dispositivi lenti può pesare: in modalità leggera è disattivato.',
+      inverter_image: 'Indirizzo di un’immagine da mostrare al posto del riquadro "INV" disegnato, ad esempio la foto del tuo inverter. Mettila in /config/www/ e scrivi /local/nomefile.png.',
+      _show_energy_supply: 'Mostra a destra la barra "Fonti energia": quanta parte della potenza in questo momento arriva da solare, carica batteria, scarica batteria e rete.',
+      _show_backup_panel: 'Mostra sotto la batteria il pannello con autonomia (in scarica) o tempo alla ricarica (in carica) ed energia residua in kWh. Serve la capacità della batteria.',
+      _daily_tiles_extended: 'Acceso: 6 riquadri giornalieri (FV, carica, scarica, prelievo, immissione, consumo). Spento: 4 riquadri (FV, carica/scarica, energia residua, consumo).',
+      home_icon_classic: 'Usa la vecchia immagine della casa invece della casa a due falde disegnata (con FV1 a sinistra e FV2 a destra).',
+      sections_stack: 'Spento (consigliato): le sezioni sotto il disegno sono un menu a schede con la goccia animata, una aperta alla volta. Acceso: le sezioni sono una sotto l’altra, richiudibili, con il flag 📌 per tenerle aperte.',
+      tabs_start: 'Cosa vedi quando apri la pagina con il menu a schede: tutte chiuse, l’ultima scheda che avevi aperto (ricordata su quel dispositivo) oppure sempre una scheda precisa.',
+      sections_order: 'Ordine delle sezioni sotto il disegno dei flussi, con ▲ ▼. Per ognuna puoi scrivere il nome che compare sulla scheda e scegliere un’icona mdi:. Se lasci vuoti, restano nome e icona predefiniti.',
+      grid_icon_classic: 'Usa la vecchia immagine del traliccio invece di quello luminoso disegnato.',
+      battery_style_classic: 'Usa la vecchia icona della batteria invece di quella a 10 segmenti.',
+      _show_battery_stats: 'Riquadri con temperatura celle, temperatura BMS, tensione cella min/max, scarica di oggi e autonomia. Sono pensati per un BMS JK: se non hai quei sensori, spegnili.',
+      // Utilizzatori
+      consumers_title: 'Titolo della sezione Utilizzatori (anche il nome della scheda si può cambiare in Layout → Ordine delle sezioni).',
+      consumers_meter_speed: 'Velocità dei dischi stile contatore Ferraris sotto ogni utilizzatore: 1 = normale (circa mezzo giro al secondo per kW), 2 = doppia, 0.5 = metà.',
+      consumers_chart: 'Mostra sotto gli utilizzatori il grafico dei consumi: un’area colorata per ognuno, dallo storico di Home Assistant.',
+      consumers_chart_hours: 'Periodo mostrato dal grafico quando apri la pagina (1–72 ore). Poi si cambia al volo con i pulsanti 1h · 4h · 8h · 12h · 24h sul grafico.',
+      consumers_chart_total: 'Aggiunge al grafico una linea tratteggiata con il consumo totale della casa (sensore "Consumo casa"): lo spazio tra le aree e la linea è il consumo non misurato.',
+      consumers_chart_legend: 'Elenco sotto il grafico con i kWh consumati da ogni utilizzatore. Togli la spunta per un grafico più compatto.',
+      'consumers.name': 'Nome mostrato nel riquadro (es. Lavatrice).',
+      'consumers.entity': 'Sensore di potenza istantanea dell’elettrodomestico, in W o kW (es. quello di una presa smart Shelly).',
+      'consumers.icon': 'Icona del riquadro: qualsiasi icona mdi:, cercala per nome (es. washing-machine).',
+      'consumers.color': 'Colore del riquadro, del disco e dell’area nel grafico.',
+      'consumers.threshold': 'Sopra questa potenza il riquadro si illumina come "acceso". Predefinita 50 W; alzala per apparecchi con consumi da standby.',
+      'consumers.chart': 'Togli la spunta per non disegnarlo nel grafico: serve se questo "utilizzatore" è in realtà il totale della casa, altrimenti verrebbe contato due volte.',
+      'consumers.more_info': 'Se attivo, toccando il riquadro nella card si apre la scheda dell’entità con i suoi grafici.',
+      // Videocamera
+      camera_title: 'Titolo della sezione Videocamera.',
+      camera_entity: 'Entità camera.* da mostrare. Se hai un NVR, usa lo stream (anche "sub", più leggero).',
+      camera_snapshot: 'Mostra un’immagine aggiornata ogni 10 secondi invece del video in diretta: più leggero e utile se il video non parte.',
+      ptz_camera: 'Entità camera.* dell’integrazione ONVIF che si muove (può essere diversa da quella del video). Con questa impostata, le frecce chiamano onvif.ptz e non servono altre entità.',
+      ptz_speed: 'Velocità del movimento ONVIF, da 0.1 a 1.',
+      ptz_distance: 'Quanto si muove la telecamera a ogni tocco (durata del movimento continuo), da 0.1 a 1. Tenendo premuta la freccia il comando si ripete.',
+      ptz_home_preset: 'Numero del preset ONVIF da richiamare con il pulsante centrale (es. 1). Facoltativo.',
+      ptz_up: 'In alternativa a ONVIF: entità (pulsante, script o switch) da attivare con la freccia ▲.',
+      ptz_down: 'Entità da attivare con la freccia ▼.',
+      ptz_left: 'Entità da attivare con la freccia ◀.',
+      ptz_right: 'Entità da attivare con la freccia ▶.',
+      ptz_home: 'Entità da attivare con il pulsante centrale (posizione iniziale).',
+      // Statistiche
+      stats_pv: 'Grafico della produzione di oggi, a barre orarie divise per stringa, con la curva della stima se imposti il sensore qui sotto.',
+      stats_forecast_entity: 'Sensore di previsione della produzione. Il migliore è uno con la previsione negli attributi (es. Solcast "Forecast Today"): la curva copre tutta la giornata. Un sensore di potenza mostra la curva fino ad adesso; uno di energia (kWh) mostra solo il totale stimato.',
+      stats_load: 'Grafico del consumo della casa nelle ultime 24 ore, colorato per intensità, con il picco evidenziato. Usa il sensore "Consumo casa".',
+      stats_battery: 'Grafico della batteria nelle ultime 24 ore: carica (blu), scarica (arancione) e SOC.',
+      // Ventilazione
+      vent_title: 'Titolo della sezione Ventilazione.',
+      vent_state_entity: 'Stato termico del controller delle ventole: idle, cool, low, medium, high, very high, critical. Decide colore, testo e velocità della ventola grande.',
+      vent_status_entity: 'Testo da mostrare come descrizione. Se vuoto, la card usa una frase in base al livello (es. "Raffreddamento leggero").',
+      vent_ambient_temp: 'Temperatura del locale dove sta l’inverter.',
+      vent_pwm: 'Percentuale di potenza delle ventole (PWM, 0–100%).',
+      vent_rpm_avg: 'Giri medi delle ventole. Se vuoto, la card fa la media delle ventole aggiunte qui sotto.',
+      vent_inv_temp: 'Temperatura dell’inverter da mostrare qui. Se vuota usa quella della sezione Fotovoltaico.',
+      vent_dc_temp: 'Temperatura del lato DC dell’inverter, se disponibile.',
+      'vent_fans.name': 'Nome della ventola (es. FAN1).',
+      'vent_fans.entity': 'Sensore dei giri della ventola (rpm). L’icona gira in proporzione.',
+      'vent_fans.more_info': 'Se attivo, toccando la ventola nella card si apre la scheda dell’entità con i suoi grafici.',
+      // Etichette
+      _labels_custom_entities: 'Permette di rinominare i riquadri della batteria e di mostrare un’altra entità al posto di quella predefinita.',
+      label_cell_temp_minmax: 'Testo del riquadro temperatura celle. Cambialo per poter scegliere un’altra entità qui sotto.',
+      label_bms_temp: 'Testo del riquadro temperatura BMS. Cambialo per poter scegliere un’altra entità.',
+      label_min_cell: 'Testo del riquadro tensione cella minima.',
+      label_max_cell: 'Testo del riquadro tensione cella massima.',
+      label_batt_dis: 'Testo del riquadro scarica di oggi.',
+      label_total_pv_gen: 'Testo del riquadro produzione FV totale.',
+      label_entity_cell_temp: 'Entità da mostrare al posto delle temperature celle predefinite (si sblocca cambiando il testo dell’etichetta).',
+      label_entity_bms_temp: 'Entità da mostrare al posto della temperatura BMS predefinita.',
+      label_entity_min_cell: 'Entità da mostrare al posto della tensione cella minima.',
+      label_entity_max_cell: 'Entità da mostrare al posto della tensione cella massima.',
+      label_entity_batt_dis: 'Entità da mostrare al posto della scarica di oggi.',
+      total_pv_gen_entity: 'Sensore della produzione fotovoltaica totale (da sempre), in kWh.',
+      // Fotovoltaico
+      pv1_power: 'Potenza istantanea della stringa 1 (W o kW). Compare accanto alla falda sinistra della casa, che si illumina in base a questo valore. Se il tuo inverter dà solo tensione e corrente, crea un sensore template tensione × corrente.',
+      pv1_name: 'Nome della falda/stringa 1 (es. Sud, Garage). Se vuoto: FV1.',
+      pv2_power: 'Potenza istantanea della stringa 2 (W o kW), mostrata sulla falda destra.',
+      pv2_name: 'Nome della falda/stringa 2. Se vuoto: FV2.',
+      pv3_power: 'Potenza della stringa 3, mostrata sotto FV1 (falda sinistra).',
+      pv3_name: 'Nome della stringa 3. Se vuoto: FV3.',
+      pv4_power: 'Potenza della stringa 4, mostrata sotto FV2 (falda destra).',
+      pv4_name: 'Nome della stringa 4. Se vuoto: FV4.',
+      pv_total_power: 'Potenza fotovoltaica totale istantanea, mostrata vicino al sole. Se vuota la card somma le stringhe.',
+      inv_temp: 'Temperatura dell’inverter, mostrata sotto il nome dell’inverter.',
+      today_pv: 'Energia prodotta oggi dal fotovoltaico (kWh), si azzera a mezzanotte.',
+      today_batt_chg: 'Energia caricata oggi nella batteria (kWh).',
+      today_load: 'Energia consumata oggi dalla casa (kWh).',
+      consump: 'Potenza istantanea consumata dalla casa (W o kW). È il valore sotto la casa; serve anche per il grafico e per i colori del flusso verso la casa.',
+      // Rete
+      invert_grid_power: 'La card si aspetta la potenza di rete positiva quando PRELEVI e negativa quando IMMETTI. Se il tuo sensore fa il contrario (es. -739 W mentre prelevi), attiva questo interruttore.',
+      grid_active_power: 'Potenza scambiata con la rete in questo momento, con il segno (prelievo / immissione). Colora il traliccio e il flusso.',
+      grid_import_energy: 'Energia prelevata dalla rete oggi (kWh), mostrata con ▼ accanto al traliccio.',
+      grid_export_energy: 'Energia immessa in rete oggi (kWh), mostrata con ▲. Facoltativa se non immetti.',
+      grid_power_alt: 'Sensore di riserva per la potenza di rete, usato se quello principale non è disponibile.',
+      // Batteria
+      invert_battery_power: 'La card si aspetta la potenza batteria positiva quando si CARICA e negativa quando si SCARICA. Se il badge mostra CARICA mentre la batteria si scarica, attiva questo interruttore.',
+      battery_soc: 'Stato di carica della batteria in percentuale.',
+      battery_power: 'Potenza della batteria in questo momento (W o kW), con il segno. Decide CARICA / SCARICA, il verso del flusso e l’autonomia.',
+      battery_current: 'Corrente della batteria (A), mostrata accanto al flusso.',
+      battery_voltage: 'Tensione della batteria (V), mostrata sotto l’icona. Serve per i calcoli se la capacità è in Ah.',
+      battery_temp1: 'Prima sonda di temperatura delle celle (BMS).',
+      battery_temp2: 'Seconda sonda di temperatura delle celle (BMS).',
+      battery_mos: 'Temperatura del BMS (MOS).',
+      battery_min_cell: 'Tensione della cella più bassa (V).',
+      battery_max_cell: 'Tensione della cella più alta (V).',
+      batt_dis: 'Energia scaricata oggi dalla batteria (kWh).',
+      goodwe_battery_soc: 'SOC di riserva, usato se il sensore SOC principale non è disponibile (es. quello dell’inverter invece di quello del BMS).',
+      goodwe_battery_curr: 'Corrente di riserva, usata se quella principale non è disponibile.',
+      battery2_soc: 'Stato di carica della seconda batteria.',
+      battery2_power: 'Potenza della seconda batteria, con lo stesso segno della principale.',
+      battery2_current: 'Corrente della seconda batteria.',
+      battery2_voltage: 'Tensione della seconda batteria.',
+      battery2_mos: 'Temperatura del BMS della seconda batteria.',
+      battery2_full_ah: 'Capacità della seconda batteria in Ah, se diversa dalla prima.',
+      battery2_full_wh: 'Capacità della seconda batteria in kWh, se diversa dalla prima.',
+      // Wallbox
+      charger_power: 'Potenza della wallbox o della presa dell’auto (W o kW). È l’unico campo necessario: sopra 50 W l’auto risulta "in carica".',
+      charger_state: 'Stato della wallbox (es. charging, completed, connected). Facoltativo: se vuoto lo stato si ricava dalla potenza.',
+      charger_soc: 'Livello della batteria dell’auto (%), dall’integrazione della tua auto.',
+      charger_current: 'Corrente di carica (A).',
+      charger_eta: 'Minuti alla carica completa, se la wallbox o l’auto li forniscono.',
+      charger_battery_capacity_wh: 'Capacità della batteria dell’auto in Wh (es. 43200 per 43,2 kWh): serve a stimare il tempo alla carica completa se non hai il sensore dei minuti.',
+    };
+  }
+  static get SECTION_HELP() {
+    return {
+      general: 'Impostazioni di base: nome dell’inverter, capacità della batteria e potenze massime. Compilale per prime: servono ai calcoli di autonomia e alle barre.',
+      layout: 'Aspetto della card: titolo, stato rete e commutazione, modalità EMS, meteo, prestazioni, sfondo, quali pannelli mostrare e come organizzare le sezioni sotto il disegno.',
+      consumers: 'Riquadri per i singoli elettrodomestici, con disco contatore e grafico dei consumi. Premi "＋ Attiva", poi "＋ Aggiungi utilizzatore" per ognuno.',
+      camera: 'Video di una telecamera con le frecce per muoverla (ONVIF). Premi "＋ Attiva" e scegli la videocamera.',
+      stats: 'Tre grafici: produzione di oggi per stringa con la stima, consumi della casa nelle 24 ore, batteria nelle 24 ore.',
+      ventilation: 'Per chi ha una ventilazione ausiliaria dell’inverter: stato termico, temperature, PWM e giri delle ventole.',
+      labels: 'Rinomina i riquadri della batteria (JK BMS) e mostra altre entità al loro posto.',
+      solar: 'Le due stringhe principali: la loro potenza illumina le due falde della casa.',
+      solar_extra: 'Fino a due stringhe in più (FV3 e FV4), mostrate sotto FV1 e FV2.',
+      solar_extras: 'Totali del fotovoltaico, temperatura dell’inverter, energie di oggi e consumo istantaneo della casa.',
+      grid: 'Scambio con la rete: potenza istantanea ed energia prelevata / immessa oggi.',
+      battery1: 'Dati della batteria principale. Il segno della potenza decide se la card mostra CARICA o SCARICA.',
+      battery2: 'Seconda batteria, se ne hai due: la card le mostra affiancate.',
+      ev: 'Wallbox e auto elettrica disegnate accanto alla casa. Basta la potenza della wallbox; il resto è facoltativo.',
+    };
+  }
+  // Card elements that open the entity's "more info" dialog when the option is ticked in the editor
+  static get MORE_INFO() {
+    return {
+      pv_total_power: ['arcPvLabelRect', 'arcPvLabelText', 'arcSunGroup'],
+      pv1_power: ['pv1FlowVal', 'pv1label'], pv2_power: ['pv2FlowVal', 'pv2label'],
+      pv3_power: ['pv3FlowVal', 'pv3label'], pv4_power: ['pv4FlowVal', 'pv4label'],
+      grid_active_power: ['fcGridVal', 'gridIconImg'],
+      grid_import_energy: ['gridImportVal', 'invTodayGridImp'],
+      grid_export_energy: ['gridExportVal', 'invTodayGridExp'],
+      consump: ['fcLoadVal', 'homeIconImg'],
+      battery_soc: ['battIconWrap', 'fcBattVal', 'fcBattVal1'],
+      battery_power: ['battPwrFlow', 'battPwrFlow1'],
+      battery_current: ['battCurrFlow', 'battCurrFlow1'],
+      battery_voltage: ['battVoltageFlow', 'battVoltageFlow1'],
+      battery2_soc: ['fcBattVal2'], battery2_power: ['battPwrFlow2'], battery2_current: ['battCurrFlow2'], battery2_voltage: ['battVoltageFlow2'],
+      inv_temp: ['invTempFlow', 'fcInvRect', 'invImg'],
+      today_pv: ['invTodayPv'], today_batt_chg: ['invTodayBattChg'], batt_dis: ['invTodayBattDis', 'bBattDis'], today_load: ['invTodayLoad'],
+      battery_temp1: ['bTemp1'], battery_mos: ['bTemp2'], battery_min_cell: ['bMinCell'], battery_max_cell: ['bMaxCell'], total_pv_gen_entity: ['bTotalPvGen'],
+      charger_power: ['evPowerVal'], charger_soc: ['evSocVal', 'evSocBar'], charger_state: ['evStateVal'],
+      grid_status_entity: ['gridStatusPill'], ems_mode_entity: ['emsBadge'],
+      vent_state_entity: ['ventState', 'ventMainIco'], vent_status_entity: ['ventStatus'], vent_ambient_temp: ['ventAmb'],
+      vent_pwm: ['ventPwm'], vent_rpm_avg: ['ventRpm'], vent_inv_temp: ['ventTemps'], vent_dc_temp: ['ventTemps'],
+    };
+  }
+
   // Line icons (24×24, stroke = currentColor) used in the tab menu and in the section titles
   static get SEC_ICONS() {
     return {
@@ -1572,7 +1876,20 @@ class FFlowCard extends HTMLElement {
       cam: '<rect x="2.5" y="6.5" width="13" height="11" rx="2.5"/><path d="m15.5 10.5 5.5-3.3v9.6l-5.5-3.3z"/><circle cx="9" cy="12" r="2.2"/>',
     };
   }
+  static get TAB_LABELS() { return { bms: 'Batteria', inv: 'Inverter', cons: 'Utilizzatori', vent: 'Ventilazione', stats: 'Statistiche', cam: 'Video' }; }
+  _esc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+  // v1.13.0: name and icon chosen in the editor (section_names / section_icons), else defaults
+  _secName(k, def) {
+    const n = this.config.section_names && this.config.section_names[k];
+    return this._esc(n && String(n).trim() ? n : (def !== undefined ? def : FFlowCard.TAB_LABELS[k]));
+  }
+  _secTitle(k, defHtml) {
+    const n = this.config.section_names && this.config.section_names[k];
+    return this._secIcon(k) + (n && String(n).trim() ? this._esc(n) : defHtml);
+  }
   _secIcon(k) {
+    const mdi = this.config.section_icons && this.config.section_icons[k];
+    if (mdi) return `<ha-icon class="sico" icon="${this._esc(mdi)}"></ha-icon>`;
     return `<svg class="sico" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${FFlowCard.SEC_ICONS[k] || ''}</svg>`;
   }
 
@@ -1798,7 +2115,7 @@ class FFlowCard extends HTMLElement {
         <div class="cch-info" id="cChartInfo"></div>
       </div>`;
     }
-    return '<div class="dv"></div>' + this._secHTML('cons', this._secIcon('cons') + title, h);
+    return '<div class="dv"></div>' + this._secHTML('cons', this._secTitle('cons', title), h);
   }
 
   // ── v1.4.0: 24 h consumption chart (HA recorder history) ─────────
@@ -2041,7 +2358,7 @@ class FFlowCard extends HTMLElement {
     if (this.config.stats_pv !== false) body += box('pv', 'Produzione FV oggi');
     if (this.config.stats_load !== false) body += box('load', 'Consumi casa · ultime 24 ore');
     if (this.config.stats_battery !== false) body += box('batt', 'Batteria · ultime 24 ore');
-    return '<div class="dv"></div>' + this._secHTML('stats', this._secIcon('stats') + 'Statistiche', body || '<div class="st-info">Nessun grafico attivo: attivali dall’editor.</div>');
+    return '<div class="dv"></div>' + this._secHTML('stats', this._secTitle('stats', 'Statistiche'), body || '<div class="st-info">Nessun grafico attivo: attivali dall’editor.</div>');
   }
 
   _maybeLoadStats() {
@@ -2309,7 +2626,7 @@ class FFlowCard extends HTMLElement {
   _buildCameraHTML(esc) {
     if (!this.config._show_camera) return '';
     const c = this.config;
-    if (!c.camera_entity) return '<div class="dv"></div>' + this._secHTML('cam', this._secIcon('cam') + esc(c.camera_title || 'Videocamera'), '<div class="st-info">Scegli la videocamera nell’editor (sezione Videocamera).</div>');
+    if (!c.camera_entity) return '<div class="dv"></div>' + this._secHTML('cam', this._secTitle('cam', esc(c.camera_title || 'Videocamera')), '<div class="st-info">Scegli la videocamera nell’editor (sezione Videocamera).</div>');
     const onvif = !!c.ptz_camera;   // native onvif.ptz: no per-arrow entities needed
     const arrow = (dir, key, path) => (c[key] || (onvif && key !== 'ptz_home') || (onvif && key === 'ptz_home' && c.ptz_home_preset)) ? `<button class="pz ${dir}" data-ptz="${key}" title="${{ ptz_up: 'Su', ptz_down: 'Giù', ptz_left: 'Sinistra', ptz_right: 'Destra', ptz_home: 'Posizione iniziale' }[key]}">
         <svg viewBox="0 0 24 24" width="18" height="18"><path d="${path}" fill="currentColor"/></svg></button>` : '';
@@ -2320,7 +2637,7 @@ class FFlowCard extends HTMLElement {
         ${arrow('right', 'ptz_right', 'M8.6 16.6 13.2 12 8.6 7.4 10 6l6 6-6 6z')}
         ${c.ptz_home || (onvif && c.ptz_home_preset) ? arrow('home', 'ptz_home', 'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z') : '<span class="pz home dot"></span>'}
       </div>` : '';
-    return '<div class="dv"></div>' + this._secHTML('cam', this._secIcon('cam') + esc(c.camera_title || 'Videocamera'), `
+    return '<div class="dv"></div>' + this._secHTML('cam', this._secTitle('cam', esc(c.camera_title || 'Videocamera')), `
       <div class="cam" id="camBox">
         <div class="cam-v" id="camView"></div>
         <div class="cam-off" id="camOff">Videocamera non disponibile</div>
@@ -2577,7 +2894,7 @@ class FFlowCard extends HTMLElement {
       fh += `<div class="vk"><div class="vfi" id="vfIco${i}">${this._fanSVG('vfRot' + i, 14)}<span class="v" id="vfVal${i}">--</span></div>
         <div class="l">${esc(f.name || 'FAN' + (i + 1))}</div></div>`;
     });
-    return '<div class="dv"></div>' + this._secHTML('vent', this._secIcon('vent') + esc(this.config.vent_title || 'Ventilazione inverter'), `
+    return '<div class="dv"></div>' + this._secHTML('vent', this._secTitle('vent', esc(this.config.vent_title || 'Ventilazione inverter')), `
       <div class="vent" id="ventBox">
         <div class="vrow">
           <div class="vico" id="ventMainIco">${this._fanSVG('ventMainRot', 26)}
@@ -2593,10 +2910,44 @@ class FFlowCard extends HTMLElement {
       </div>`);
   }
 
+  // ── v1.13.0: open HA's "more info" dialog for the entities ticked in the editor ──
+  _moreInfo(entityId) {
+    if (!entityId || Date.now() - (this._holdAt || 0) < 700) return;   // a hold just opened its own dialog
+    this.dispatchEvent(new CustomEvent('hass-more-info', { detail: { entityId }, bubbles: true, composed: true }));
+  }
+  _bindMoreInfo() {
+    const root = this.shadowRoot;
+    const keys = Array.isArray(this.config.more_info) ? this.config.more_info : [];
+    const MAP = FFlowCard.MORE_INFO;
+    keys.forEach(key => {
+      const eid = this.config[key];
+      if (!eid || !MAP[key]) return;
+      MAP[key].forEach(id => {
+        let el = root.getElementById(id);
+        if (!el || el._ffcMi) return;
+        const tile = el.closest && el.closest('.pvi, .st, .vk');   // whole tile for values inside tiles
+        if (tile) el = tile;
+        if (el._ffcMi) return;
+        el._ffcMi = true;
+        el.classList.add('mi');
+        el.addEventListener('click', (e) => { e.stopPropagation(); this._moreInfo(eid); });
+      });
+    });
+    this._ventFans().forEach((f, i) => {
+      if (!f.more_info) return;
+      const ico = root.getElementById('vfIco' + i);
+      const tile = ico && ico.closest('.vk');
+      if (!tile || tile._ffcMi) return;
+      tile._ffcMi = true; tile.classList.add('mi');
+      tile.addEventListener('click', () => this._moreInfo(f.entity));
+    });
+  }
+
   _bindExtraSections() {
-    this.shadowRoot.querySelectorAll('.cn[data-entity]').forEach(el => {
-      el.addEventListener('click', () => this.dispatchEvent(new CustomEvent('hass-more-info', {
-        detail: { entityId: el.dataset.entity }, bubbles: true, composed: true })));
+    this.shadowRoot.querySelectorAll('.cn[data-entity]').forEach((el, i) => {
+      const c = this._consumers()[i];
+      if (c && c.more_info === false) { el.style.cursor = 'default'; return; }
+      el.addEventListener('click', () => this._moreInfo(el.dataset.entity));
     });
     // animation state: meters and fans keep their own angle so speed changes are smooth
     this._spin = { meters: {}, fans: {}, rings: {} };
@@ -2783,7 +3134,7 @@ class FFlowCard extends HTMLElement {
     const start = (ev) => {
       if (ev.button > 0) return;
       badge.classList.add('holding');
-      timer = setTimeout(() => { timer = null; badge.classList.remove('holding'); this._openEms(); }, 800);
+      timer = setTimeout(() => { timer = null; this._holdAt = Date.now(); badge.classList.remove('holding'); this._openEms(); }, 800);
     };
     const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } badge.classList.remove('holding'); };
     badge.addEventListener('pointerdown', start);
@@ -2836,7 +3187,7 @@ class FFlowCard extends HTMLElement {
       const start = (ev) => {
         if (ev.button > 0 || this._gridPending) return;
         if (pill) pill.classList.add('holding');
-        timer = setTimeout(() => { timer = null; if (pill) pill.classList.remove('holding'); this._askGridSwitch(); }, HOLD);
+        timer = setTimeout(() => { timer = null; this._holdAt = Date.now(); if (pill) pill.classList.remove('holding'); this._askGridSwitch(); }, HOLD);
       };
       const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } if (pill) pill.classList.remove('holding'); };
       el.addEventListener('pointerdown', start);
@@ -3108,6 +3459,11 @@ class FFlowCard extends HTMLElement {
       .dv{height:1px;background:#21262d;margin:8px 0}
       .ct{font-size:.68rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#8b949e;margin-bottom:10px;display:flex;align-items:center;gap:7px}
       .ct::after{content:'';flex:1;height:1px;background:#21262d}
+      .mi{cursor:pointer}
+      svg .mi{pointer-events:bounding-box}
+      .pvi.mi:hover,.st.mi:hover,.vk.mi:hover{border-color:#58a6ff}
+      ha-icon.sico{--mdc-icon-size:16px;width:16px;height:16px;display:inline-flex}
+      .sec-t ha-icon.sico{--mdc-icon-size:15px;width:15px;height:15px;color:#a8c1ff}
       .ffc.lite svg *{filter:none!important}
       .ffc.lite .tgoo{display:none}
       .ffc.lite #arcSunGlow1,.ffc.lite #arcSunGlow2{display:none}
@@ -3418,7 +3774,7 @@ class FFlowCard extends HTMLElement {
         </div>
       </div>
       </div>`,
-      inv: this._secHTML('inv', this._secIcon('inv') + invSection, tiles6 ? `<div class="pvf six">
+      inv: this._secHTML('inv', this._secTitle('inv', invSection), tiles6 ? `<div class="pvf six">
         <div class="pvi"><div class="ico">☀️</div><div class="lbl">FV Oggi</div><div class="val yw" id="invTodayPv">-- kWh</div></div>
         <div class="pvi"><div class="ico">🔋</div><div class="lbl">Carica Batt</div><div class="val" id="invTodayBattChg">-- kWh</div></div>
         <div class="pvi"><div class="ico">⚡</div><div class="lbl">Scarica Batt</div><div class="val" id="invTodayBattDis">-- kWh</div></div>
@@ -3438,6 +3794,7 @@ class FFlowCard extends HTMLElement {
     this._bindEms();
     this._bindSections();
     this._bindTabs();
+    this._bindMoreInfo();
     if (this._lite()) {
       const keep = '#flowBattIn,#flowBattOut,#flowGridIn,#flowGridOut,#flowInvLoad,#flowHomeEV,#pvFlowGroup';
       this.shadowRoot.querySelectorAll('animate,animateTransform,animateMotion').forEach(a => { if (!a.closest(keep)) a.remove(); });

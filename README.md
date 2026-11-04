@@ -7,7 +7,7 @@
 [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
 [![Release](https://img.shields.io/github/v/release/fabiustek/f-flow-card)](https://github.com/fabiustek/f-flow-card/releases)
 
-Versione attuale: **v1.12.0** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
+Versione attuale: **v1.13.0** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/card-overview.png" alt="F-Flow Card con tutte le sezioni attive" width="480">
@@ -22,6 +22,8 @@ Versione attuale: **v1.12.0** · Fork di [k-flow-card](https://github.com/thekha
 - [Cosa fa](#cosa-fa)
 - [Installazione](#installazione)
 - [Primi passi](#primi-passi)
+  - [Aiuto nell'editor](#aiuto-nelleditor)
+  - [Aprire i grafici di un'entità dalla card](#aprire-i-grafici-di-unentità-dalla-card)
 - [Le sezioni della card](#le-sezioni-della-card)
   - [Flussi di energia](#flussi-di-energia)
   - [Casa a due falde](#casa-a-due-falde)
@@ -107,9 +109,26 @@ HACS registra la risorsa da solo e ti avvisa quando esce una nuova versione.
    - **🔌 Rete**: potenza della rete, energia prelevata e immessa.
    - **🔋 Batteria principale**: SOC, potenza, corrente, tensione.
 3. Se un valore va al contrario (per esempio la batteria risulta in scarica mentre si carica), usa l'interruttore **Inverti segno** nella sezione della rete o della batteria.
-4. Attiva le sezioni che ti servono: **🎨 Layout e intestazione**, **🔌 Utilizzatori**, **🌀 Ventilazione inverter**, **🚗 Auto elettrica / Wallbox**.
+4. Se non sai cosa inserire in un campo, tocca il **?** accanto al suo nome: si apre la spiegazione (vedi [Aiuto nell'editor](#aiuto-nelleditor)).
+5. Attiva le sezioni che ti servono: **🎨 Layout e intestazione**, **🔌 Utilizzatori**, **🌀 Ventilazione inverter**, **🚗 Auto elettrica / Wallbox**.
 
 Tutte le funzioni aggiuntive sono facoltative: se non le attivi, non compaiono.
+
+### Aiuto nell'editor
+
+<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/editor-help.png" alt="Editor con le spiegazioni aperte e le caselle apri al tocco" width="460"></p>
+
+Accanto al nome di ogni campo, interruttore e sezione dell'editor c'è un **?**:
+- **toccalo** (anche da telefono o tablet) per aprire sotto il campo la spiegazione di cosa inserire, con esempi; toccalo di nuovo per chiuderla;
+- dal computer la stessa spiegazione compare anche **passando il mouse** sopra il **?**.
+
+### Aprire i grafici di un'entità dalla card
+
+Accanto alle entità che compaiono nella card c'è la casella **📈 apri al tocco**. Se la spunti, toccando quel valore nella card si apre la finestra di Home Assistant con i dettagli e i **grafici** dell'entità (la "more-info"). Per esempio, spuntandola su **Consumo casa** e toccando la casa (o il valore sotto) vedi il grafico del consumo.
+
+Funziona per: produzione FV (etichetta vicino al sole) e stringhe FV1–FV4, potenza ed energie della rete (traliccio e valori), consumo casa (casa e valore), batteria (icona, potenza, corrente, tensione), temperatura e riquadro dell'inverter, riquadri giornalieri, riquadri JK BMS, wallbox (potenza, SOC, stato), indicatore IN RETE / FUORI RETE, badge EMS e valori della ventilazione. Per gli **utilizzatori** e le **ventole** la casella è dentro ogni elemento dell'elenco (gli utilizzatori la hanno attiva di partenza, come prima).
+
+Sull'indicatore della rete e sul badge EMS il **tocco breve** apre la scheda, mentre **tenere premuto** continua ad aprire la commutazione o la scelta della modalità.
 
 ---
 
@@ -366,7 +385,7 @@ Il flag **📌** a destra decide come si presenta la sezione quando apri o ricar
 - **📌 spuntato**: la sezione si apre **sempre aperta** (bloccata aperta).
 - **📌 senza spunta**: puoi aprirla quando vuoi, ma a ogni ricaricamento della pagina la trovi **chiusa**.
 
-**Ordine delle sezioni**: in **🎨 Layout e intestazione** → **Ordine delle sezioni** sposti con **▲ ▼** le parti sotto il disegno dei flussi: statistiche batteria (JK BMS), Inverter, Utilizzatori e grafico, Ventilazione, Statistiche, Videocamera. Le sezioni non attive non compaiono nella card ma tengono il loro posto nell'elenco.
+**Ordine, nome e icona delle sezioni**: in **🎨 Layout e intestazione** → **Sezioni sotto il disegno** sposti con **▲ ▼** le parti sotto il disegno dei flussi; sotto ogni riga puoi scrivere il **nome** da mostrare sulla scheda (e nel titolo delle sezioni impilate) e scegliere un'**icona** `mdi:` al posto di quella disegnata. Lasciando vuoti restano nome e icona predefiniti. Le parti sono: statistiche batteria (JK BMS), Inverter, Utilizzatori e grafico, Ventilazione, Statistiche, Videocamera. Le sezioni non attive non compaiono nella card ma tengono il loro posto nell'elenco.
 
 Di partenza tutte le sezioni hanno il flag spuntato, quindi la card si presenta come prima finché non togli la spunta. Il flag e la scelta delle ore del grafico vengono salvati **sul dispositivo** (nel browser o nell'app): sul telefono e sul computer puoi avere impostazioni diverse.
 
@@ -496,6 +515,9 @@ Tutte le opzioni si impostano dall'editor visuale; qui trovi le chiavi YAML corr
 | `battery_style` | `modern` | `modern` (a segmenti) o `classic` |
 | `sections_layout` | `tabs` | `tabs` (menu a schede) o `stack` (sezioni impilate) |
 | `tabs_start` | `none` | Menu a schede all'apertura: `none` (tutte chiuse), `last` (ultima usata) o il nome di una sezione (`inv`, `cons`…) |
+| `section_names` | `{}` | Nome personalizzato per scheda/sezione, es. `{inv: Il mio Deye, cons: Elettrodomestici}` |
+| `section_icons` | `{}` | Icona `mdi:` per scheda/sezione, es. `{cons: mdi:fridge}` |
+| `more_info` | `[]` | Entità che aprono la scheda di Home Assistant al tocco nella card (chiavi della configurazione, es. `[consump, battery_soc]`) |
 | `sections_order` | `[bms, inv, cons, vent, stats, cam]` | Ordine delle sezioni sotto il disegno (bms = statistiche batteria, inv = Inverter, cons = Utilizzatori, vent = Ventilazione, stats = Statistiche, cam = Videocamera) |
 | `grid_icon_style` | `modern` | `modern` (traliccio luminoso) o `classic` (immagine) |
 | `home_icon_style` | `modern` | `modern` (casa a due falde) o `classic` (immagine) |
@@ -557,7 +579,7 @@ Tutte le opzioni si impostano dall'editor visuale; qui trovi le chiavi YAML corr
 | `_show_consumers` | `false` | Mostra la sezione |
 | `consumers_title` | `Utilizzatori` | Titolo della sezione |
 | `consumers_meter_speed` | `1` | Velocità dei dischi contatore (0.1–5) |
-| `consumers` | `[]` | Elenco con `name`, `entity`, `icon`, `color`, `threshold` (W), `chart` (`false` per escluderlo dal grafico) |
+| `consumers` | `[]` | Elenco con `name`, `entity`, `icon`, `color`, `threshold` (W), `chart` (`false` per escluderlo dal grafico), `more_info` (`false` per non aprire la scheda al tocco) |
 | `consumers_chart` | `true` | Mostra il grafico dei consumi |
 | `consumers_chart_hours` | `24` | Ore mostrate all'apertura (1–72); poi si cambiano con i pulsanti sul grafico |
 | `consumers_chart_legend` | `true` | Legenda sotto il grafico (`false` per un grafico più compatto) |
@@ -602,7 +624,7 @@ Tutte le opzioni si impostano dall'editor visuale; qui trovi le chiavi YAML corr
 | `vent_rpm_avg` | RPM medio (se vuoto: media delle ventole) |
 | `vent_inv_temp` | Temperatura inverter (se vuota: `inv_temp`) |
 | `vent_dc_temp` | Temperatura DC |
-| `vent_fans` | Elenco ventole con `name` e `entity` (rpm) |
+| `vent_fans` | Elenco ventole con `name`, `entity` (rpm) e `more_info` (`true` per aprire la scheda al tocco) |
 
 ### Auto elettrica / Wallbox
 
@@ -676,7 +698,7 @@ Misure su un telefono di fascia bassa simulato (processore 6 volte più lento, 2
 
 A ogni nuova versione viene creata automaticamente una **release** su GitHub e HACS ti propone l'aggiornamento in Home Assistant. Dopo l'aggiornamento ricarica il browser con `Ctrl + Shift + R`.
 
-Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.12.0**.
+Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.13.0**.
 
 ### Icona nella notifica di aggiornamento
 
@@ -728,6 +750,9 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 - Controlla il sensore **Potenza wallbox**: è l'unico necessario. Senza **Stato wallbox**, la card mostra "IN CARICA" solo quando la potenza supera 50 W, altrimenti "IN ATTESA".
 - Se hai configurato lo stato ma il valore non è tra quelli riconosciuti (vedi [Auto elettrica / Wallbox](#auto-elettrica--wallbox)), la card mostra "SCOLLEGATA": in quel caso lascia vuoto lo stato.
 
+**Toccando un valore non si apre nulla**
+- Spunta **📈 apri al tocco** accanto a quell'entità nell'editor. Sull'indicatore della rete e sul badge EMS il tocco deve essere breve: tenendo premuto si apre la commutazione / la scelta della modalità.
+
 **La dashboard è lenta o il dispositivo scalda**
 - Aggiorna almeno alla v1.12.0, che è molto più leggera a parità di aspetto.
 - Sui dispositivi poco potenti imposta **Prestazioni → Leggera** (o **Automatica**) in **🎨 Layout e intestazione**.
@@ -771,6 +796,11 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 ---
 
 ## Registro delle modifiche
+
+### v1.13.0
+- **Aiuto nell'editor**: un **?** accanto a ogni campo, interruttore e sezione apre la spiegazione di cosa inserire (tocco, oppure passaggio del mouse).
+- **Nome e icona delle schede** a scelta, anche per i titoli delle sezioni impilate.
+- **Apri al tocco**: spuntando la casella accanto a un'entità, toccandola nella card si apre la scheda di Home Assistant con i grafici.
 
 ### v1.12.0
 - **Card molto più leggera a parità di aspetto**: aggiornamenti solo quando cambiano i suoi sensori (massimo uno al secondo), animazioni sul motore nativo del browser, stelle e meteo solo quando servono, pausa automatica quando la card non si vede, videocamera collegata solo con la sezione aperta. Su un telefono lento simulato: da 4 a 40–60 fotogrammi al secondo.
@@ -872,4 +902,4 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 
 ---
 
-*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.12.0*
+*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.13.0*
