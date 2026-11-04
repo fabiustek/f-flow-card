@@ -1170,6 +1170,11 @@ class FFlowCardEditor extends HTMLElement {
       labelRow('label_max_cell',         'Etichetta cella max',          'Cella Max',          'label_entity_max_cell',  maxCellActive),
       labelRow('label_batt_dis',         'Etichetta scarica batteria',          'Scarica Batt.',         'label_entity_batt_dis',  battDisActive),
       labelRow('label_total_pv_gen',     'Etichetta produzione FV totale',      'PRODUZIONE FV TOT.',     'total_pv_gen_entity',    totalPvGenActive),
+      divider(),
+      textField('label_custom1', 'Campo libero 1: etichetta (es. CICLI BATTERIA)', 'CAMPO 1'),
+      picker('label_entity_custom1', 'Campo libero 1: entità da mostrare', true),
+      textField('label_custom2', 'Campo libero 2: etichetta (es. SOH BATTERIA)', 'CAMPO 2'),
+      picker('label_entity_custom2', 'Campo libero 2: entità da mostrare', true),
     ], { toggleKey: '_labels_custom_entities', toggleOn: labelsEnabled, hidden: !labelsEnabled }));
 
     shell.appendChild(makeSection('solar', '☀️', 'Fotovoltaico', [
@@ -1339,6 +1344,7 @@ class FFlowCard extends HTMLElement {
       label_entity_min_cell: '',
       label_entity_max_cell: '',
       label_entity_batt_dis: '',
+      label_custom1: '', label_entity_custom1: '', label_custom2: '', label_entity_custom2: '',
       _labels_custom_entities: false,
       grid_power_alt: 'sensor.grid_phase_a_power',
       _show_battery: true,
@@ -1857,6 +1863,10 @@ class FFlowCard extends HTMLElement {
       label_entity_min_cell: 'Entità da mostrare al posto della tensione cella minima.',
       label_entity_max_cell: 'Entità da mostrare al posto della tensione cella massima.',
       label_entity_batt_dis: 'Entità da mostrare al posto della scarica di oggi.',
+      label_custom1: 'Testo del primo riquadro libero tra le statistiche batteria (es. CICLI BATTERIA). Compare solo se scegli anche l’entità qui sotto.',
+      label_entity_custom1: 'Qualsiasi entità: la card mostra il suo valore con l’unità (es. sensor.jk_cycles). Il riquadro compare tra le statistiche batteria.',
+      label_custom2: 'Testo del secondo riquadro libero (es. SOH BATTERIA).',
+      label_entity_custom2: 'Qualsiasi entità per il secondo riquadro libero (es. sensor.jk_soh).',
       total_pv_gen_entity: 'Sensore della produzione fotovoltaica totale (da sempre), in kWh.',
       // Fotovoltaico
       pv1_power: 'Potenza istantanea della stringa 1 (W o kW). Compare accanto alla falda sinistra della casa, che si illumina in base a questo valore. Se il tuo inverter dà solo tensione e corrente, crea un sensore template tensione × corrente.',
@@ -1981,7 +1991,7 @@ class FFlowCard extends HTMLElement {
       battery_voltage: ['battVoltageFlow', 'battVoltageFlow1'],
       battery2_soc: ['fcBattVal2'], battery2_power: ['battPwrFlow2'], battery2_current: ['battCurrFlow2'], battery2_voltage: ['battVoltageFlow2'],
       inv_temp: ['invTempFlow', 'fcInvRect', 'invImg'],
-      today_pv: ['invTodayPv'], today_batt_chg: ['invTodayBattChg'], batt_dis: ['invTodayBattDis', 'bBattDis'], today_load: ['invTodayLoad'],
+      today_pv: ['invTodayPv'], today_batt_chg: ['invTodayBattChg'], batt_dis: ['invTodayBattDis', 'bBattDis'], label_entity_custom1: ['bCustom1'], label_entity_custom2: ['bCustom2'], today_load: ['invTodayLoad'],
       battery_temp1: ['bTemp1'], battery_mos: ['bTemp2'], battery_min_cell: ['bMinCell'], battery_max_cell: ['bMaxCell'], total_pv_gen_entity: ['bTotalPvGen'],
       charger_power: ['evPowerVal'], charger_soc: ['evSocVal', 'evSocBar'], charger_state: ['evStateVal'],
       grid_status_entity: ['gridStatusPill'], ems_mode_entity: ['emsBadge'],
@@ -4666,6 +4676,9 @@ class FFlowCard extends HTMLElement {
         <div class="st"><div class="l">${this.config.label_max_cell || 'Cella Max'}</div><div class="v" id="bMaxCell">-- V</div></div>
         <div class="st"><div class="l">${this.config.label_batt_dis || 'Scarica Batt.'}</div><div class="v" id="bBattDis">-- kWh</div></div>
       </div>
+      ${(this.config._labels_custom_entities && (this.config.label_entity_custom1 || this.config.label_entity_custom2)) ? `<div style="display:grid;grid-template-columns:repeat(${this.config.label_entity_custom1 && this.config.label_entity_custom2 ? 2 : 1},1fr);gap:4px;margin-top:4px">
+        ${[1, 2].filter(i => this.config['label_entity_custom' + i]).map(i => `<div class="st"><div class="l">${this._esc(this.config['label_custom' + i] || 'CAMPO ' + i)}</div><div class="v" id="bCustom${i}">--</div></div>`).join('')}
+      </div>` : ''}
       <div style="margin-top:4px">
         <div class="st" style="display:flex;flex-direction:row;align-items:flex-end;justify-content:space-between;gap:8px;padding:4px 9px 5px;width:100%;box-sizing:border-box">
           <div class="l" id="bEnduStatLbl" style="margin-bottom:0;white-space:nowrap;line-height:1.4">${this.config.label_endurance || 'AUTONOMIA'}</div>
@@ -5268,6 +5281,19 @@ class FFlowCard extends HTMLElement {
     const _battDisRaw = battDisCustom ? _readVal('label_entity_batt_dis') : null;
     const battDisFinal = (_battDisRaw && !_battDisRaw.isText) ? _battDisRaw.val : battDis1;
     const battDisUnit  = battDisCustom ? _readUnit('label_entity_batt_dis') : 'kWh';
+
+    // ── v1.15.0: two free tiles (label + any entity) ──
+    [1, 2].forEach(i => {
+      const el = getEl('bCustom' + i), key = 'label_entity_custom' + i;
+      if (!el || !this.config[key]) return;
+      const raw = _readVal(key);
+      if (!raw) { el.textContent = '--'; el.style.color = '#8b949e'; }
+      else if (raw.isText) { el.textContent = raw.text; el.style.color = '#c9d1d9'; }
+      else {
+        const u = _readUnit(key), fmt = _fmtCustom(raw.val, u);
+        el.textContent = (Number.isInteger(raw.val) ? raw.val : +raw.val.toFixed(2)) + (u ? ' ' + u : ''); el.style.color = fmt.color;
+      }
+    });
 
     // ── Apply overrides to stat tiles ──
     const _bT1o = getEl('bTemp1');
