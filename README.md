@@ -805,6 +805,10 @@ Tutte le opzioni si impostano dall'editor visuale; qui trovi le chiavi YAML corr
 | `label_total_pv_gen` | `PRODUZIONE FV TOT.` | Etichetta produzione FV totale |
 | `label_endurance` | `AUTONOMIA` | Etichetta autonomia |
 | `label_entity_*` | `''` | Entità alternativa per il riquadro corrispondente |
+| `label_custom1` / `label_custom2` | `''` | Testo dei due **campi liberi** (es. `CICLI BATTERIA`) |
+| `label_entity_custom1` / `label_entity_custom2` | `''` | Entità dei due campi liberi: compaiono come riquadri in più tra le statistiche batteria |
+
+**Campi liberi** (dalla v1.15.0): in fondo alla sezione **🏷️ Etichette** ci sono due campi in più, ognuno con un testo e un'entità a scelta (per esempio *CICLI BATTERIA* con `sensor.jk_cycles` e *SOH BATTERIA* con `sensor.jk_soh`). Compaiono come riquadri in più sotto le statistiche batteria (serve **Riquadri statistiche batteria** attivo); un campo senza entità non compare. Il valore è mostrato con la sua unità e si può aprire al tocco con 📈.
 
 Nella sezione Etichette la scelta di un'entità alternativa si sblocca solo dopo aver cambiato il testo dell'etichetta; il sensore corrispondente nella sezione Batteria viene allora bloccato, per evitare doppioni.
 
@@ -987,6 +991,7 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 - **Effetto calore sulle falde**: i pannelli in produzione tremolano come una superficie rovente, con onde gialle che risalgono la falda, in proporzione alla potenza di ogni falda (`roof_heat`, disattivabile).
 - **Tensione delle stringhe** accanto alla potenza di FV1…FV4; i nomi delle falde (es. *Lato piazza*, *Lato ingresso*) restano configurabili con `pv1_name` / `pv2_name`.
 - **Ricarica EV**: nella parte Wallbox tolta la voce *Connettore*, già indicata in alto.
+- **Etichette**: due **campi liberi** (testo + entità a scelta) come riquadri in più tra le statistiche batteria.
 
 ### v1.14.3
 - **Ricarica EV**: barra a bolle rifatta e **animata** come nel video di riferimento: le bolle nascono, ondeggiano, si spostano e scoppiano di continuo. La barra è più sottile, rallenta da sola sui dispositivi lenti e resta ferma in modalità leggera.
