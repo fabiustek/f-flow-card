@@ -1,5 +1,11 @@
-// f-flow-card.js – Unified Edition v1.15.0
-const FFC_VERSION = '1.15.0';
+// f-flow-card.js – Unified Edition v1.15.1
+const FFC_VERSION = '1.15.1';
+// Changes v1.15.1:
+//   NEW  – Ricarica EV: the bubble bar becomes a "liquid in glass" canvas (glass reflection, cloudy
+//           liquid, fine rising bubbles; livelier with the charging power). Connector chip removed.
+//   NEW  – Labels: two free tiles (label_custom1/2 + label_entity_custom1/2) in the battery stats.
+//   FIX  – "Fonti energia" block centred like a pyramid (self-sufficiency/consumption in two columns);
+//           string voltage on the same line as the string power, so it never overlaps the slopes.
 // Changes v1.15.0:
 //   NEW  – Autosufficienza / autoconsumo of today under "Fonti energia" (_show_self_stats, on by default),
 //           computed from today's energies or taken from self_sufficiency_entity / self_consumption_entity.
@@ -1170,6 +1176,11 @@ class FFlowCardEditor extends HTMLElement {
       labelRow('label_max_cell',         'Etichetta cella max',          'Cella Max',          'label_entity_max_cell',  maxCellActive),
       labelRow('label_batt_dis',         'Etichetta scarica batteria',          'Scarica Batt.',         'label_entity_batt_dis',  battDisActive),
       labelRow('label_total_pv_gen',     'Etichetta produzione FV totale',      'PRODUZIONE FV TOT.',     'total_pv_gen_entity',    totalPvGenActive),
+      divider(),
+      textField('label_custom1', 'Campo libero 1: etichetta (es. CICLI BATTERIA)', 'CAMPO 1'),
+      picker('label_entity_custom1', 'Campo libero 1: entità da mostrare', true),
+      textField('label_custom2', 'Campo libero 2: etichetta (es. SOH BATTERIA)', 'CAMPO 2'),
+      picker('label_entity_custom2', 'Campo libero 2: entità da mostrare', true),
     ], { toggleKey: '_labels_custom_entities', toggleOn: labelsEnabled, hidden: !labelsEnabled }));
 
     shell.appendChild(makeSection('solar', '☀️', 'Fotovoltaico', [
@@ -1339,6 +1350,7 @@ class FFlowCard extends HTMLElement {
       label_entity_min_cell: '',
       label_entity_max_cell: '',
       label_entity_batt_dis: '',
+      label_custom1: '', label_entity_custom1: '', label_custom2: '', label_entity_custom2: '',
       _labels_custom_entities: false,
       grid_power_alt: 'sensor.grid_phase_a_power',
       _show_battery: true,
@@ -1857,6 +1869,10 @@ class FFlowCard extends HTMLElement {
       label_entity_min_cell: 'Entità da mostrare al posto della tensione cella minima.',
       label_entity_max_cell: 'Entità da mostrare al posto della tensione cella massima.',
       label_entity_batt_dis: 'Entità da mostrare al posto della scarica di oggi.',
+      label_custom1: 'Testo del primo riquadro libero tra le statistiche batteria (es. CICLI BATTERIA). Compare solo se scegli anche l’entità qui sotto.',
+      label_entity_custom1: 'Qualsiasi entità: la card mostra il suo valore con l’unità (es. sensor.jk_cycles). Il riquadro compare tra le statistiche batteria.',
+      label_custom2: 'Testo del secondo riquadro libero (es. SOH BATTERIA).',
+      label_entity_custom2: 'Qualsiasi entità per il secondo riquadro libero (es. sensor.jk_soh).',
       total_pv_gen_entity: 'Sensore della produzione fotovoltaica totale (da sempre), in kWh.',
       // Fotovoltaico
       pv1_power: 'Potenza istantanea della stringa 1 (W o kW). Compare accanto alla falda sinistra della casa, che si illumina in base a questo valore. Se il tuo inverter dà solo tensione e corrente, crea un sensore template tensione × corrente.',
@@ -1981,7 +1997,7 @@ class FFlowCard extends HTMLElement {
       battery_voltage: ['battVoltageFlow', 'battVoltageFlow1'],
       battery2_soc: ['fcBattVal2'], battery2_power: ['battPwrFlow2'], battery2_current: ['battCurrFlow2'], battery2_voltage: ['battVoltageFlow2'],
       inv_temp: ['invTempFlow', 'fcInvRect', 'invImg'],
-      today_pv: ['invTodayPv'], today_batt_chg: ['invTodayBattChg'], batt_dis: ['invTodayBattDis', 'bBattDis'], today_load: ['invTodayLoad'],
+      today_pv: ['invTodayPv'], today_batt_chg: ['invTodayBattChg'], batt_dis: ['invTodayBattDis', 'bBattDis'], label_entity_custom1: ['bCustom1'], label_entity_custom2: ['bCustom2'], today_load: ['invTodayLoad'],
       battery_temp1: ['bTemp1'], battery_mos: ['bTemp2'], battery_min_cell: ['bMinCell'], battery_max_cell: ['bMaxCell'], total_pv_gen_entity: ['bTotalPvGen'],
       charger_power: ['evPowerVal'], charger_soc: ['evSocVal', 'evSocBar'], charger_state: ['evStateVal'],
       grid_status_entity: ['gridStatusPill'], ems_mode_entity: ['emsBadge'],
@@ -3231,10 +3247,10 @@ class FFlowCard extends HTMLElement {
   }
   _evcFmtDur(sec) { if (sec === null || !isFinite(sec)) return '--'; const h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60); return h + ':' + String(m).padStart(2, '0'); }
 
-  // Bubble bar: a <canvas> particle system, like a fizzing liquid. Every bubble grows, wobbles, drifts
-  // and pops, then respawns somewhere else; colour follows the SOC ramp with a horizontal gradient.
-  // Sprites are pre-rendered per colour step, so a frame is ~300 drawImage calls at 30 fps. The loop
-  // stops while the card is paused/hidden or the tab is closed; light mode draws one still frame.
+  // EV bar "liquid in glass": a <canvas> liquid fills the tube up to the SOC with a gently moving
+  // front; inside, cloudy light swirls drift and fine bubbles rise, faster while the car charges
+  // (with the charging power), calm when it does not draw. The glass reflection is a static CSS layer.
+  // ~30 fps, slower on weak devices; stopped while hidden/paused; a still frame in light mode.
   _evcBubbles(soc) {
     const box = this.shadowRoot.getElementById('evcBub');
     if (!box) return;
@@ -3261,42 +3277,33 @@ class FFlowCard extends HTMLElement {
       if (!cv) { box.innerHTML = '<canvas></canvas>'; cv = box.firstChild; }
       cv.width = W * dpr; cv.height = H * dpr; cv.style.width = W + 'px'; cv.style.height = H + 'px';
       b.W = W; b.H = H; b.dpr = dpr; b.ctx = cv.getContext('2d');
-      // ~6 rows of bubbles, almost touching
-      const n = Math.min(480, Math.round(W * H / 30));
-      b.parts = Array.from({ length: n }, () => this._evcSpawn(b, Math.random()));
+      b.blobs = Array.from({ length: Math.max(10, Math.round(W / 17)) }, () => ({ x: Math.random() * W, y: Math.random() * H,
+        r: 8 + Math.random() * 16, vx: (Math.random() - 0.5) * 14, vy: (Math.random() - 0.5) * 6, a: 0.08 + Math.random() * 0.14 }));
+      b.fizz = Array.from({ length: Math.min(160, Math.round(W * 0.27)) }, () => ({ x: Math.random() * W, y: Math.random() * H,
+        v: 8 + Math.random() * 20, r: 0.4 + Math.random() * 0.9, ph: Math.random() * 6.28 }));
+      // soft white swirl sprite, drawn scaled for every cloud
+      const sp = document.createElement('canvas'), R = 32; sp.width = sp.height = R * 2;
+      const sg = sp.getContext('2d'), gr = sg.createRadialGradient(R, R, 0, R, R, R);
+      gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+      sg.fillStyle = gr; sg.fillRect(0, 0, R * 2, R * 2); b.swirl = sp;
     }
-    b.target = s;
+    b.target = s; if (this._evcBoilLvl != null) b.boil = this._evcBoilLvl;
     if (this._evcIntroDue && !this._lite() && !this._paused && soc !== null) { this._evcIntroDue = false; b.fill = 0; b.t0 = performance.now(); b.from = 0; b.intro = true; }
     else if (!b.intro && Math.abs(b.fill - s) > 0.05) { b.t0 = performance.now(); b.from = b.fill; }
     this._evcIntroDue = false;
     this._evcKick();
   }
-  _evcSpawn(b, age01) {
-    const big = Math.random() > 0.14, life = 1.2 + Math.random() * 2.4;
-    return { x: Math.random() * b.W, y: 2 + Math.random() * (b.H - 4), r: big ? 3.0 + Math.random() * 1.2 : 1.3 + Math.random() * 1.0,
-      life, age: age01 * life, ph: Math.random() * 6.28, wf: 1.5 + Math.random() * 2.5, vy: (Math.random() - 0.6) * 5, vx: (Math.random() - 0.5) * 3 };
-  }
   _evcSprites(b, v) {
-    const k = Math.round(v), key = k + '|' + b.dpr;
+    const key = Math.round(v) + '';
     if (b.spriteKey === key) return;
-    b.spriteKey = key;
-    const R = 8 * b.dpr, steps = 8, c0 = this._evcRampRGB(v), c1 = this._evcRampRGB(Math.max(0, v - 9 - v * 0.06));
-    b.cols = [c0, c1];
-    b.sprites = Array.from({ length: steps }, (_, i) => {
-      const t = i / (steps - 1), c = c0.map((x, j) => Math.round(x + (c1[j] - x) * t));
-      const cnv = document.createElement('canvas'); cnv.width = cnv.height = R * 2;
-      const g = cnv.getContext('2d'), lt = c.map(x => Math.round(x + (255 - x) * 0.55));
-      const gr = g.createRadialGradient(R * 0.7, R * 0.65, R * 0.08, R, R, R);
-      gr.addColorStop(0, `rgba(${lt},1)`); gr.addColorStop(0.45, `rgba(${c},1)`); gr.addColorStop(0.78, `rgba(${c},.85)`); gr.addColorStop(1, `rgba(${c},0)`);
-      g.fillStyle = gr; g.beginPath(); g.arc(R, R, R, 0, 6.2832); g.fill();
-      return cnv;
-    });
+    b.spriteKey = key; b.glowKey = null;
+    b.cols = [this._evcRampRGB(v), this._evcRampRGB(Math.max(0, v - 10))];
   }
   _evcKick() {
     if (this._evcLoop || !this._evcB) return;
     const lite = this._lite();
     let last = 0;
-    const b0 = this._evcB; if (!b0.gap) b0.gap = 40;   // ms between frames, adapted to the device
+    const b0 = this._evcB; if (!b0.gap) b0.gap = 33;   // ms between frames, adapted to the device
     const frame = (now) => {
       this._evcLoop = null;
       const b = this._evcB;
@@ -3326,37 +3333,40 @@ class FFlowCard extends HTMLElement {
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, W, H);
     if (fw < 0.5) return;
-    const [c0, c1] = b.cols;
-    // liquid glow behind the bubbles, fading at the front
-    const gk = Math.round(fw) + b.spriteKey;
+    const [c0, c1] = b.cols, boil = b.boil == null ? 0.3 : b.boil, sp = 0.4 + boil;
+    g.save();
+    // liquid with a gently moving front
+    g.beginPath(); g.moveTo(0, 0);
+    for (let y = 0; y <= H; y += 4) g.lineTo(Math.min(W, fw + Math.sin(y * 0.18 + t * 1.6) * 1.4), y);
+    g.lineTo(0, H); g.closePath(); g.clip();
+    const gk = Math.round(fw) + '|' + b.spriteKey;
     if (b.glowKey !== gk) {
-      b.glowKey = gk; b.glow = g.createLinearGradient(0, 0, fw, 0);
-      b.glow.addColorStop(0, `rgba(${c0},.42)`); b.glow.addColorStop(Math.max(0, 1 - 26 / fw), `rgba(${c1},.36)`); b.glow.addColorStop(1, `rgba(${c1},0)`);
+      b.glowKey = gk;
+      b.body = g.createLinearGradient(0, 0, fw, 0); b.body.addColorStop(0, `rgba(${c0},.78)`); b.body.addColorStop(1, `rgba(${c1},.78)`);
+      b.shade = g.createLinearGradient(0, 0, 0, H); b.shade.addColorStop(0, 'rgba(0,0,0,0)'); b.shade.addColorStop(1, 'rgba(0,0,0,.3)');
     }
-    g.fillStyle = b.glow; g.fillRect(0, 0, fw, H);
-    const sp = b.sprites, n = sp.length, R = 8;
-    for (const p of b.parts) {
-      p.age += dt;
-      if (p.age >= p.life) Object.assign(p, this._evcSpawn(b, 0));
-      if (p.x > fw + 4) continue;                       // outside the filled part: just ages
-      p.x += p.vx * dt; p.y += p.vy * dt;
-      if (p.y < 1 || p.y > H - 1) p.vy = -p.vy;
-      const x = p.x + Math.sin(t * p.wf + p.ph) * 0.9, y = p.y + Math.cos(t * p.wf * 0.8 + p.ph) * 0.8;
-      if (x > fw + 2) continue;
-      const a = p.age / p.life;
-      // grow in, breathe, pop out
-      let sc = a < 0.12 ? a / 0.12 : a > 0.9 ? Math.max(0, (1 - a) / 0.1) : 1;
-      sc *= 1 + Math.sin(t * 3.1 + p.ph) * 0.07;
-      const edge = Math.min(1, (fw - x) / 18 + 0.15);   // soft front: smaller, fainter bubbles
-      if (edge <= 0) continue;
-      const rr = p.r * sc * (0.55 + 0.45 * edge);
-      if (rr < 0.3) continue;
-      g.globalAlpha = Math.min(1, edge * (0.85 + 0.15 * Math.sin(t * 2.3 + p.ph * 2)));
-      const img = sp[Math.min(n - 1, Math.max(0, Math.floor(x / fw * n)))];
-      const d = rr / R * 2 * R * 1.25;   // sprite has a glow ring: draw slightly larger than the core
-      g.drawImage(img, x - d / 2, y - d / 2, d, d);
+    g.fillStyle = b.body; g.fillRect(0, 0, fw + 4, H);
+    // cloudy swirls drifting through the liquid
+    g.globalCompositeOperation = 'lighter';
+    for (const c of b.blobs) {
+      c.x += c.vx * dt * sp; c.y += c.vy * dt;
+      if (c.y < 0 || c.y > H) c.vy = -c.vy;
+      if (c.x < -20) c.x = fw + 10; else if (c.x > fw + 20) c.x = -10;
+      g.globalAlpha = c.a; g.drawImage(b.swirl, c.x - c.r, c.y - c.r, c.r * 2, c.r * 2);
+    }
+    g.globalCompositeOperation = 'source-over';
+    // fine bubbles rising
+    g.fillStyle = '#fff';
+    for (const f of b.fizz) {
+      f.y -= f.v * dt * sp; f.x += Math.sin(t * 4 + f.ph) * 0.15;
+      if (f.y < 0) { f.y = H; f.x = Math.random() * fw; }
+      if (f.x > fw) continue;
+      g.globalAlpha = 0.35 + 0.4 * (1 - f.y / H);
+      g.beginPath(); g.arc(f.x, f.y, f.r, 0, 6.2832); g.fill();
     }
     g.globalAlpha = 1;
+    g.fillStyle = b.shade; g.fillRect(0, 0, fw + 4, H);
+    g.restore();
   }
 
   _updateEvc() {
@@ -3394,6 +3404,9 @@ class FFlowCard extends HTMLElement {
       const sw = root.querySelector('.evsoc'); if (sw) sw.style.color = socCol;
     }
     const bolt = g('evcBolt'); if (bolt) bolt.style.visibility = charging ? 'visible' : 'hidden';
+    // liquid motion: livelier while charging (with the power), calm otherwise
+    this._evcBoilLvl = charging ? 0.35 + 0.65 * Math.min(1, (pW || 0) / 7400) : 0.15;
+    if (this._evcB) this._evcB.boil = this._evcBoilLvl;
     this._evcBubbles(soc);
     if (pW === null) setV('evcPow', null, 'kW'); else if (Math.abs(pW) < 1000) setV('evcPow', Math.round(pW), 'W'); else setV('evcPow', (pW / 1000).toFixed(2), 'kW');
     setV('evcCur', cur === null ? null : cur.toFixed(1), 'A');
@@ -3480,7 +3493,6 @@ class FFlowCard extends HTMLElement {
     const info = g('evcInfo');
     if (info) {
       const chips = [];
-      if (stRaw) chips.push('Connettore: ' + lbl);
       const err = this._evcSt(c.evc_error);
       if (err && !/^(noerror|none|ok|0)$/i.test(String(err.state).replace(/[\s_-]/g, ''))) chips.push('⚠️ Errore: ' + err.state);
       const offA = this._val(c.evc_offered_current);
@@ -4084,12 +4096,14 @@ class FFlowCard extends HTMLElement {
       <polygon id="roofR" points="${quad(Rq)}" fill="#1b2230" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" style="transition:stroke .5s,fill .5s"/>
       ${cells(Lq, 'L')}${cells(Rq, 'R')}
     </g>
-    ${pv1Show ? `<text class="sm" id="pv1label" x="210" y="362" text-anchor="end" font-size="10.5" fill="#8b949e" letter-spacing="1">${this._pvName(1)}</text>
-    <text id="pv1FlowVal" x="210" y="378" text-anchor="end" font-size="14.5" font-weight="700" fill="#ffe83c">-- W</text>
-    ${this.config.pv1_voltage ? '<text class="sm" id="pv1Volt" x="210" y="391" text-anchor="end" font-size="10" font-weight="600" fill="#c9a227">-- V</text>' : ''}` : ''}
-    ${pv2Show ? `<text class="sm" id="pv2label" x="310" y="362" font-size="10.5" fill="#8b949e" letter-spacing="1">${this._pvName(2)}</text>
-    <text id="pv2FlowVal" x="310" y="378" font-size="14.5" font-weight="700" fill="#ffe83c">-- W</text>
-    ${this.config.pv2_voltage ? '<text class="sm" id="pv2Volt" x="310" y="391" font-size="10" font-weight="600" fill="#c9a227">-- V</text>' : ''}` : ''}
+    ${pv1Show ? `<text class="sm" id="pv1label" x="210" y="365" text-anchor="end" font-size="10.5" fill="#8b949e" letter-spacing="1">${this._pvName(1)}</text>
+    ${this.config.pv1_voltage
+      ? '<text x="210" y="381" text-anchor="end" font-weight="700"><tspan id="pv1FlowVal" font-size="14.5" fill="#ffe83c">-- W</tspan><tspan id="pv1Volt" dx="5" font-size="10" font-weight="600" fill="#c9a227">-- V</tspan></text>'
+      : '<text id="pv1FlowVal" x="210" y="381" text-anchor="end" font-size="14.5" font-weight="700" fill="#ffe83c">-- W</text>'}` : ''}
+    ${pv2Show ? `<text class="sm" id="pv2label" x="310" y="365" font-size="10.5" fill="#8b949e" letter-spacing="1">${this._pvName(2)}</text>
+    ${this.config.pv2_voltage
+      ? '<text x="310" y="381" font-weight="700"><tspan id="pv2FlowVal" font-size="14.5" fill="#ffe83c">-- W</tspan><tspan id="pv2Volt" dx="5" font-size="10" font-weight="600" fill="#c9a227">-- V</tspan></text>'
+      : '<text id="pv2FlowVal" x="310" y="381" font-size="14.5" font-weight="700" fill="#ffe83c">-- W</text>'}` : ''}
     <text id="fcLoadVal" x="${cx}" y="497" text-anchor="middle" font-size="15.5" font-weight="700" fill="#F7F6D3">-- W</text>
     ${this.config.load_voltage || this.config.load_frequency ? `<text class="sm" id="loadVF" x="${cx + 38}" y="491" font-size="9.5" font-weight="600" fill="#8b949e"><tspan id="loadV" x="${cx + 38}">-- V</tspan><tspan id="loadF" x="${cx + 38}" dy="11">-- Hz</tspan></text>` : ''}`;
   }
@@ -4141,7 +4155,7 @@ class FFlowCard extends HTMLElement {
     const supDy = (this.config.grid_voltage || this.config.grid_frequency) ? 9 : 0;
     const showSelf = this.config._show_self_stats !== false;
     const supplyBlock = showSupply ? `<g id="supplyGroup" transform="translate(0,${supDy})">
-      <text class="sm" x="352" y="291" font-size="10" fill="#8b949e" letter-spacing="1.2">FONTI ENERGIA</text>
+      <text class="sm" x="431" y="291" text-anchor="middle" font-size="10" fill="#8b949e" letter-spacing="1.2">FONTI ENERGIA</text>
       <text class="lg" x="364" y="305" text-anchor="middle" font-size="8.5" font-weight="700" fill="#f4d03f">SOLARE</text>
       <text class="lg" x="408" y="305" text-anchor="middle" font-size="8.5" font-weight="700" fill="#3fb950">CARICA</text>
       <text class="lg" x="452" y="305" text-anchor="middle" font-size="8.5" font-weight="700" fill="#58a6ff">SCARICA</text>
@@ -4152,7 +4166,10 @@ class FFlowCard extends HTMLElement {
       <rect id="supDis"   x="352" y="311" width="0" height="7" fill="#2b59ff"/>
       <rect id="supGrid"  x="352" y="311" width="0" height="7" fill="#f85149"/>
       ${showSelf ? `<g id="selfGroup" style="display:none">
-        <text class="sm" x="510" y="333" text-anchor="end" font-size="9" font-weight="600" fill="#8b949e" letter-spacing=".4"><tspan id="selfSuff" font-size="12" font-weight="800" fill="#3fb950">--</tspan> AUTOSUFF.  <tspan id="selfCons" font-size="12" font-weight="800" fill="#f4d03f">--</tspan> AUTOCONS.</text>
+        <text id="selfSuff" x="391" y="334" text-anchor="middle" font-size="13" font-weight="800" fill="#3fb950">--</text>
+        <text class="lg" x="391" y="343" text-anchor="middle" font-size="8" font-weight="600" fill="#8b949e" letter-spacing=".5">AUTOSUFF.</text>
+        <text id="selfCons" x="471" y="334" text-anchor="middle" font-size="13" font-weight="800" fill="#f4d03f">--</text>
+        <text class="lg" x="471" y="343" text-anchor="middle" font-size="8" font-weight="600" fill="#8b949e" letter-spacing=".5">AUTOCONS.</text>
       </g>` : ''}
     </g>` : '';
 
@@ -4169,9 +4186,13 @@ class FFlowCard extends HTMLElement {
     const modernHome = this.config.home_icon_style !== 'classic';
 
     const modernHomeX = this.config.home_icon_style !== 'classic';
-    const pv3txt = showPvExtra && modernHomeX ? (this.config.pv3_voltage ? '<text class="sm" id="pv3Volt" x="180" y="453" text-anchor="end" font-size="10" font-weight="600" fill="#c9a227">-- V</text>' : '') + `<text class="sm" id="pv3label" x="180" y="424" text-anchor="end" font-size="10.5" fill="#8b949e" letter-spacing="1">${this._pvName(3)}</text><text id="pv3FlowVal" x="180" y="440" text-anchor="end" font-size="14" font-weight="700" fill="#ffe83c">-- W</text>`
+    const pv3txt = showPvExtra && modernHomeX ? `<text class="sm" id="pv3label" x="180" y="424" text-anchor="end" font-size="10.5" fill="#8b949e" letter-spacing="1">${this._pvName(3)}</text>` + (this.config.pv3_voltage
+        ? '<text x="180" y="440" text-anchor="end" font-weight="700"><tspan id="pv3FlowVal" font-size="14" fill="#ffe83c">-- W</tspan><tspan id="pv3Volt" dx="5" font-size="10" font-weight="600" fill="#c9a227">-- V</tspan></text>'
+        : '<text id="pv3FlowVal" x="180" y="440" text-anchor="end" font-size="14" font-weight="700" fill="#ffe83c">-- W</text>')
       : showPvExtra ? `<text id="pv3label" x="-1" y="450" font-size="11" fill="#8b949e" letter-spacing="1">FV3</text><text id="pv3FlowVal" x="-1" y="464" font-size="13.5" font-weight="700" fill="#ffe83c">-- W</text>` : '';
-    const pv4txt = showPvExtra && modernHomeX ? (this.config.pv4_voltage ? '<text class="sm" id="pv4Volt" x="340" y="453" font-size="10" font-weight="600" fill="#c9a227">-- V</text>' : '') + `<text class="sm" id="pv4label" x="340" y="424" font-size="10.5" fill="#8b949e" letter-spacing="1">${this._pvName(4)}</text><text id="pv4FlowVal" x="340" y="440" font-size="14" font-weight="700" fill="#ffe83c">-- W</text>`
+    const pv4txt = showPvExtra && modernHomeX ? `<text class="sm" id="pv4label" x="340" y="424" font-size="10.5" fill="#8b949e" letter-spacing="1">${this._pvName(4)}</text>` + (this.config.pv4_voltage
+        ? '<text x="340" y="440" font-weight="700"><tspan id="pv4FlowVal" font-size="14" fill="#ffe83c">-- W</tspan><tspan id="pv4Volt" dx="5" font-size="10" font-weight="600" fill="#c9a227">-- V</tspan></text>'
+        : '<text id="pv4FlowVal" x="340" y="440" font-size="14" font-weight="700" fill="#ffe83c">-- W</text>')
       : showPvExtra ? `<text id="pv4label" x="-1" y="480" font-size="11" fill="#8b949e" letter-spacing="1">FV4</text><text id="pv4FlowVal" x="-1" y="494" font-size="13.5" font-weight="700" fill="#ffe83c">-- W</text>` : '';
 
     // EV: SVG wallbox + car to the right of the house (x 344–514, y 330–480)
@@ -4299,6 +4320,9 @@ class FFlowCard extends HTMLElement {
       .evbar{position:relative;height:40px;margin:10px 0 9px;border-radius:10px;background:#0b0f14;border:1px solid #21262d;overflow:hidden}
       .evbar{box-shadow:inset 0 0 14px rgba(0,0,0,.55)}
       .evbar canvas{position:absolute;left:0;top:0;display:block}
+      .evbar::after{content:'';position:absolute;inset:0;pointer-events:none;border-radius:inherit;
+        background:linear-gradient(180deg,rgba(255,255,255,.22) 0,rgba(255,255,255,.06) 28%,rgba(255,255,255,0) 30%,rgba(255,255,255,0) 100%)}
+      .evbar::before{content:'';position:absolute;left:8px;right:8px;top:4px;height:1.2px;background:rgba(255,255,255,.35);border-radius:1px;pointer-events:none;z-index:1}
       .eavail{display:inline-flex;align-items:center;gap:6px;margin-bottom:6px;font-size:.66rem;font-weight:700;letter-spacing:.3px;padding:3px 9px;border-radius:999px;border:1px solid}
       .eavail.free{color:#3fb950;background:rgba(63,185,80,.1);border-color:rgba(63,185,80,.4)}
       .eavail.busy{color:#f39c4b;background:rgba(243,156,75,.1);border-color:rgba(243,156,75,.4)}
@@ -4655,6 +4679,9 @@ class FFlowCard extends HTMLElement {
         <div class="st"><div class="l">${this.config.label_max_cell || 'Cella Max'}</div><div class="v" id="bMaxCell">-- V</div></div>
         <div class="st"><div class="l">${this.config.label_batt_dis || 'Scarica Batt.'}</div><div class="v" id="bBattDis">-- kWh</div></div>
       </div>
+      ${(this.config._labels_custom_entities && (this.config.label_entity_custom1 || this.config.label_entity_custom2)) ? `<div style="display:grid;grid-template-columns:repeat(${this.config.label_entity_custom1 && this.config.label_entity_custom2 ? 2 : 1},1fr);gap:4px;margin-top:4px">
+        ${[1, 2].filter(i => this.config['label_entity_custom' + i]).map(i => `<div class="st"><div class="l">${this._esc(this.config['label_custom' + i] || 'CAMPO ' + i)}</div><div class="v" id="bCustom${i}">--</div></div>`).join('')}
+      </div>` : ''}
       <div style="margin-top:4px">
         <div class="st" style="display:flex;flex-direction:row;align-items:flex-end;justify-content:space-between;gap:8px;padding:4px 9px 5px;width:100%;box-sizing:border-box">
           <div class="l" id="bEnduStatLbl" style="margin-bottom:0;white-space:nowrap;line-height:1.4">${this.config.label_endurance || 'AUTONOMIA'}</div>
@@ -5257,6 +5284,19 @@ class FFlowCard extends HTMLElement {
     const _battDisRaw = battDisCustom ? _readVal('label_entity_batt_dis') : null;
     const battDisFinal = (_battDisRaw && !_battDisRaw.isText) ? _battDisRaw.val : battDis1;
     const battDisUnit  = battDisCustom ? _readUnit('label_entity_batt_dis') : 'kWh';
+
+    // ── v1.15.0: two free tiles (label + any entity) ──
+    [1, 2].forEach(i => {
+      const el = getEl('bCustom' + i), key = 'label_entity_custom' + i;
+      if (!el || !this.config[key]) return;
+      const raw = _readVal(key);
+      if (!raw) { el.textContent = '--'; el.style.color = '#8b949e'; }
+      else if (raw.isText) { el.textContent = raw.text; el.style.color = '#c9d1d9'; }
+      else {
+        const u = _readUnit(key), fmt = _fmtCustom(raw.val, u);
+        el.textContent = (Number.isInteger(raw.val) ? raw.val : +raw.val.toFixed(2)) + (u ? ' ' + u : ''); el.style.color = fmt.color;
+      }
+    });
 
     // ── Apply overrides to stat tiles ──
     const _bT1o = getEl('bTemp1');

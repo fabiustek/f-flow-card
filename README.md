@@ -7,7 +7,7 @@
 [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
 [![Release](https://img.shields.io/github/v/release/fabiustek/f-flow-card)](https://github.com/fabiustek/f-flow-card/releases)
 
-Versione attuale: **v1.15.0** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
+Versione attuale: **v1.15.1** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/card-overview.png" alt="F-Flow Card con tutte le sezioni attive" width="480">
@@ -175,7 +175,7 @@ Esempio: SOC 45%, soglia 20%, batteria da 16 kWh, scarica a 1533 W → 25% di 16
 
 Tutti facoltativi: se non configuri un'entità, quella scritta non compare.
 
-**Autosufficienza e autoconsumo** (sotto la barra **Fonti energia**):
+**Autosufficienza e autoconsumo** (sotto la barra **Fonti energia**, su due colonne centrate):
 - **Autosufficienza**: quanta parte del consumo di oggi **non** è arrivata dalla rete = (consumo oggi − prelievo oggi) ÷ consumo oggi. Verde dal 70%, arancione dal 40%, rosso sotto.
 - **Autoconsumo**: quanta parte della produzione FV di oggi è stata **usata** (in casa o in batteria) invece di essere immessa = (produzione FV oggi − immissione oggi) ÷ produzione FV oggi.
 - La card li calcola da sola con le entità che hai già: **Produzione FV oggi** e **Consumo oggi** (sezione ☀️ Altri dati fotovoltaico), **Energia prelevata** ed **Energia immessa** (sezione 🔌 Rete). Se hai già sensori in % puoi usarli in **🔌 Rete** → **Autosufficienza %** / **Autoconsumo %**.
@@ -186,7 +186,7 @@ Tutti facoltativi: se non configuri un'entità, quella scritta non compare.
 2. Sezione **☀️ Altri dati fotovoltaico** → **Tensione erogata alla casa** e **Frequenza erogata alla casa**: compaiono accanto al consumo sotto la casa.
 
 **Tensione e nome delle stringhe** (sezione **☀️ Fotovoltaico**):
-1. **Tensione FV1** / **Tensione FV2** (e FV3/FV4 nelle stringhe aggiuntive): in piccolo sotto la potenza della stringa.
+1. **Tensione FV1** / **Tensione FV2** (e FV3/FV4 nelle stringhe aggiuntive): in piccolo **accanto alla potenza** della stringa, sulla stessa riga (es. "1.29 kW 161 V"), così non si sovrappone alle falde.
 2. **Nome della falda** (`pv1_name`, `pv2_name`): per esempio **Lato piazza** e **Lato ingresso** al posto di FV1 e FV2. Il nome compare sul disegno e nelle statistiche.
 
 Esempio per Deye (controlla i nomi esatti in **Strumenti per sviluppatori → Stati**):
@@ -400,14 +400,14 @@ Stati riconosciuti (non importano maiuscole e minuscole):
 
 Una scheda dedicata alla **ricarica dell'auto** con una wallbox **OCPP** (pensata per JuiceBox con l'integrazione OCPP, funziona con qualsiasi wallbox che esponga entità simili). Dall'alto in basso:
 
-- **Stato e batteria dell'auto**: stato del connettore tradotto in italiano (Scollegata, Collegata, In carica, In pausa, Completata, Errore…), nome dell'auto e una **barra a bolle** sottile che si riempie fino al SOC. Le bolle sono **vive**, come un liquido che frizza: ognuna nasce, si gonfia, ondeggia, si sposta un po' e scoppia, poi ne nasce un'altra; il fronte è sfumato. Il colore cambia **in modo continuo** con il livello: **rosso** sotto il 10%, **arancione** verso il 25%, **giallo** a metà, **verde** verso l'80% e **acquamarina** al 100%, con una leggera sfumatura lungo la barra. Il ⚡% ha lo stesso colore. **Quando apri la scheda** la barra si riempie da 0 al SOC e il numero conta in su. L'animazione si ferma quando la scheda è chiusa o la card non si vede, rallenta da sola sui dispositivi lenti e in modalità leggera la barra è ferma.
+- **Stato e batteria dell'auto**: stato del connettore tradotto in italiano (Scollegata, Collegata, In carica, In pausa, Completata, Errore…), nome dell'auto e una **barra a liquido** sottile, come un **tubo di vetro** che si riempie fino al SOC: in alto c'è il riflesso del vetro, dentro un liquido torbido che si muove lentamente con bollicine fini che salgono, e il bordo del liquido ondeggia appena. Quando l'auto carica il liquido è più vivace (in proporzione alla potenza di carica), quando non assorbe è calmo. Il colore cambia **in modo continuo** con il livello: **rosso** sotto il 10%, **arancione** verso il 25%, **giallo** a metà, **verde** verso l'80% e **acquamarina** al 100%. Il ⚡% ha lo stesso colore. **Quando apri la scheda** il tubo si riempie da 0 al SOC e il numero conta in su. L'animazione si ferma quando la scheda è chiusa o la card non si vede, rallenta da sola sui dispositivi lenti e in modalità leggera è ferma.
 - **8 riquadri**: potenza, corrente, durata della sessione, tempo al 100%, energia della sessione, **km aggiunti** (energia ÷ consumo dell'auto), tensione e temperatura della wallbox.
 - **Comando ricarica** protetto (vedi sotto), con accanto il badge della **disponibilità della box**: **Box disponibile** (verde) quando nessuna auto è collegata, **Box occupata · auto collegata** (arancione) quando c'è l'auto.
 - **Modalità di ricarica**: interruttori **Carica intelligente FV** e **Pausa sotto 6 A**, e il cursore **Ripartizione surplus**: il valore è la quota del surplus che va alla **batteria di casa** (0% = tutto all'auto, 100% = tutto all'accumulo di casa). Nella barra il verde a sinistra è la casa, l'azzurro a destra l'auto.
 - **Corrente massima** con il cursore e il selettore **A / W** (i watt sono calcolati come A × tensione × fasi). Mentre la carica intelligente FV è accesa il cursore è **bloccato** 🔒, perché la corrente la decide l'automazione: spegnila per regolare a mano.
 - **Sessione in corso**: grafico della potenza con la linea tratteggiata del SOC dell'auto, SOC iniziale → attuale, energia e potenza media.
 - **Ultime ricariche** degli ultimi 7 giorni, ricavate dallo storico della potenza: giorno, orario, energia, durata e SOC da → a.
-- **Wallbox**: stato del connettore, corrente offerta, eventuale codice di errore (nascosto se è `NoError`) e i pulsanti **Sblocca cavo** e **Riavvia wallbox**.
+- **Wallbox**: corrente offerta, eventuale codice di errore (nascosto se è `NoError`) e i pulsanti **Sblocca cavo** e **Riavvia wallbox**.
 
 #### Comando protetto: un solo comando alla wallbox
 
@@ -651,7 +651,7 @@ Tutte le opzioni si impostano dall'editor visuale; qui trovi le chiavi YAML corr
 |---|---|---|
 | `pv1_power` / `pv2_power` | sensori GoodWe | Potenza delle stringhe FV1 (falda sinistra) e FV2 (falda destra) |
 | `pv1_name` … `pv4_name` | `''` | Nome libero delle falde/stringhe (es. `Lato piazza`); se vuoto `FV1`, `FV2`… |
-| `pv1_voltage` … `pv4_voltage` | `''` | Tensione delle stringhe (V), sotto la potenza |
+| `pv1_voltage` … `pv4_voltage` | `''` | Tensione delle stringhe (V), accanto alla potenza |
 | `_show_pv_extra` | `false` | Mostra le stringhe FV3 e FV4 |
 | `pv3_power` / `pv4_power` | `''` | Potenza delle stringhe FV3 (sotto FV1, falda sinistra) e FV4 (sotto FV2, falda destra) |
 | `pv_total_power` | `sensor.goodwe_pv_power` | Potenza FV totale (se vuota: somma delle stringhe) |
@@ -805,6 +805,10 @@ Tutte le opzioni si impostano dall'editor visuale; qui trovi le chiavi YAML corr
 | `label_total_pv_gen` | `PRODUZIONE FV TOT.` | Etichetta produzione FV totale |
 | `label_endurance` | `AUTONOMIA` | Etichetta autonomia |
 | `label_entity_*` | `''` | Entità alternativa per il riquadro corrispondente |
+| `label_custom1` / `label_custom2` | `''` | Testo dei due **campi liberi** (es. `CICLI BATTERIA`) |
+| `label_entity_custom1` / `label_entity_custom2` | `''` | Entità dei due campi liberi: compaiono come riquadri in più tra le statistiche batteria |
+
+**Campi liberi** (dalla v1.15.0): in fondo alla sezione **🏷️ Etichette** ci sono due campi in più, ognuno con un testo e un'entità a scelta (per esempio *CICLI BATTERIA* con `sensor.jk_cycles` e *SOH BATTERIA* con `sensor.jk_soh`). Compaiono come riquadri in più sotto le statistiche batteria (serve **Riquadri statistiche batteria** attivo); un campo senza entità non compare. Il valore è mostrato con la sua unità e si può aprire al tocco con 📈.
 
 Nella sezione Etichette la scelta di un'entità alternativa si sblocca solo dopo aver cambiato il testo dell'etichetta; il sensore corrispondente nella sezione Batteria viene allora bloccato, per evitare doppioni.
 
@@ -824,7 +828,7 @@ Nella sezione Etichette la scelta di un'entità alternativa si sblocca solo dopo
 | **Statistiche** | FV1 arancione · FV2 blu · FV3 viola · FV4 verde · consumi verde → giallo → rosso · batteria blu carica / arancione scarica |
 | **Autosufficienza / autoconsumo** | autosufficienza verde ≥70% · arancione ≥40% · rosso sotto; autoconsumo giallo |
 | **Wallbox e auto** | azzurro in carica · verde carica completa · giallo collegata · grigio scollegata / in attesa |
-| **Ricarica EV (bolle e ⚡%)** | sfumatura continua: rosso (0–10%) → arancione (25%) → giallo (45%) → lime (60%) → verde (80%) → acquamarina (100%); comando: verde AVVIA · arancione FERMA · grigio in attesa / non disponibile |
+| **Ricarica EV (liquido e ⚡%)** | sfumatura continua: rosso (0–10%) → arancione (25%) → giallo (45%) → lime (60%) → verde (80%) → acquamarina (100%); comando: verde AVVIA · arancione FERMA · grigio in attesa / non disponibile |
 
 ---
 
@@ -855,7 +859,7 @@ Misure su un telefono di fascia bassa simulato (processore 6 volte più lento, 2
 
 A ogni nuova versione viene creata automaticamente una **release** su GitHub e HACS ti propone l'aggiornamento in Home Assistant. Dopo l'aggiornamento ricarica il browser con `Ctrl + Shift + R`.
 
-Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.15.0**.
+Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.15.1**.
 
 ### Icona nella notifica di aggiornamento
 
@@ -980,6 +984,12 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 ---
 
 ## Registro delle modifiche
+
+### v1.15.1
+- **Ricarica EV**: la barra a bolle diventa un **liquido nel vetro** (riflesso del vetro, liquido torbido in movimento, bollicine fini), più vivace mentre l'auto carica; nella parte Wallbox tolta la voce *Connettore*, già indicata in alto.
+- **Fonti energia** centrato a piramide, con autosufficienza e autoconsumo su due colonne.
+- **Tensione delle stringhe** sulla stessa riga della potenza (es. "1.29 kW 161 V"): non si sovrappone più alle falde.
+- **Etichette**: due **campi liberi** (testo + entità a scelta) come riquadri in più tra le statistiche batteria.
 
 ### v1.15.0
 - **Autosufficienza e autoconsumo** di oggi sotto la barra **Fonti energia**, calcolati dalle entità che hai già (o da tuoi sensori in %).
@@ -1114,4 +1124,4 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 
 ---
 
-*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.15.0*
+*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.15.1*
