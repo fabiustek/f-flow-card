@@ -7,7 +7,7 @@
 [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
 [![Release](https://img.shields.io/github/v/release/fabiustek/f-flow-card)](https://github.com/fabiustek/f-flow-card/releases)
 
-Versione attuale: **v1.14.2** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
+Versione attuale: **v1.14.3** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/card-overview.png" alt="F-Flow Card con tutte le sezioni attive" width="480">
@@ -363,14 +363,14 @@ Stati riconosciuti (non importano maiuscole e minuscole):
 
 Una scheda dedicata alla **ricarica dell'auto** con una wallbox **OCPP** (pensata per JuiceBox con l'integrazione OCPP, funziona con qualsiasi wallbox che esponga entità simili). Dall'alto in basso:
 
-- **Stato e batteria dell'auto**: stato del connettore tradotto in italiano (Scollegata, Collegata, In carica, In pausa, Completata, Errore…), nome dell'auto e una **barra a bolle** fitte e lucide che si riempie fino al SOC, con il fronte sfumato. Il colore cambia **in modo continuo** con il livello: **rosso** sotto il 10%, **arancione** verso il 25%, **giallo** a metà, **verde** verso l'80% e **acquamarina** al 100%; lungo la barra sfuma verso il colore di un livello più basso. Il ⚡% ha lo stesso colore. **Quando apri la scheda** la barra si riempie da 0 al SOC e il numero conta in su (in modalità leggera compare subito, senza animazione).
+- **Stato e batteria dell'auto**: stato del connettore tradotto in italiano (Scollegata, Collegata, In carica, In pausa, Completata, Errore…), nome dell'auto e una **barra a bolle** sottile che si riempie fino al SOC. Le bolle sono **vive**, come un liquido che frizza: ognuna nasce, si gonfia, ondeggia, si sposta un po' e scoppia, poi ne nasce un'altra; il fronte è sfumato. Il colore cambia **in modo continuo** con il livello: **rosso** sotto il 10%, **arancione** verso il 25%, **giallo** a metà, **verde** verso l'80% e **acquamarina** al 100%, con una leggera sfumatura lungo la barra. Il ⚡% ha lo stesso colore. **Quando apri la scheda** la barra si riempie da 0 al SOC e il numero conta in su. L'animazione si ferma quando la scheda è chiusa o la card non si vede, rallenta da sola sui dispositivi lenti e in modalità leggera la barra è ferma.
 - **8 riquadri**: potenza, corrente, durata della sessione, tempo al 100%, energia della sessione, **km aggiunti** (energia ÷ consumo dell'auto), tensione e temperatura della wallbox.
-- **Comando ricarica** protetto (vedi sotto).
+- **Comando ricarica** protetto (vedi sotto), con accanto il badge della **disponibilità della box**: **Box disponibile** (verde) quando nessuna auto è collegata, **Box occupata · auto collegata** (arancione) quando c'è l'auto.
 - **Modalità di ricarica**: interruttori **Carica intelligente FV** e **Pausa sotto 6 A**, e il cursore **Ripartizione surplus**: il valore è la quota del surplus che va alla **batteria di casa** (0% = tutto all'auto, 100% = tutto all'accumulo di casa). Nella barra il verde a sinistra è la casa, l'azzurro a destra l'auto.
 - **Corrente massima** con il cursore e il selettore **A / W** (i watt sono calcolati come A × tensione × fasi). Mentre la carica intelligente FV è accesa il cursore è **bloccato** 🔒, perché la corrente la decide l'automazione: spegnila per regolare a mano.
 - **Sessione in corso**: grafico della potenza con la linea tratteggiata del SOC dell'auto, SOC iniziale → attuale, energia e potenza media.
 - **Ultime ricariche** degli ultimi 7 giorni, ricavate dallo storico della potenza: giorno, orario, energia, durata e SOC da → a.
-- **Wallbox**: disponibilità OCPP (solo informativa), stato del connettore, corrente offerta, eventuale codice di errore (nascosto se è `NoError`) e i pulsanti **Sblocca cavo** e **Riavvia wallbox**.
+- **Wallbox**: stato del connettore, corrente offerta, eventuale codice di errore (nascosto se è `NoError`) e i pulsanti **Sblocca cavo** e **Riavvia wallbox**.
 
 #### Comando protetto: un solo comando alla wallbox
 
@@ -390,7 +390,7 @@ Alcune wallbox si bloccano se ricevono più comandi di fila. Per questo il pulsa
 Nell'editor apri **⚡ Ricarica EV** → **＋ Attiva**, poi:
 1. **Nome dell'auto** (facoltativo), es. `BYD Dolphin Surf`.
 2. **Comando ricarica**: l'interruttore che avvia e ferma la carica, es. `switch.juicebox_charge_control`.
-3. **Stato del connettore OCPP** (es. `sensor.juicebox_status_connector`) e, se vuoi, **Disponibilità OCPP** (es. `switch.juicebox_availability`): è solo informativa e non blocca il comando, perché con JuiceBox di solito è spenta quando l'auto è collegata.
+3. **Stato del connettore OCPP** (es. `sensor.juicebox_status_connector`) e, se vuoi, **Disponibilità box** (es. `switch.juicebox_availability`): acceso = box libera, spento = auto collegata. Compare come badge accanto al pulsante e non blocca il comando.
 4. **Attesa massima della conferma**: quanti secondi aspettare la risposta della wallbox (10–300, predefinito 60).
 5. **Potenza di ricarica**: il sensore più affidabile che hai (es. `sensor.consumi_wallbox`). Se lo lasci vuoto usa **Potenza wallbox** della sezione 🚗.
 6. Corrente, tensione, temperatura, energia e durata della sessione (tutti facoltativi). La durata può essere in secondi, minuti, ore o `h:mm:ss`.
@@ -729,7 +729,7 @@ Tutte le opzioni si impostano dall'editor visuale; qui trovi le chiavi YAML corr
 | `_show_evc` | `false` | Mostra la scheda Ricarica EV |
 | `evc_car_name` | `''` | Nome dell'auto sotto lo stato |
 | `evc_charge_switch` | `''` | Interruttore della funzione di ricarica (on = attiva): la card lo accende/spegne con un solo comando, tieni premuto + conferma. Se è `unavailable` il comando è bloccato |
-| `evc_availability` | `''` | Disponibilità OCPP, solo informativa (mostrata tra le informazioni della wallbox, non blocca nulla) |
+| `evc_availability` | `''` | Disponibilità della box: `on` = libera (nessuna auto), `off` = auto collegata. Badge accanto al pulsante, non blocca il comando |
 | `evc_status` | `''` | Stato del connettore OCPP (`Available`, `Preparing`, `Charging`, `SuspendedEV`, `SuspendedEVSE`, `Finishing`, `Faulted`…) |
 | `evc_confirm_timeout` | `60` | Secondi di attesa della conferma prima di sbloccare il pulsante |
 | `evc_power` | `''` | Potenza di ricarica (W o kW); se vuoto usa `charger_power` |
@@ -811,7 +811,7 @@ Misure su un telefono di fascia bassa simulato (processore 6 volte più lento, 2
 
 A ogni nuova versione viene creata automaticamente una **release** su GitHub e HACS ti propone l'aggiornamento in Home Assistant. Dopo l'aggiornamento ricarica il browser con `Ctrl + Shift + R`.
 
-Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.14.2**.
+Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.14.3**.
 
 ### Icona nella notifica di aggiornamento
 
@@ -873,7 +873,7 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 - **A 100%** resta `--` se manca la **Capacità batteria auto** nella sezione 🚗 Auto elettrica / Wallbox (es. `43200` per 43,2 kWh) o se l'auto non sta caricando.
 
 **Ricarica EV: il pulsante è grigio e non si preme**
-- L'entità **Comando ricarica** è `unavailable` o `unknown` in Home Assistant: l'integrazione OCPP non comunica con la wallbox. La **Disponibilità OCPP** non blocca più il comando (dalla v1.14.1).
+- L'entità **Comando ricarica** è `unavailable` o `unknown` in Home Assistant: l'integrazione OCPP non comunica con la wallbox. La **Disponibilità box** non blocca il comando: è solo il badge accanto al pulsante.
 
 **Ricarica EV: la ripartizione sembra al contrario**
 - Il valore di **Quota del surplus all'accumulo di casa** è la parte che va alla **casa**: 0% = tutto all'auto. Se la tua automazione usa il significato opposto, il cursore si comporta al contrario.
@@ -933,6 +933,10 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 ---
 
 ## Registro delle modifiche
+
+### v1.14.3
+- **Ricarica EV**: barra a bolle rifatta e **animata** come nel video di riferimento: le bolle nascono, ondeggiano, si spostano e scoppiano di continuo. La barra è più sottile, rallenta da sola sui dispositivi lenti e resta ferma in modalità leggera.
+- **Ricarica EV**: badge **Box disponibile / Box occupata · auto collegata** accanto al pulsante di ricarica, da `evc_availability` (acceso = box libera).
 
 ### v1.14.2
 - **Ricarica EV**: sotto 1 kW la potenza è in W (5 W prima appariva come 0.00 kW); tensione `--` quando la wallbox non misura (0 V); energia della sessione convertita se il sensore è in Wh.
@@ -1057,4 +1061,4 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 
 ---
 
-*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.14.2*
+*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.14.3*
