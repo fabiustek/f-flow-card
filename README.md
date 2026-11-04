@@ -175,7 +175,7 @@ Esempio: SOC 45%, soglia 20%, batteria da 16 kWh, scarica a 1533 W → 25% di 16
 
 Tutti facoltativi: se non configuri un'entità, quella scritta non compare.
 
-**Autosufficienza e autoconsumo** (sotto la barra **Fonti energia**):
+**Autosufficienza e autoconsumo** (sotto la barra **Fonti energia**, su due colonne centrate):
 - **Autosufficienza**: quanta parte del consumo di oggi **non** è arrivata dalla rete = (consumo oggi − prelievo oggi) ÷ consumo oggi. Verde dal 70%, arancione dal 40%, rosso sotto.
 - **Autoconsumo**: quanta parte della produzione FV di oggi è stata **usata** (in casa o in batteria) invece di essere immessa = (produzione FV oggi − immissione oggi) ÷ produzione FV oggi.
 - La card li calcola da sola con le entità che hai già: **Produzione FV oggi** e **Consumo oggi** (sezione ☀️ Altri dati fotovoltaico), **Energia prelevata** ed **Energia immessa** (sezione 🔌 Rete). Se hai già sensori in % puoi usarli in **🔌 Rete** → **Autosufficienza %** / **Autoconsumo %**.
@@ -186,7 +186,7 @@ Tutti facoltativi: se non configuri un'entità, quella scritta non compare.
 2. Sezione **☀️ Altri dati fotovoltaico** → **Tensione erogata alla casa** e **Frequenza erogata alla casa**: compaiono accanto al consumo sotto la casa.
 
 **Tensione e nome delle stringhe** (sezione **☀️ Fotovoltaico**):
-1. **Tensione FV1** / **Tensione FV2** (e FV3/FV4 nelle stringhe aggiuntive): in piccolo sotto la potenza della stringa.
+1. **Tensione FV1** / **Tensione FV2** (e FV3/FV4 nelle stringhe aggiuntive): in piccolo **accanto alla potenza** della stringa, sulla stessa riga (es. "1.29 kW 161 V"), così non si sovrappone alle falde.
 2. **Nome della falda** (`pv1_name`, `pv2_name`): per esempio **Lato piazza** e **Lato ingresso** al posto di FV1 e FV2. Il nome compare sul disegno e nelle statistiche.
 
 Esempio per Deye (controlla i nomi esatti in **Strumenti per sviluppatori → Stati**):
@@ -407,7 +407,7 @@ Una scheda dedicata alla **ricarica dell'auto** con una wallbox **OCPP** (pensat
 - **Corrente massima** con il cursore e il selettore **A / W** (i watt sono calcolati come A × tensione × fasi). Mentre la carica intelligente FV è accesa il cursore è **bloccato** 🔒, perché la corrente la decide l'automazione: spegnila per regolare a mano.
 - **Sessione in corso**: grafico della potenza con la linea tratteggiata del SOC dell'auto, SOC iniziale → attuale, energia e potenza media.
 - **Ultime ricariche** degli ultimi 7 giorni, ricavate dallo storico della potenza: giorno, orario, energia, durata e SOC da → a.
-- **Wallbox**: stato del connettore, corrente offerta, eventuale codice di errore (nascosto se è `NoError`) e i pulsanti **Sblocca cavo** e **Riavvia wallbox**.
+- **Wallbox**: corrente offerta, eventuale codice di errore (nascosto se è `NoError`) e i pulsanti **Sblocca cavo** e **Riavvia wallbox**.
 
 #### Comando protetto: un solo comando alla wallbox
 
@@ -651,7 +651,7 @@ Tutte le opzioni si impostano dall'editor visuale; qui trovi le chiavi YAML corr
 |---|---|---|
 | `pv1_power` / `pv2_power` | sensori GoodWe | Potenza delle stringhe FV1 (falda sinistra) e FV2 (falda destra) |
 | `pv1_name` … `pv4_name` | `''` | Nome libero delle falde/stringhe (es. `Lato piazza`); se vuoto `FV1`, `FV2`… |
-| `pv1_voltage` … `pv4_voltage` | `''` | Tensione delle stringhe (V), sotto la potenza |
+| `pv1_voltage` … `pv4_voltage` | `''` | Tensione delle stringhe (V), accanto alla potenza |
 | `_show_pv_extra` | `false` | Mostra le stringhe FV3 e FV4 |
 | `pv3_power` / `pv4_power` | `''` | Potenza delle stringhe FV3 (sotto FV1, falda sinistra) e FV4 (sotto FV2, falda destra) |
 | `pv_total_power` | `sensor.goodwe_pv_power` | Potenza FV totale (se vuota: somma delle stringhe) |
@@ -982,10 +982,11 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 ## Registro delle modifiche
 
 ### v1.15.0
-- **Autosufficienza e autoconsumo** di oggi sotto la barra **Fonti energia**, calcolati dalle entità che hai già (o da tuoi sensori in %).
+- **Autosufficienza e autoconsumo** di oggi sotto la barra **Fonti energia** (blocco centrato), calcolati dalle entità che hai già (o da tuoi sensori in %).
 - **Tensione e frequenza** di rete sotto la potenza prelevata/ceduta e della casa accanto al consumo.
 - **Effetto calore sulle falde**: i pannelli in produzione tremolano come una superficie rovente, con onde gialle che risalgono la falda, in proporzione alla potenza di ogni falda (`roof_heat`, disattivabile).
-- **Tensione delle stringhe** sotto la potenza di FV1…FV4; i nomi delle falde (es. *Lato piazza*, *Lato ingresso*) restano configurabili con `pv1_name` / `pv2_name`.
+- **Tensione delle stringhe** accanto alla potenza di FV1…FV4; i nomi delle falde (es. *Lato piazza*, *Lato ingresso*) restano configurabili con `pv1_name` / `pv2_name`.
+- **Ricarica EV**: nella parte Wallbox tolta la voce *Connettore*, già indicata in alto.
 
 ### v1.14.3
 - **Ricarica EV**: barra a bolle rifatta e **animata** come nel video di riferimento: le bolle nascono, ondeggiano, si spostano e scoppiano di continuo. La barra è più sottile, rallenta da sola sui dispositivi lenti e resta ferma in modalità leggera.

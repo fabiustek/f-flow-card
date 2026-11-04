@@ -3265,7 +3265,7 @@ class FFlowCard extends HTMLElement {
       const n = Math.min(480, Math.round(W * H / 30));
       b.parts = Array.from({ length: n }, () => this._evcSpawn(b, Math.random()));
     }
-    b.target = s;
+    b.target = s; if (this._evcBoilLvl != null) b.boil = this._evcBoilLvl;
     if (this._evcIntroDue && !this._lite() && !this._paused && soc !== null) { this._evcIntroDue = false; b.fill = 0; b.t0 = performance.now(); b.from = 0; b.intro = true; }
     else if (!b.intro && Math.abs(b.fill - s) > 0.05) { b.t0 = performance.now(); b.from = b.fill; }
     this._evcIntroDue = false;
@@ -3394,6 +3394,9 @@ class FFlowCard extends HTMLElement {
       const sw = root.querySelector('.evsoc'); if (sw) sw.style.color = socCol;
     }
     const bolt = g('evcBolt'); if (bolt) bolt.style.visibility = charging ? 'visible' : 'hidden';
+    // boiling intensity for the fluid: strong while charging (with the power), a simmer otherwise
+    this._evcBoilLvl = charging ? 0.35 + 0.65 * Math.min(1, (pW || 0) / 7400) : 0.06;
+    if (this._evcB) this._evcB.boil = this._evcBoilLvl;
     this._evcBubbles(soc);
     if (pW === null) setV('evcPow', null, 'kW'); else if (Math.abs(pW) < 1000) setV('evcPow', Math.round(pW), 'W'); else setV('evcPow', (pW / 1000).toFixed(2), 'kW');
     setV('evcCur', cur === null ? null : cur.toFixed(1), 'A');
@@ -3480,7 +3483,6 @@ class FFlowCard extends HTMLElement {
     const info = g('evcInfo');
     if (info) {
       const chips = [];
-      if (stRaw) chips.push('Connettore: ' + lbl);
       const err = this._evcSt(c.evc_error);
       if (err && !/^(noerror|none|ok|0)$/i.test(String(err.state).replace(/[\s_-]/g, ''))) chips.push('⚠️ Errore: ' + err.state);
       const offA = this._val(c.evc_offered_current);
@@ -4084,12 +4086,14 @@ class FFlowCard extends HTMLElement {
       <polygon id="roofR" points="${quad(Rq)}" fill="#1b2230" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" style="transition:stroke .5s,fill .5s"/>
       ${cells(Lq, 'L')}${cells(Rq, 'R')}
     </g>
-    ${pv1Show ? `<text class="sm" id="pv1label" x="210" y="362" text-anchor="end" font-size="10.5" fill="#8b949e" letter-spacing="1">${this._pvName(1)}</text>
-    <text id="pv1FlowVal" x="210" y="378" text-anchor="end" font-size="14.5" font-weight="700" fill="#ffe83c">-- W</text>
-    ${this.config.pv1_voltage ? '<text class="sm" id="pv1Volt" x="210" y="391" text-anchor="end" font-size="10" font-weight="600" fill="#c9a227">-- V</text>' : ''}` : ''}
-    ${pv2Show ? `<text class="sm" id="pv2label" x="310" y="362" font-size="10.5" fill="#8b949e" letter-spacing="1">${this._pvName(2)}</text>
-    <text id="pv2FlowVal" x="310" y="378" font-size="14.5" font-weight="700" fill="#ffe83c">-- W</text>
-    ${this.config.pv2_voltage ? '<text class="sm" id="pv2Volt" x="310" y="391" font-size="10" font-weight="600" fill="#c9a227">-- V</text>' : ''}` : ''}
+    ${pv1Show ? `<text class="sm" id="pv1label" x="210" y="365" text-anchor="end" font-size="10.5" fill="#8b949e" letter-spacing="1">${this._pvName(1)}</text>
+    ${this.config.pv1_voltage
+      ? '<text x="210" y="381" text-anchor="end" font-weight="700"><tspan id="pv1FlowVal" font-size="14.5" fill="#ffe83c">-- W</tspan><tspan id="pv1Volt" dx="5" font-size="10" font-weight="600" fill="#c9a227">-- V</tspan></text>'
+      : '<text id="pv1FlowVal" x="210" y="381" text-anchor="end" font-size="14.5" font-weight="700" fill="#ffe83c">-- W</text>'}` : ''}
+    ${pv2Show ? `<text class="sm" id="pv2label" x="310" y="365" font-size="10.5" fill="#8b949e" letter-spacing="1">${this._pvName(2)}</text>
+    ${this.config.pv2_voltage
+      ? '<text x="310" y="381" font-weight="700"><tspan id="pv2FlowVal" font-size="14.5" fill="#ffe83c">-- W</tspan><tspan id="pv2Volt" dx="5" font-size="10" font-weight="600" fill="#c9a227">-- V</tspan></text>'
+      : '<text id="pv2FlowVal" x="310" y="381" font-size="14.5" font-weight="700" fill="#ffe83c">-- W</text>'}` : ''}
     <text id="fcLoadVal" x="${cx}" y="497" text-anchor="middle" font-size="15.5" font-weight="700" fill="#F7F6D3">-- W</text>
     ${this.config.load_voltage || this.config.load_frequency ? `<text class="sm" id="loadVF" x="${cx + 38}" y="491" font-size="9.5" font-weight="600" fill="#8b949e"><tspan id="loadV" x="${cx + 38}">-- V</tspan><tspan id="loadF" x="${cx + 38}" dy="11">-- Hz</tspan></text>` : ''}`;
   }
@@ -4141,7 +4145,7 @@ class FFlowCard extends HTMLElement {
     const supDy = (this.config.grid_voltage || this.config.grid_frequency) ? 9 : 0;
     const showSelf = this.config._show_self_stats !== false;
     const supplyBlock = showSupply ? `<g id="supplyGroup" transform="translate(0,${supDy})">
-      <text class="sm" x="352" y="291" font-size="10" fill="#8b949e" letter-spacing="1.2">FONTI ENERGIA</text>
+      <text class="sm" x="431" y="291" text-anchor="middle" font-size="10" fill="#8b949e" letter-spacing="1.2">FONTI ENERGIA</text>
       <text class="lg" x="364" y="305" text-anchor="middle" font-size="8.5" font-weight="700" fill="#f4d03f">SOLARE</text>
       <text class="lg" x="408" y="305" text-anchor="middle" font-size="8.5" font-weight="700" fill="#3fb950">CARICA</text>
       <text class="lg" x="452" y="305" text-anchor="middle" font-size="8.5" font-weight="700" fill="#58a6ff">SCARICA</text>
@@ -4152,7 +4156,10 @@ class FFlowCard extends HTMLElement {
       <rect id="supDis"   x="352" y="311" width="0" height="7" fill="#2b59ff"/>
       <rect id="supGrid"  x="352" y="311" width="0" height="7" fill="#f85149"/>
       ${showSelf ? `<g id="selfGroup" style="display:none">
-        <text class="sm" x="510" y="333" text-anchor="end" font-size="9" font-weight="600" fill="#8b949e" letter-spacing=".4"><tspan id="selfSuff" font-size="12" font-weight="800" fill="#3fb950">--</tspan> AUTOSUFF.  <tspan id="selfCons" font-size="12" font-weight="800" fill="#f4d03f">--</tspan> AUTOCONS.</text>
+        <text id="selfSuff" x="391" y="334" text-anchor="middle" font-size="13" font-weight="800" fill="#3fb950">--</text>
+        <text class="lg" x="391" y="343" text-anchor="middle" font-size="8" font-weight="600" fill="#8b949e" letter-spacing=".5">AUTOSUFF.</text>
+        <text id="selfCons" x="471" y="334" text-anchor="middle" font-size="13" font-weight="800" fill="#f4d03f">--</text>
+        <text class="lg" x="471" y="343" text-anchor="middle" font-size="8" font-weight="600" fill="#8b949e" letter-spacing=".5">AUTOCONS.</text>
       </g>` : ''}
     </g>` : '';
 
@@ -4169,9 +4176,13 @@ class FFlowCard extends HTMLElement {
     const modernHome = this.config.home_icon_style !== 'classic';
 
     const modernHomeX = this.config.home_icon_style !== 'classic';
-    const pv3txt = showPvExtra && modernHomeX ? (this.config.pv3_voltage ? '<text class="sm" id="pv3Volt" x="180" y="453" text-anchor="end" font-size="10" font-weight="600" fill="#c9a227">-- V</text>' : '') + `<text class="sm" id="pv3label" x="180" y="424" text-anchor="end" font-size="10.5" fill="#8b949e" letter-spacing="1">${this._pvName(3)}</text><text id="pv3FlowVal" x="180" y="440" text-anchor="end" font-size="14" font-weight="700" fill="#ffe83c">-- W</text>`
+    const pv3txt = showPvExtra && modernHomeX ? `<text class="sm" id="pv3label" x="180" y="424" text-anchor="end" font-size="10.5" fill="#8b949e" letter-spacing="1">${this._pvName(3)}</text>` + (this.config.pv3_voltage
+        ? '<text x="180" y="440" text-anchor="end" font-weight="700"><tspan id="pv3FlowVal" font-size="14" fill="#ffe83c">-- W</tspan><tspan id="pv3Volt" dx="5" font-size="10" font-weight="600" fill="#c9a227">-- V</tspan></text>'
+        : '<text id="pv3FlowVal" x="180" y="440" text-anchor="end" font-size="14" font-weight="700" fill="#ffe83c">-- W</text>')
       : showPvExtra ? `<text id="pv3label" x="-1" y="450" font-size="11" fill="#8b949e" letter-spacing="1">FV3</text><text id="pv3FlowVal" x="-1" y="464" font-size="13.5" font-weight="700" fill="#ffe83c">-- W</text>` : '';
-    const pv4txt = showPvExtra && modernHomeX ? (this.config.pv4_voltage ? '<text class="sm" id="pv4Volt" x="340" y="453" font-size="10" font-weight="600" fill="#c9a227">-- V</text>' : '') + `<text class="sm" id="pv4label" x="340" y="424" font-size="10.5" fill="#8b949e" letter-spacing="1">${this._pvName(4)}</text><text id="pv4FlowVal" x="340" y="440" font-size="14" font-weight="700" fill="#ffe83c">-- W</text>`
+    const pv4txt = showPvExtra && modernHomeX ? `<text class="sm" id="pv4label" x="340" y="424" font-size="10.5" fill="#8b949e" letter-spacing="1">${this._pvName(4)}</text>` + (this.config.pv4_voltage
+        ? '<text x="340" y="440" font-weight="700"><tspan id="pv4FlowVal" font-size="14" fill="#ffe83c">-- W</tspan><tspan id="pv4Volt" dx="5" font-size="10" font-weight="600" fill="#c9a227">-- V</tspan></text>'
+        : '<text id="pv4FlowVal" x="340" y="440" font-size="14" font-weight="700" fill="#ffe83c">-- W</text>')
       : showPvExtra ? `<text id="pv4label" x="-1" y="480" font-size="11" fill="#8b949e" letter-spacing="1">FV4</text><text id="pv4FlowVal" x="-1" y="494" font-size="13.5" font-weight="700" fill="#ffe83c">-- W</text>` : '';
 
     // EV: SVG wallbox + car to the right of the house (x 344–514, y 330–480)
