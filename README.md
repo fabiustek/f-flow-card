@@ -60,7 +60,7 @@ Versione attuale: **v1.15.0** · Fork di [k-flow-card](https://github.com/thekha
 - **Meteo animato** nel cielo: nuvole, pioggia, temporale, neve, nebbia e vento dalla tua entità `weather.*`
 - **Batteria a segmenti** colorata in base al SOC, con scia che sale in carica e scende in scarica
 - **Traliccio luminoso**: rosso quando prelevi, verde quando immetti, barrato quando sei fuori rete
-- **Casa a due falde** con FV1 a sinistra e FV2 a destra, ognuna illuminata dalla propria produzione
+- **Casa a due falde** con FV1 a sinistra e FV2 a destra, ognuna illuminata dalla propria produzione, con un **effetto calore** sui pannelli proporzionale alla potenza
 - **Commutazione IN RETE / FUORI RETE** dalla card: tieni premuto, conferma, fatto
 - **Utilizzatori** con icona, colore e un disco stile contatore Ferraris che gira in base al consumo
 - **Grafico dei consumi** delle ultime 24 ore: chi ha consumato e quando
@@ -205,6 +205,8 @@ load_frequency: sensor.deye_load_frequency
 ### Casa a due falde
 
 La casa ha due falde di pannelli: **FV1 sulla sinistra** e **FV2 sulla destra**. Quando una stringa produce, la sua **falda diventa gialla** (come il flusso dal sole all'inverter) e i pannelli si illuminano tanto più quanto più produce; nome e potenza sono scritti in alto, accanto alla falda. Sotto la casa c'è il consumo istantaneo, e l'**anello alla base gira più veloce quanto più la casa consuma** (fermo sotto i 10 W). La casa (con il flusso che arriva dall'inverter, l'anello e il valore del consumo) prende il **colore delle fonti che la alimentano, mescolate in proporzione**: **giallo** per il solare, **blu** per la batteria, **rosso** per la rete. Per esempio, se la casa prende il 60% dal solare e il 40% dalla rete diventa arancione; metà solare e metà batteria dà un verde chiaro. La quota solare è la produzione FV che resta dopo la carica della batteria e l'immissione in rete. Le finestre si accendono quando c'è consumo.
+
+**Effetto calore sulle falde** (dalla v1.15.0, attivo di partenza): quando una falda produce, i suoi pannelli **tremolano come l'aria sopra l'asfalto d'estate** e onde di luce gialla risalgono lentamente la falda dalla gronda al colmo, come il calore che sale. Il colore resta il giallo dei pannelli. L'effetto è **proporzionale alla produzione di ogni falda**: più la stringa produce, più il tremolio è forte e le onde sono luminose e veloci; a 0 W sparisce. Si spegne in **🎨 Layout e intestazione** → **Effetto calore sulle falde** (`roof_heat: false`); in modalità leggera non c'è e si ferma quando la card non si vede.
 
 **Stringhe aggiuntive FV3 e FV4**: attivale nella sezione **☀️ Stringhe FV aggiuntive** (＋ Attiva). **FV3** compare sotto FV1, sul lato della falda sinistra; **FV4** sotto FV2, sul lato della falda destra. Ogni falda si illumina con la somma delle sue stringhe (sinistra FV1 + FV3, destra FV2 + FV4). Con l'icona casa classica, FV3 e FV4 restano nella colonna di sinistra.
 
@@ -640,6 +642,7 @@ Tutte le opzioni si impostano dall'editor visuale; qui trovi le chiavi YAML corr
 | `sections_order` | `[bms, inv, cons, evc, vent, stats, cam]` | Ordine delle sezioni sotto il disegno (bms = statistiche batteria, inv = Inverter, cons = Utilizzatori, evc = Ricarica EV, vent = Ventilazione, stats = Statistiche, cam = Videocamera) |
 | `grid_icon_style` | `modern` | `modern` (traliccio luminoso) o `classic` (immagine) |
 | `home_icon_style` | `modern` | `modern` (casa a due falde) o `classic` (immagine) |
+| `roof_heat` | `true` | Effetto calore (superficie rovente) sulle falde in produzione, proporzionale alla potenza di ogni falda |
 | `sun` | `sun.sun` | Entità del sole |
 
 ### Fotovoltaico e casa
@@ -845,7 +848,7 @@ Misure su un telefono di fascia bassa simulato (processore 6 volte più lento, 2
 
 **Modalità leggera** — per tablet a muro datati o telefoni lenti. In **🎨 Layout e intestazione** → **Prestazioni**:
 - **Normale** (predefinita): tutte le animazioni.
-- **Leggera**: restano i **flussi animati** (sole, batteria, rete, casa, wallbox); spariscono bagliori, animazioni decorative (stelle che brillano, nuvole e pioggia in movimento, pulsazioni, scia nella batteria, dischi e ventole), la goccia del menu a schede (resta una pillola evidenziata) e lo sfondo sfocato; la card si aggiorna ogni 3 secondi e i grafici ogni 15 minuti.
+- **Leggera**: restano i **flussi animati** (sole, batteria, rete, casa, wallbox); spariscono bagliori, animazioni decorative (stelle che brillano, nuvole e pioggia in movimento, pulsazioni, scia nella batteria, dischi e ventole, effetto calore sulle falde), la goccia del menu a schede (resta una pillola evidenziata) e lo sfondo sfocato; la card si aggiorna ogni 3 secondi e i grafici ogni 15 minuti.
 - **Automatica**: leggera solo sui dispositivi lenti (pochi processori o poca memoria) o con l'impostazione di sistema "riduci movimento", normale sugli altri. Utile se la stessa plancia si apre da dispositivi diversi.
 
 ## Aggiornamenti
@@ -981,6 +984,7 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 ### v1.15.0
 - **Autosufficienza e autoconsumo** di oggi sotto la barra **Fonti energia**, calcolati dalle entità che hai già (o da tuoi sensori in %).
 - **Tensione e frequenza** di rete sotto la potenza prelevata/ceduta e della casa accanto al consumo.
+- **Effetto calore sulle falde**: i pannelli in produzione tremolano come una superficie rovente, con onde gialle che risalgono la falda, in proporzione alla potenza di ogni falda (`roof_heat`, disattivabile).
 - **Tensione delle stringhe** sotto la potenza di FV1…FV4; i nomi delle falde (es. *Lato piazza*, *Lato ingresso*) restano configurabili con `pv1_name` / `pv2_name`.
 
 ### v1.14.3

@@ -5,6 +5,8 @@ const FFC_VERSION = '1.15.0';
 //           computed from today's energies or taken from self_sufficiency_entity / self_consumption_entity.
 //   NEW  – grid_voltage / grid_frequency under the grid power; load_voltage / load_frequency next to the
 //           house consumption; pv1_voltage…pv4_voltage under each string power. All optional.
+//   NEW  – roof_heat (on by default): hot-surface shimmer + rising heat waves on each producing slope,
+//           proportional to its string power; not in light mode, stopped while hidden.
 // Changes v1.14.3:
 //   NEW  – Ricarica EV: bubble bar is now a canvas particle system (bubbles grow, wobble, drift and pop,
 //           like the reference video), slimmer (40 px). Still frame in light mode, stopped when hidden.
@@ -862,6 +864,7 @@ class FFlowCardEditor extends HTMLElement {
       switchRow('_show_backup_panel',    'Pannello autonomia', 'Autonomia e kWh residui nell’area del flusso'),
       switchRow('_daily_tiles_extended', '6 riquadri giornalieri', 'FV, carica, scarica, prelievo, immissione, consumo'),
       switchRow('home_icon_classic', 'Icona casa classica', 'Usa la vecchia immagine invece della casa a due falde con FV1 / FV2'),
+      switchRow('roof_heat', 'Effetto calore sulle falde', 'Le falde in produzione tremolano come una superficie rovente, in proporzione alla potenza di ogni stringa', true),
       divider(),
       switchRow('sections_stack', 'Sezioni impilate (vecchio stile)', 'Spento: menu a schede con l’animazione a goccia, una sezione aperta alla volta'),
       tabStart,
@@ -1377,6 +1380,7 @@ class FFlowCard extends HTMLElement {
       background_blur: false,
       tabs_start: 'none',
       home_icon_style: 'modern',
+      roof_heat: true,
       grid_switch_to_off: '',
       grid_switch_to_on: '',
       grid_switch_confirm: true,
@@ -1532,6 +1536,7 @@ class FFlowCard extends HTMLElement {
     if (p === !!this._paused) return;
     this._paused = p;
     if (!p && this._evcB) setTimeout(() => this._evcKick(), 0);   // EV bubbles resume
+    if (!p && this._heat) setTimeout(() => this._heatKick(), 0);  // roof heat shimmer resumes
     const root = this.shadowRoot;
     root.querySelectorAll('svg').forEach(svg => { try { p ? svg.pauseAnimations() : svg.unpauseAnimations(); } catch (e) { /* not an outer svg */ } });
     try { (root.getAnimations ? root.getAnimations() : []).forEach(an => p ? an.pause() : an.play()); } catch (e) { /* older browser */ }
@@ -1787,6 +1792,7 @@ class FFlowCard extends HTMLElement {
       _show_energy_supply: 'Mostra a destra la barra "Fonti energia": quanta parte della potenza in questo momento arriva da solare, carica batteria, scarica batteria e rete.',
       _show_backup_panel: 'Mostra sotto la batteria il pannello con autonomia (in scarica) o tempo alla ricarica (in carica) ed energia residua in kWh. Serve la capacità della batteria.',
       _daily_tiles_extended: 'Acceso: 6 riquadri giornalieri (FV, carica, scarica, prelievo, immissione, consumo). Spento: 4 riquadri (FV, carica/scarica, energia residua, consumo).',
+      roof_heat: 'Effetto “superficie rovente” sui pannelli della casa a due falde: i pannelli tremolano come l’aria sopra l’asfalto d’estate e onde di luce gialla risalgono la falda. Ogni falda segue la propria stringa: più produce, più l’effetto è forte e veloce; a 0 W sparisce. Escluso in modalità leggera.',
       home_icon_classic: 'Usa la vecchia immagine della casa invece della casa a due falde disegnata (con FV1 a sinistra e FV2 a destra).',
       sections_stack: 'Spento (consigliato): le sezioni sotto il disegno sono un menu a schede con la goccia animata, una aperta alla volta. Acceso: le sezioni sono una sotto l’altra, richiudibili, con il flag 📌 per tenerle aperte.',
       tabs_start: 'Cosa vedi quando apri la pagina con il menu a schede: tutte chiuse, l’ultima scheda che avevi aperto (ricordata su quel dispositivo) oppure sempre una scheda precisa.',
@@ -3957,6 +3963,67 @@ class FFlowCard extends HTMLElement {
     this._updateDynamic();
   }
 
+  // ── v1.15.0: hot-surface effect on the producing roof slopes ──────────────────────────────
+  _roofHeat(watts, half) {
+    const root = this.shadowRoot;
+    const st = this._heat || (this._heat = { L: { v: 0, t: 0 }, R: { v: 0, t: 3 } });
+    ['L', 'R'].forEach(k => {
+      const g = root.getElementById('roofHeat' + k); if (!g) { st[k].v = 0; return; }
+      const w = watts[k], on = w > 10, v = on ? Math.min(1, w / half) : 0;
+      st[k].v = v;
+      if (g.style.display !== (on ? '' : 'none')) g.style.display = on ? '' : 'none';
+      g.setAttribute('opacity', on ? (0.25 + 0.75 * v).toFixed(2) : '0');
+      const d = root.getElementById('ffcDisp' + k); if (d) d.setAttribute('scale', on ? (1 + 4 * v).toFixed(1) : '0');
+      // rising waves: positions are driven by the same low-rate loop as the shimmer (see _heatKick),
+      // so the filtered slope is repainted ~20×/s instead of every frame
+      if (!g._waves) g._waves = [...g.querySelectorAll('.heatWaves rect')];
+    });
+    this._heatKick();
+  }
+  // shimmer + waves: attribute updates on a small rAF loop (waves ~20 fps, turbulence ~10 fps), only
+  // while a slope produces and the card is visible
+  _heatKick() {
+    if (this._heatRaf) return;
+    let last = 0, n = 0;
+    const step = (now) => {
+      this._heatRaf = null;
+      const st = this._heat, root = this.shadowRoot;
+      if (!st || this._paused || document.hidden || !(st.L.v > 0 || st.R.v > 0)) return;
+      if (now - last >= 50) {
+        const dt = last ? Math.min(0.2, (now - last) / 1000) : 0; last = now; n++;
+        let alive = false;
+        ['L', 'R'].forEach(k => {
+          const v = st[k].v, geo = this._heatGeo && this._heatGeo[k];
+          if (!v || !root.getElementById('roofHeat' + k)) return;
+          alive = true;
+          st[k].t += dt * (0.4 + 1.6 * v);
+          const t = st[k].t;
+          if (n % 2 === 0) {          // shimmer at ~10 fps
+            const tu = root.getElementById('ffcTurb' + k);
+            if (tu) {
+              tu.setAttribute('baseFrequency', `${(0.035 + Math.sin(t * 0.9) * 0.008).toFixed(4)} ${(0.16 + Math.sin(t * 1.3 + 1) * 0.04).toFixed(4)}`);
+              tu.setAttribute('seed', String(Math.floor(t * 6) % 50));
+            }
+          }
+          // three waves rising from the gutter to the ridge, faster with more power
+          const g = root.getElementById('roofHeat' + k);
+          if (g && g._waves && geo) {
+            const { ang, mid, len } = geo;
+            g._waves.forEach((r, i) => {
+              const ph = ((t * 0.42 + i / 3) % 1 + 1) % 1, e = ph < .5 ? 2 * ph * ph : 1 - Math.pow(-2 * ph + 2, 2) / 2;
+              const d = (len / 2 + 10) - e * (len + 20), op = ph < .3 ? ph / .3 * .6 : ph > .7 ? (1 - ph) / .3 * .5 : .6 - (ph - .3) * .25;
+              r.setAttribute('transform', `translate(${mid[0].toFixed(1)},${mid[1].toFixed(1)}) rotate(${ang.toFixed(1)}) translate(${d.toFixed(1)},0)`);
+              r.setAttribute('opacity', op.toFixed(2));
+            });
+          }
+        });
+        if (!alive) return;
+      }
+      this._heatRaf = requestAnimationFrame(step);
+    };
+    this._heatRaf = requestAnimationFrame(step);
+  }
+
   _buildHouseSVG(pv1Show, pv2Show) {
     const cx = 260;
     const Lq = { a: [cx, 352], b: [184, 410], c: [197, 420], d: [cx, 373] };
@@ -3976,7 +4043,30 @@ class FFlowCard extends HTMLElement {
         h += `<polygon points="${[P(Q, ua, va), P(Q, ub, va), P(Q, ub, vb), P(Q, ua, vb)].map(pt).join(' ')}"/>`;
       }
       return `<g fill="#123a6b" stroke="#2f6fb5" stroke-width=".5">${h}</g>
-        <g id="hpGlow${side}" fill="#ffe83c" opacity="0" style="transition:opacity .6s">${h}</g>`;
+        <g id="hpGlow${side}" fill="#ffe83c" opacity="0" style="transition:opacity .6s">${h}</g>${heat(Q, side, h)}`;
+    };
+    // v1.15.0 "hot surface": the lit cells shimmer like air over hot asphalt (turbulence displacement)
+    // and soft yellow heat waves rise from the gutter to the ridge; both scale with the slope's power.
+    const heatOn = this.config.roof_heat !== false && !this._lite();
+    const heat = (Q, side, h) => {
+      if (!heatOn) return '';
+      const ang = Math.atan2(Q.b[1] - Q.a[1], Q.b[0] - Q.a[0]) * 180 / Math.PI;
+      const mid = lerp(Q.a, Q.c, 0.5), len = Math.hypot(Q.b[0] - Q.a[0], Q.b[1] - Q.a[1]);
+      this._heatGeo = { ...(this._heatGeo || {}), [side]: { ang, mid, len } };
+      return `<defs>
+          <filter id="ffcHeat${side}" x="-10%" y="-40%" width="120%" height="180%">
+            <feTurbulence id="ffcTurb${side}" type="fractalNoise" baseFrequency="0.035 0.16" numOctaves="1" seed="${side === 'L' ? 3 : 8}" result="n"/>
+            <feDisplacementMap id="ffcDisp${side}" in="SourceGraphic" in2="n" scale="0" xChannelSelector="R" yChannelSelector="G"/>
+          </filter>
+          <clipPath id="ffcHeatClip${side}"><polygon points="${quad(Q)}"/></clipPath>
+          <linearGradient id="ffcHeatWave${side}" gradientUnits="userSpaceOnUse" x1="-9" y1="0" x2="9" y2="0">
+            <stop offset="0" stop-color="#ffe83c" stop-opacity="0"/><stop offset=".5" stop-color="#fff08a" stop-opacity=".9"/><stop offset="1" stop-color="#ffe83c" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <g id="roofHeat${side}" clip-path="url(#ffcHeatClip${side})" opacity="0" style="display:none">
+          <g opacity=".8"><g fill="#ffe83c" filter="url(#ffcHeat${side})">${h}</g></g>
+          <g class="heatWaves">${[0, 1, 2].map(() => `<rect x="-9" y="-40" width="18" height="80" fill="url(#ffcHeatWave${side})" opacity="0"/>`).join('')}</g>
+        </g>`;
     };
     return `<g id="homeIconImg" data-modern="1" style="color:#8b949e;transition:color .5s">
       <ellipse cx="${cx}" cy="473" rx="82" ry="7" fill="currentColor" fill-opacity=".10" stroke="currentColor" stroke-opacity=".3" stroke-width="1.2"/>
@@ -4795,6 +4885,7 @@ class FFlowCard extends HTMLElement {
       const glow = (w) => w > 10 ? (0.25 + 0.65 * Math.min(1, w / half)).toFixed(2) : '0';
       if (gl) gl.setAttribute('opacity', glow(pv1 + pv3));   // left slope: FV1 (+ FV3)
       if (gr) gr.setAttribute('opacity', glow(pv2 + pv4));   // right slope: FV2 (+ FV4)
+      this._roofHeat({ L: pv1 + pv3, R: pv2 + pv4 }, half);
       // v1.9.0: a producing slope turns PV-yellow, like the sun → inverter flow
       [['roofL', pv1 + pv3], ['roofR', pv2 + pv4]].forEach(([id, w]) => {
         const r = getEl(id); if (!r) return;
