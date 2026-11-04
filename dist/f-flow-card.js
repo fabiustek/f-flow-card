@@ -1,5 +1,9 @@
-// f-flow-card.js – Unified Edition v1.14.1
-const FFC_VERSION = '1.14.1';
+// f-flow-card.js – Unified Edition v1.14.2
+const FFC_VERSION = '1.14.2';
+// Changes v1.14.2:
+//   FIX  – Ricarica EV: power below 1 kW shown in W (5 W was "0.00 kW"); 0 V shown as "--" (the box
+//           measures only while current flows); session energy converted from Wh when needed;
+//           "In carica · l'auto non assorbe" (orange, no bolt) when OCPP says Charging but power ≤ 50 W.
 // Changes v1.14.1:
 //   FIX  – Tab bar scrolls with the mouse wheel and by dragging on desktop (it had no scrollbar).
 //   FIX  – Ricarica EV: OCPP availability is informational only and no longer blocks the command
@@ -3283,7 +3287,10 @@ class FFlowCard extends HTMLElement {
     const setV = (id, v, u) => { const e = g(id); if (e) FFlowCard._setH(e, (v === null || v === undefined ? '--' : v) + (u ? `<small>${u}</small>` : '')); };
     const pW = this._val(this._evcPowerId(), true), cur = this._val(c.evc_current), volt = this._val(c.evc_voltage);
     const soc = this._val(this._evcSocId()), temp = this._val(c.evc_temp);
-    const eS = this._val(c.evc_session_energy), tS = this._evcSessionSecs(this._evcSt(c.evc_session_time));
+    // session energy in kWh whatever the sensor unit (JuiceBox/OCPP may report Wh)
+    const eSu = ((this._hass.states[c.evc_session_energy] || {}).attributes || {}).unit_of_measurement || '';
+    let eS = this._val(c.evc_session_energy); if (eS !== null && /^wh$/i.test(eSu.trim())) eS /= 1000;
+    const tS = this._evcSessionSecs(this._evcSt(c.evc_session_time));
     // status
     const stRaw = this._evcSt(c.evc_status);
     const key = stRaw ? String(stRaw.state).toLowerCase().replace(/[\s_-]/g, '') : '';
@@ -3295,7 +3302,10 @@ class FFlowCard extends HTMLElement {
     this._evcUnavailable = !swNow || ['unavailable', 'unknown'].includes(String(swNow.state).toLowerCase());
     let [lbl, col] = FFlowCard.EVC_STATUS[key] || (stRaw ? [String(stRaw.state), '#c9d1d9'] : (pW !== null && pW > 50 ? ['In carica', '#3fb950'] : ['--', '#8b949e']));
     if (this._evcUnavailable && !stRaw) [lbl, col] = ['Wallbox non raggiungibile', '#6e7681'];
-    const charging = key === 'charging' || (!stRaw && pW !== null && pW > 50);
+    // OCPP may stay "Charging" while the car draws nothing (target reached, car paused): say so
+    const idleCharging = key === 'charging' && pW !== null && pW <= 50;
+    if (idleCharging) [lbl, col] = ['In carica · l’auto non assorbe', '#f39c4b'];
+    const charging = (key === 'charging' && !idleCharging) || (!stRaw && pW !== null && pW > 50);
     const hero = g('evcHero'); if (hero) hero.style.setProperty('--ec', col);
     const se = g('evcState'); if (se) { FFlowCard._setT(se, '● ' + lbl.toUpperCase()); se.style.color = col; }
     const socCol = this._evcSocColor(soc);
@@ -3305,13 +3315,13 @@ class FFlowCard extends HTMLElement {
     }
     const bolt = g('evcBolt'); if (bolt) bolt.style.visibility = charging ? 'visible' : 'hidden';
     this._evcBubbles(soc);
-    setV('evcPow', pW === null ? null : (pW / 1000).toFixed(2), 'kW');
+    if (pW === null) setV('evcPow', null, 'kW'); else if (Math.abs(pW) < 1000) setV('evcPow', Math.round(pW), 'W'); else setV('evcPow', (pW / 1000).toFixed(2), 'kW');
     setV('evcCur', cur === null ? null : cur.toFixed(1), 'A');
     setV('evcTime', this._evcFmtDur(tS), 'h');
     setV('evcEnergy', eS === null ? null : eS.toFixed(1), 'kWh');
     const cons = Number(c.evc_consumption) || 14;
     setV('evcKm', eS === null ? null : '+' + Math.round(eS / cons * 100), 'km');
-    setV('evcVolt', volt === null ? null : Math.round(volt), 'V');
+    setV('evcVolt', volt === null || volt < 50 ? null : Math.round(volt), 'V');   // 0 V = the box is not measuring (no current)
     setV('evcTemp', temp === null ? null : Math.round(temp), '°C');
     const capWh = Number(c.charger_battery_capacity_wh) || 0;
     const eta = charging && capWh && soc !== null && pW > 50 ? capWh * (100 - soc) / 100 / pW * 3600 : null;
