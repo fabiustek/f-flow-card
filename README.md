@@ -7,7 +7,7 @@
 [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
 [![Release](https://img.shields.io/github/v/release/fabiustek/f-flow-card)](https://github.com/fabiustek/f-flow-card/releases)
 
-Versione attuale: **v1.14.3** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
+Versione attuale: **v1.15.0** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/card-overview.png" alt="F-Flow Card con tutte le sezioni attive" width="480">
@@ -26,6 +26,7 @@ Versione attuale: **v1.14.3** · Fork di [k-flow-card](https://github.com/thekha
   - [Aprire i grafici di un'entità dalla card](#aprire-i-grafici-di-unentità-dalla-card)
 - [Le sezioni della card](#le-sezioni-della-card)
   - [Flussi di energia](#flussi-di-energia)
+  - [Tensioni, frequenza, autosufficienza e autoconsumo](#tensioni-frequenza-autosufficienza-e-autoconsumo)
   - [Casa a due falde](#casa-a-due-falde)
   - [Commutazione IN RETE / FUORI RETE](#commutazione-in-rete--fuori-rete)
   - [Riquadri giornalieri](#riquadri-giornalieri)
@@ -149,7 +150,8 @@ Sull'indicatore della rete e sul badge EMS il **tocco breve** apre la scheda, me
   - a riposo mostra "batteria a riposo". Sotto c'è l'**energia residua** in kWh.
 - **Flussi**: curve morbide con linee tratteggiate sottili e luminose che scorrono nella direzione dell'energia, più veloci quando la potenza sale. Il flusso della batteria è sempre blu, come la batteria.
 - **Inverter** al centro: temperatura e percentuale di carico. Si può sostituire con una foto (`inverter_image`).
-- **Rete** a destra: potenza istantanea, energia prelevata (▼) e immessa (▲) oggi. Sotto, la barra **Fonti energia** mostra in proporzione solare, carica, scarica e rete.
+- **Rete** a destra: potenza istantanea, energia prelevata (▼) e immessa (▲) oggi e, se configurate, **tensione e frequenza di rete** sotto la potenza. Sotto, la barra **Fonti energia** mostra in proporzione solare, carica, scarica e rete, con sotto l'**autosufficienza** e l'**autoconsumo** di oggi.
+- **Casa**: consumo istantaneo sotto la casa e, se configurate, **tensione e frequenza erogate** accanto. Sotto la potenza di ogni stringa può comparire la sua **tensione**.
 - **Barre FV / POT**: produzione rispetto alla potenza massima dell'impianto e potenza della batteria rispetto a quella dell'inverter.
 
 Nella sezione **🎨 Layout e intestazione** puoi cambiare titolo, attivare la barra delle fonti, il pannello autonomia, l'immagine dell'inverter e tornare alle icone classiche (batteria, rete, casa).
@@ -166,6 +168,39 @@ Nella sezione **🎨 Layout e intestazione** puoi cambiare titolo, attivare la b
 3. Serve anche la **capacità della batteria** nella stessa sezione.
 
 Esempio: SOC 45%, soglia 20%, batteria da 16 kWh, scarica a 1533 W → 25% di 16 kWh = 4 kWh utilizzabili → **2h 36m**.
+
+### Tensioni, frequenza, autosufficienza e autoconsumo
+
+<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/flow.png" alt="Tensioni delle stringhe, tensione e frequenza di casa e rete, autosufficienza e autoconsumo" width="480"></p>
+
+Tutti facoltativi: se non configuri un'entità, quella scritta non compare.
+
+**Autosufficienza e autoconsumo** (sotto la barra **Fonti energia**):
+- **Autosufficienza**: quanta parte del consumo di oggi **non** è arrivata dalla rete = (consumo oggi − prelievo oggi) ÷ consumo oggi. Verde dal 70%, arancione dal 40%, rosso sotto.
+- **Autoconsumo**: quanta parte della produzione FV di oggi è stata **usata** (in casa o in batteria) invece di essere immessa = (produzione FV oggi − immissione oggi) ÷ produzione FV oggi.
+- La card li calcola da sola con le entità che hai già: **Produzione FV oggi** e **Consumo oggi** (sezione ☀️ Altri dati fotovoltaico), **Energia prelevata** ed **Energia immessa** (sezione 🔌 Rete). Se hai già sensori in % puoi usarli in **🔌 Rete** → **Autosufficienza %** / **Autoconsumo %**.
+- Si spengono in **🎨 Layout e intestazione** → **Autosufficienza e autoconsumo** (servono la barra fonti energia attiva).
+
+**Tensione e frequenza**:
+1. Sezione **🔌 Rete** → **Tensione di rete** e **Frequenza di rete**: compaiono sotto la potenza prelevata/ceduta, es. "231 V · 49.98 Hz".
+2. Sezione **☀️ Altri dati fotovoltaico** → **Tensione erogata alla casa** e **Frequenza erogata alla casa**: compaiono accanto al consumo sotto la casa.
+
+**Tensione e nome delle stringhe** (sezione **☀️ Fotovoltaico**):
+1. **Tensione FV1** / **Tensione FV2** (e FV3/FV4 nelle stringhe aggiuntive): in piccolo sotto la potenza della stringa.
+2. **Nome della falda** (`pv1_name`, `pv2_name`): per esempio **Lato piazza** e **Lato ingresso** al posto di FV1 e FV2. Il nome compare sul disegno e nelle statistiche.
+
+Esempio per Deye (controlla i nomi esatti in **Strumenti per sviluppatori → Stati**):
+
+```yaml
+pv1_name: Lato piazza
+pv2_name: Lato ingresso
+pv1_voltage: sensor.deye_pv1_voltage
+pv2_voltage: sensor.deye_pv2_voltage
+grid_voltage: sensor.deye_grid_voltage
+grid_frequency: sensor.deye_grid_frequency
+load_voltage: sensor.deye_load_voltage
+load_frequency: sensor.deye_load_frequency
+```
 
 ### Casa a due falde
 
@@ -612,7 +647,8 @@ Tutte le opzioni si impostano dall'editor visuale; qui trovi le chiavi YAML corr
 | Chiave | Predefinito | Descrizione |
 |---|---|---|
 | `pv1_power` / `pv2_power` | sensori GoodWe | Potenza delle stringhe FV1 (falda sinistra) e FV2 (falda destra) |
-| `pv1_name` … `pv4_name` | `''` | Nome libero delle falde/stringhe; se vuoto `FV1`, `FV2`… |
+| `pv1_name` … `pv4_name` | `''` | Nome libero delle falde/stringhe (es. `Lato piazza`); se vuoto `FV1`, `FV2`… |
+| `pv1_voltage` … `pv4_voltage` | `''` | Tensione delle stringhe (V), sotto la potenza |
 | `_show_pv_extra` | `false` | Mostra le stringhe FV3 e FV4 |
 | `pv3_power` / `pv4_power` | `''` | Potenza delle stringhe FV3 (sotto FV1, falda sinistra) e FV4 (sotto FV2, falda destra) |
 | `pv_total_power` | `sensor.goodwe_pv_power` | Potenza FV totale (se vuota: somma delle stringhe) |
@@ -621,6 +657,7 @@ Tutte le opzioni si impostano dall'editor visuale; qui trovi le chiavi YAML corr
 | `inv_temp` | `sensor.goodwe_inverter_temperature_module` | Temperatura dell'inverter |
 | `consump` | `sensor.goodwe_house_consumption` | Consumo della casa (W) |
 | `today_load` | `sensor.goodwe_today_load` | Consumo di oggi (kWh) |
+| `load_voltage` / `load_frequency` | `''` | Tensione (V) e frequenza (Hz) erogate alla casa, accanto al consumo |
 
 ### Rete
 
@@ -631,6 +668,9 @@ Tutte le opzioni si impostano dall'editor visuale; qui trovi le chiavi YAML corr
 | `invert_grid_power` | `false` | Inverte il segno (se positivo = immissione) |
 | `grid_import_energy` | `sensor.goodwe_today_energy_import` | Energia prelevata oggi (kWh) |
 | `grid_export_energy` | `''` | Energia immessa oggi (kWh) |
+| `grid_voltage` / `grid_frequency` | `''` | Tensione (V) e frequenza (Hz) di rete, sotto la potenza |
+| `_show_self_stats` | `true` | Autosufficienza e autoconsumo di oggi sotto la barra fonti energia |
+| `self_sufficiency_entity` / `self_consumption_entity` | `''` | Sensori in % da usare al posto del calcolo della card |
 | `grid_status_entity` | `''` | Stato IN RETE / FUORI RETE |
 | `grid_switch_to_off` | `''` | Entità da attivare per passare fuori rete |
 | `grid_switch_to_on` | `''` | Entità da attivare per tornare in rete |
@@ -779,6 +819,7 @@ Nella sezione Etichette la scelta di un'entità alternativa si sblocca solo dopo
 | **Ventilazione** | da grigio (idle) ad azzurro, blu, indaco, viola, fino a magenta (critical) |
 | **Flusso batteria** | sempre blu; la direzione dei trattini indica carica o scarica |
 | **Statistiche** | FV1 arancione · FV2 blu · FV3 viola · FV4 verde · consumi verde → giallo → rosso · batteria blu carica / arancione scarica |
+| **Autosufficienza / autoconsumo** | autosufficienza verde ≥70% · arancione ≥40% · rosso sotto; autoconsumo giallo |
 | **Wallbox e auto** | azzurro in carica · verde carica completa · giallo collegata · grigio scollegata / in attesa |
 | **Ricarica EV (bolle e ⚡%)** | sfumatura continua: rosso (0–10%) → arancione (25%) → giallo (45%) → lime (60%) → verde (80%) → acquamarina (100%); comando: verde AVVIA · arancione FERMA · grigio in attesa / non disponibile |
 
@@ -811,7 +852,7 @@ Misure su un telefono di fascia bassa simulato (processore 6 volte più lento, 2
 
 A ogni nuova versione viene creata automaticamente una **release** su GitHub e HACS ti propone l'aggiornamento in Home Assistant. Dopo l'aggiornamento ricarica il browser con `Ctrl + Shift + R`.
 
-Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.14.3**.
+Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.15.0**.
 
 ### Icona nella notifica di aggiornamento
 
@@ -904,6 +945,9 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 **Le icone degli utilizzatori non si vedono**
 - Usa nomi di icone `mdi:` validi (es. `mdi:washing-machine`); nell'editor puoi cercarle per nome.
 
+**Autosufficienza o autoconsumo non compaiono o mostrano `--`**
+- Servono la barra **Fonti energia** attiva e le energie di oggi: **Consumo oggi** + **Energia prelevata** per l'autosufficienza, **Produzione FV oggi** + **Energia immessa** per l'autoconsumo. A inizio giornata (energie quasi a zero) mostrano `--`.
+
 **L'autonomia mostra `--`**
 - Serve la capacità della batteria nella sezione **⚙️ Generale** e un sensore di potenza della batteria valido. Se la batteria è a riposo non c'è una stima ("batteria a riposo").
 
@@ -933,6 +977,11 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 ---
 
 ## Registro delle modifiche
+
+### v1.15.0
+- **Autosufficienza e autoconsumo** di oggi sotto la barra **Fonti energia**, calcolati dalle entità che hai già (o da tuoi sensori in %).
+- **Tensione e frequenza** di rete sotto la potenza prelevata/ceduta e della casa accanto al consumo.
+- **Tensione delle stringhe** sotto la potenza di FV1…FV4; i nomi delle falde (es. *Lato piazza*, *Lato ingresso*) restano configurabili con `pv1_name` / `pv2_name`.
 
 ### v1.14.3
 - **Ricarica EV**: barra a bolle rifatta e **animata** come nel video di riferimento: le bolle nascono, ondeggiano, si spostano e scoppiano di continuo. La barra è più sottile, rallenta da sola sui dispositivi lenti e resta ferma in modalità leggera.
@@ -1061,4 +1110,4 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 
 ---
 
-*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.14.3*
+*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.15.0*

@@ -1,5 +1,10 @@
-// f-flow-card.js – Unified Edition v1.14.3
-const FFC_VERSION = '1.14.3';
+// f-flow-card.js – Unified Edition v1.15.0
+const FFC_VERSION = '1.15.0';
+// Changes v1.15.0:
+//   NEW  – Autosufficienza / autoconsumo of today under "Fonti energia" (_show_self_stats, on by default),
+//           computed from today's energies or taken from self_sufficiency_entity / self_consumption_entity.
+//   NEW  – grid_voltage / grid_frequency under the grid power; load_voltage / load_frequency next to the
+//           house consumption; pv1_voltage…pv4_voltage under each string power. All optional.
 // Changes v1.14.3:
 //   NEW  – Ricarica EV: bubble bar is now a canvas particle system (bubbles grow, wobble, drift and pop,
 //           like the reference video), slimmer (40 px). Still frame in light mode, stopped when hidden.
@@ -853,6 +858,7 @@ class FFlowCardEditor extends HTMLElement {
       textField('inverter_image', 'URL immagine inverter (sostituisce il riquadro INV)', '/local/sigenergy-inverter.png'),
       divider(),
       switchRow('_show_energy_supply',   'Barra fonti energia', 'Barra Solare / Carica / Scarica / Rete a destra'),
+      switchRow('_show_self_stats', 'Autosufficienza e autoconsumo', 'Sotto la barra fonti energia, calcolati dalle energie di oggi', true),
       switchRow('_show_backup_panel',    'Pannello autonomia', 'Autonomia e kWh residui nell’area del flusso'),
       switchRow('_daily_tiles_extended', '6 riquadri giornalieri', 'FV, carica, scarica, prelievo, immissione, consumo'),
       switchRow('home_icon_classic', 'Icona casa classica', 'Usa la vecchia immagine invece della casa a due falde con FV1 / FV2'),
@@ -1165,15 +1171,19 @@ class FFlowCardEditor extends HTMLElement {
 
     shell.appendChild(makeSection('solar', '☀️', 'Fotovoltaico', [
       picker('pv1_power', 'Potenza FV1'),
-      textField('pv1_name', 'Nome della falda sinistra / stringa FV1 (facoltativo: se vuoto resta "FV1")', 'FV1'),
+      picker('pv1_voltage', 'Tensione FV1 (facoltativa, sotto la potenza)', true),
+      textField('pv1_name', 'Nome della falda sinistra / stringa FV1 (es. Lato piazza; se vuoto resta "FV1")', 'FV1'),
       picker('pv2_power', 'Potenza FV2'),
-      textField('pv2_name', 'Nome della falda destra / stringa FV2 (facoltativo: se vuoto resta "FV2")', 'FV2'),
+      picker('pv2_voltage', 'Tensione FV2 (facoltativa, sotto la potenza)', true),
+      textField('pv2_name', 'Nome della falda destra / stringa FV2 (es. Lato ingresso; se vuoto resta "FV2")', 'FV2'),
     ]));
 
     shell.appendChild(makeSection('solar_extra', '☀️', 'Stringhe FV aggiuntive', [
       picker('pv3_power', 'Potenza FV3', true),
+      picker('pv3_voltage', 'Tensione FV3 (facoltativa)', true),
       textField('pv3_name', 'Nome stringa FV3 (facoltativo)', 'FV3'),
       picker('pv4_power', 'Potenza FV4', true),
+      picker('pv4_voltage', 'Tensione FV4 (facoltativa)', true),
       textField('pv4_name', 'Nome stringa FV4 (facoltativo)', 'FV4'),
     ], { toggleKey: '_show_pv_extra', toggleOn: showPVExtra, hidden: !showPVExtra }));
 
@@ -1185,6 +1195,8 @@ class FFlowCardEditor extends HTMLElement {
       picker('today_batt_chg',  'Carica batteria oggi'),
       picker('today_load',      'Consumo oggi'),
       picker('consump',         'Consumo casa'),
+      picker('load_voltage',    'Tensione erogata alla casa (facoltativa, accanto al consumo)', true),
+      picker('load_frequency',  'Frequenza erogata alla casa (Hz, facoltativa)', true),
     ]));
 
     shell.appendChild(makeSection('grid', '🔌', 'Rete', [
@@ -1194,6 +1206,11 @@ class FFlowCardEditor extends HTMLElement {
       picker('grid_import_energy', 'Energia prelevata dalla rete'),
       picker('grid_export_energy', 'Energia immessa in rete', true),
       picker('grid_power_alt',     'Sensore rete alternativo',    true),
+      picker('grid_voltage',       'Tensione di rete (facoltativa, sotto la potenza)', true),
+      picker('grid_frequency',     'Frequenza di rete (Hz, facoltativa)', true),
+      divider(),
+      picker('self_sufficiency_entity', 'Autosufficienza % (facoltativa: se vuota la calcola la card)', true),
+      picker('self_consumption_entity', 'Autoconsumo % (facoltativa: se vuota la calcola la card)', true),
     ]));
 
     shell.appendChild(makeSection('battery1', '🔋', 'Batteria principale', [
@@ -1366,6 +1383,9 @@ class FFlowCard extends HTMLElement {
       battery_reserve_soc: 0,
       battery_target_soc: 100,
       pv1_name: '', pv2_name: '', pv3_name: '', pv4_name: '',
+      pv1_voltage: '', pv2_voltage: '', pv3_voltage: '', pv4_voltage: '',
+      grid_voltage: '', grid_frequency: '', load_voltage: '', load_frequency: '',
+      _show_self_stats: true, self_sufficiency_entity: '', self_consumption_entity: '',
       _show_stats: false,
       stats_forecast_entity: '',
       stats_pv: true,
@@ -1834,7 +1854,18 @@ class FFlowCard extends HTMLElement {
       total_pv_gen_entity: 'Sensore della produzione fotovoltaica totale (da sempre), in kWh.',
       // Fotovoltaico
       pv1_power: 'Potenza istantanea della stringa 1 (W o kW). Compare accanto alla falda sinistra della casa, che si illumina in base a questo valore. Se il tuo inverter dà solo tensione e corrente, crea un sensore template tensione × corrente.',
-      pv1_name: 'Nome della falda/stringa 1 (es. Sud, Garage). Se vuoto: FV1.',
+      pv1_name: 'Nome della falda/stringa 1 (es. Sud, Garage, Lato piazza). Se vuoto: FV1.',
+      pv1_voltage: 'Sensore della tensione della stringa 1 (V). Compare in piccolo sotto la potenza di FV1.',
+      pv2_voltage: 'Sensore della tensione della stringa 2 (V). Compare in piccolo sotto la potenza di FV2.',
+      pv3_voltage: 'Sensore della tensione della stringa 3 (V).',
+      pv4_voltage: 'Sensore della tensione della stringa 4 (V).',
+      grid_voltage: 'Tensione della rete (V), es. sensor.deye_grid_voltage. Compare sotto la potenza prelevata/ceduta, accanto al traliccio.',
+      grid_frequency: 'Frequenza della rete (Hz), es. sensor.deye_grid_frequency.',
+      load_voltage: 'Tensione erogata dall’inverter alla casa (V), es. sensor.deye_load_voltage. Compare accanto al consumo della casa.',
+      load_frequency: 'Frequenza erogata alla casa (Hz), es. sensor.deye_load_frequency.',
+      _show_self_stats: 'Mostra sotto la barra fonti energia l’autosufficienza (quanta parte del consumo di oggi non è arrivata dalla rete) e l’autoconsumo (quanta parte della produzione FV di oggi è stata usata in casa invece di essere immessa). Servono Produzione FV oggi, Consumo oggi, Energia prelevata ed Energia immessa.',
+      self_sufficiency_entity: 'Se hai già un sensore di autosufficienza in % usalo qui; se vuoto la card la calcola: (consumo oggi − prelievo oggi) ÷ consumo oggi.',
+      self_consumption_entity: 'Se hai già un sensore di autoconsumo in % usalo qui; se vuoto la card lo calcola: (produzione FV oggi − immissione oggi) ÷ produzione FV oggi.',
       pv2_power: 'Potenza istantanea della stringa 2 (W o kW), mostrata sulla falda destra.',
       pv2_name: 'Nome della falda/stringa 2. Se vuoto: FV2.',
       pv3_power: 'Potenza della stringa 3, mostrata sotto FV1 (falda sinistra).',
@@ -1935,6 +1966,9 @@ class FFlowCard extends HTMLElement {
       grid_import_energy: ['gridImportVal', 'invTodayGridImp'],
       grid_export_energy: ['gridExportVal', 'invTodayGridExp'],
       consump: ['fcLoadVal', 'homeIconImg'],
+      load_voltage: ['loadVF'], load_frequency: ['loadVF'], grid_voltage: ['gridVF'], grid_frequency: ['gridVF'],
+      pv1_voltage: ['pv1Volt'], pv2_voltage: ['pv2Volt'], pv3_voltage: ['pv3Volt'], pv4_voltage: ['pv4Volt'],
+      self_sufficiency_entity: ['selfSuff'], self_consumption_entity: ['selfCons'],
       battery_soc: ['battIconWrap', 'fcBattVal', 'fcBattVal1'],
       battery_power: ['battPwrFlow', 'battPwrFlow1'],
       battery_current: ['battCurrFlow', 'battCurrFlow1'],
@@ -3961,10 +3995,13 @@ class FFlowCard extends HTMLElement {
       ${cells(Lq, 'L')}${cells(Rq, 'R')}
     </g>
     ${pv1Show ? `<text class="sm" id="pv1label" x="210" y="362" text-anchor="end" font-size="10.5" fill="#8b949e" letter-spacing="1">${this._pvName(1)}</text>
-    <text id="pv1FlowVal" x="210" y="378" text-anchor="end" font-size="14.5" font-weight="700" fill="#ffe83c">-- W</text>` : ''}
+    <text id="pv1FlowVal" x="210" y="378" text-anchor="end" font-size="14.5" font-weight="700" fill="#ffe83c">-- W</text>
+    ${this.config.pv1_voltage ? '<text class="sm" id="pv1Volt" x="210" y="391" text-anchor="end" font-size="10" font-weight="600" fill="#c9a227">-- V</text>' : ''}` : ''}
     ${pv2Show ? `<text class="sm" id="pv2label" x="310" y="362" font-size="10.5" fill="#8b949e" letter-spacing="1">${this._pvName(2)}</text>
-    <text id="pv2FlowVal" x="310" y="378" font-size="14.5" font-weight="700" fill="#ffe83c">-- W</text>` : ''}
-    <text id="fcLoadVal" x="${cx}" y="497" text-anchor="middle" font-size="15.5" font-weight="700" fill="#F7F6D3">-- W</text>`;
+    <text id="pv2FlowVal" x="310" y="378" font-size="14.5" font-weight="700" fill="#ffe83c">-- W</text>
+    ${this.config.pv2_voltage ? '<text class="sm" id="pv2Volt" x="310" y="391" font-size="10" font-weight="600" fill="#c9a227">-- V</text>' : ''}` : ''}
+    <text id="fcLoadVal" x="${cx}" y="497" text-anchor="middle" font-size="15.5" font-weight="700" fill="#F7F6D3">-- W</text>
+    ${this.config.load_voltage || this.config.load_frequency ? `<text class="sm" id="loadVF" x="${cx + 38}" y="491" font-size="9.5" font-weight="600" fill="#8b949e"><tspan id="loadV" x="${cx + 38}">-- V</tspan><tspan id="loadF" x="${cx + 38}" dy="11">-- Hz</tspan></text>` : ''}`;
   }
 
   _buildStaticSVG() {
@@ -4011,7 +4048,9 @@ class FFlowCard extends HTMLElement {
       <text class="md" id="invLoadPctFlow" x="260" y="244" text-anchor="middle" font-size="14" font-weight="700" fill="#3ce878">--%</text>`;
 
     // Energy supply stacked bar (right side, between grid and EV/home row)
-    const supplyBlock = showSupply ? `<g id="supplyGroup">
+    const supDy = (this.config.grid_voltage || this.config.grid_frequency) ? 9 : 0;
+    const showSelf = this.config._show_self_stats !== false;
+    const supplyBlock = showSupply ? `<g id="supplyGroup" transform="translate(0,${supDy})">
       <text class="sm" x="352" y="291" font-size="10" fill="#8b949e" letter-spacing="1.2">FONTI ENERGIA</text>
       <text class="lg" x="364" y="305" text-anchor="middle" font-size="8.5" font-weight="700" fill="#f4d03f">SOLARE</text>
       <text class="lg" x="408" y="305" text-anchor="middle" font-size="8.5" font-weight="700" fill="#3fb950">CARICA</text>
@@ -4022,6 +4061,9 @@ class FFlowCard extends HTMLElement {
       <rect id="supChg"   x="352" y="311" width="0" height="7" fill="#3fb950"/>
       <rect id="supDis"   x="352" y="311" width="0" height="7" fill="#2b59ff"/>
       <rect id="supGrid"  x="352" y="311" width="0" height="7" fill="#f85149"/>
+      ${showSelf ? `<g id="selfGroup" style="display:none">
+        <text class="sm" x="510" y="333" text-anchor="end" font-size="9" font-weight="600" fill="#8b949e" letter-spacing=".4"><tspan id="selfSuff" font-size="12" font-weight="800" fill="#3fb950">--</tspan> AUTOSUFF.  <tspan id="selfCons" font-size="12" font-weight="800" fill="#f4d03f">--</tspan> AUTOCONS.</text>
+      </g>` : ''}
     </g>` : '';
 
     // Backup panel (left side, above PV string labels)
@@ -4037,9 +4079,9 @@ class FFlowCard extends HTMLElement {
     const modernHome = this.config.home_icon_style !== 'classic';
 
     const modernHomeX = this.config.home_icon_style !== 'classic';
-    const pv3txt = showPvExtra && modernHomeX ? `<text class="sm" id="pv3label" x="180" y="424" text-anchor="end" font-size="10.5" fill="#8b949e" letter-spacing="1">${this._pvName(3)}</text><text id="pv3FlowVal" x="180" y="440" text-anchor="end" font-size="14" font-weight="700" fill="#ffe83c">-- W</text>`
+    const pv3txt = showPvExtra && modernHomeX ? (this.config.pv3_voltage ? '<text class="sm" id="pv3Volt" x="180" y="453" text-anchor="end" font-size="10" font-weight="600" fill="#c9a227">-- V</text>' : '') + `<text class="sm" id="pv3label" x="180" y="424" text-anchor="end" font-size="10.5" fill="#8b949e" letter-spacing="1">${this._pvName(3)}</text><text id="pv3FlowVal" x="180" y="440" text-anchor="end" font-size="14" font-weight="700" fill="#ffe83c">-- W</text>`
       : showPvExtra ? `<text id="pv3label" x="-1" y="450" font-size="11" fill="#8b949e" letter-spacing="1">FV3</text><text id="pv3FlowVal" x="-1" y="464" font-size="13.5" font-weight="700" fill="#ffe83c">-- W</text>` : '';
-    const pv4txt = showPvExtra && modernHomeX ? `<text class="sm" id="pv4label" x="340" y="424" font-size="10.5" fill="#8b949e" letter-spacing="1">${this._pvName(4)}</text><text id="pv4FlowVal" x="340" y="440" font-size="14" font-weight="700" fill="#ffe83c">-- W</text>`
+    const pv4txt = showPvExtra && modernHomeX ? (this.config.pv4_voltage ? '<text class="sm" id="pv4Volt" x="340" y="453" font-size="10" font-weight="600" fill="#c9a227">-- V</text>' : '') + `<text class="sm" id="pv4label" x="340" y="424" font-size="10.5" fill="#8b949e" letter-spacing="1">${this._pvName(4)}</text><text id="pv4FlowVal" x="340" y="440" font-size="14" font-weight="700" fill="#ffe83c">-- W</text>`
       : showPvExtra ? `<text id="pv4label" x="-1" y="480" font-size="11" fill="#8b949e" letter-spacing="1">FV4</text><text id="pv4FlowVal" x="-1" y="494" font-size="13.5" font-weight="700" fill="#ffe83c">-- W</text>` : '';
 
     // EV: SVG wallbox + car to the right of the house (x 344–514, y 330–480)
@@ -4486,6 +4528,7 @@ class FFlowCard extends HTMLElement {
         </g>
       </g>`}
       <text id="fcGridVal" x="445" y="271" text-anchor="middle" font-size="15" font-weight="700" fill="#e05c00">-- W</text>
+      ${this.config.grid_voltage || this.config.grid_frequency ? '<text class="sm" id="gridVF" x="445" y="284" text-anchor="middle" font-size="9.5" font-weight="600" fill="#8b949e">--</text>' : ''}
       <text class="md" id="gridImportVal" x="393" y="164" text-anchor="middle" font-size="12" font-weight="600" fill="#cde">-- kWh</text>
       <text class="md" id="gridExportVal" x="393" y="194" text-anchor="middle" font-size="12" font-weight="600" fill="#cde" style="display:none">-- kWh</text>
 
@@ -4944,6 +4987,28 @@ class FFlowCard extends HTMLElement {
 
     setText('fcLoadVal', load >= 1000 ? (load / 1000).toFixed(2) + ' kW' : load.toFixed(0) + ' W');
     setAttr('fcLoadVal', 'fill', load > 10 ? loadFlowColor : '#8b949e');
+    // voltage / frequency next to the house and under the grid, string voltages under FV1–FV4
+    const fmtV = (id) => { const v = this._val(this.config[id]); return v === null ? '-- V' : (v >= 100 ? v.toFixed(0) : v.toFixed(1)) + ' V'; };
+    const fmtF = (id) => { const v = this._val(this.config[id]); return v === null ? '-- Hz' : v.toFixed(2) + ' Hz'; };
+    if (this.config.load_voltage || this.config.load_frequency) {
+      setText('loadV', this.config.load_voltage ? fmtV('load_voltage') : '');
+      setText('loadF', this.config.load_frequency ? fmtF('load_frequency') : '');
+    }
+    if (this.config.grid_voltage || this.config.grid_frequency) {
+      setText('gridVF', [this.config.grid_voltage ? fmtV('grid_voltage') : '', this.config.grid_frequency ? fmtF('grid_frequency') : ''].filter(Boolean).join(' · '));
+    }
+    [1, 2, 3, 4].forEach(i => { if (this.config['pv' + i + '_voltage']) setText('pv' + i + 'Volt', fmtV('pv' + i + '_voltage')); });
+    // self-sufficiency / self-consumption of today (own sensors win, otherwise from today's energies)
+    if (this.config._show_self_stats !== false && this.config._show_energy_supply) {
+      const pct = (v) => v === null || !isFinite(v) ? null : Math.max(0, Math.min(100, v));
+      let ss = pct(this._val(this.config.self_sufficiency_entity)), sc = pct(this._val(this.config.self_consumption_entity));
+      if (ss === null && _todayLoadRaw !== null && this.config.grid_import_energy && todayLoad > 0.05) ss = pct((todayLoad - gridImport) / todayLoad * 100);
+      if (sc === null && _todayPvRaw !== null && this.config.grid_export_energy && todayPv > 0.05) sc = pct((todayPv - gridExport) / todayPv * 100);
+      setDisplay('selfGroup', ss !== null || sc !== null);
+      setText('selfSuff', ss === null ? '--' : Math.round(ss) + '%');
+      setText('selfCons', sc === null ? '--' : Math.round(sc) + '%');
+      setAttr('selfSuff', 'fill', ss === null ? '#8b949e' : ss >= 70 ? '#3fb950' : ss >= 40 ? '#f39c4b' : '#f85149');
+    }
 
     setText('pv1FlowVal', pv1 >= 1000 ? (pv1 / 1000).toFixed(2) + ' kW' : pv1.toFixed(0) + ' W');
     setText('pv2FlowVal', pv2 >= 1000 ? (pv2 / 1000).toFixed(2) + ' kW' : pv2.toFixed(0) + ' W');
