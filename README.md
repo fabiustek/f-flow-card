@@ -7,7 +7,7 @@
 [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
 [![Release](https://img.shields.io/github/v/release/fabiustek/f-flow-card)](https://github.com/fabiustek/f-flow-card/releases)
 
-Versione attuale: **v1.14.1** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
+Versione attuale: **v1.14.2** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/card-overview.png" alt="F-Flow Card con tutte le sezioni attive" width="480">
@@ -811,7 +811,7 @@ Misure su un telefono di fascia bassa simulato (processore 6 volte più lento, 2
 
 A ogni nuova versione viene creata automaticamente una **release** su GitHub e HACS ti propone l'aggiornamento in Home Assistant. Dopo l'aggiornamento ricarica il browser con `Ctrl + Shift + R`.
 
-Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.14.1**.
+Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.14.2**.
 
 ### Icona nella notifica di aggiornamento
 
@@ -865,6 +865,12 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 
 **Ricarica EV: il pulsante resta su "ATTESA"**
 - È voluto: dopo il comando la card aspetta che **Comando ricarica** arrivi allo stato richiesto e ci resti 3 secondi, così non invia un secondo comando. Se la wallbox non risponde, dopo l'**attesa massima della conferma** (60 s di partenza) il pulsante si sblocca con un avviso. Controlla lo stato della wallbox prima di riprovare.
+
+**Ricarica EV: potenza, corrente ed energia sono a 0 anche se le entità sono collegate**
+- Di solito è giusto così: l'auto in quel momento **non assorbe** (carica arrivata al limite impostato sull'auto, auto in pausa, ricarica programmata). Con JuiceBox lo stato OCPP può restare *Charging* anche a 0 W: dalla v1.14.2 la card lo scrive come **IN CARICA · L'AUTO NON ASSORBE** in arancione, senza fulmine.
+- La **tensione** viene misurata dalla wallbox solo mentre passa corrente: a 0 V la card mostra `--`.
+- Per verificare, guarda le stesse entità in **Strumenti per sviluppatori → Stati**: la card mostra quei valori.
+- **A 100%** resta `--` se manca la **Capacità batteria auto** nella sezione 🚗 Auto elettrica / Wallbox (es. `43200` per 43,2 kWh) o se l'auto non sta caricando.
 
 **Ricarica EV: il pulsante è grigio e non si preme**
 - L'entità **Comando ricarica** è `unavailable` o `unknown` in Home Assistant: l'integrazione OCPP non comunica con la wallbox. La **Disponibilità OCPP** non blocca più il comando (dalla v1.14.1).
@@ -927,6 +933,10 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 ---
 
 ## Registro delle modifiche
+
+### v1.14.2
+- **Ricarica EV**: sotto 1 kW la potenza è in W (5 W prima appariva come 0.00 kW); tensione `--` quando la wallbox non misura (0 V); energia della sessione convertita se il sensore è in Wh.
+- **Ricarica EV**: se lo stato OCPP è *Charging* ma l'auto non assorbe (≤ 50 W) la card mostra **IN CARICA · L'AUTO NON ASSORBE** in arancione, senza fulmine e senza stima del tempo.
 
 ### v1.14.1
 - **Menu a schede dal computer**: la barra si scorre con la rotella del mouse e trascinandola (prima si poteva solo col dito).
@@ -1047,4 +1057,4 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 
 ---
 
-*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.14.1*
+*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.14.2*
