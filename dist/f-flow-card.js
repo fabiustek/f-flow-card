@@ -1,5 +1,12 @@
-// f-flow-card.js – Unified Edition v1.13.0
-const FFC_VERSION = '1.13.0';
+// f-flow-card.js – Unified Edition v1.14.0
+const FFC_VERSION = '1.14.0';
+// Changes v1.14.0:
+//   NEW  – "Ricarica EV" section/tab for an (OCPP) wallbox: status in Italian, SOC-coloured bubble bar,
+//           session KPIs, protected start/stop (hold 1 s + confirm, one single command, button locked
+//           until the switch is stable in the requested state or the timeout expires), smart-PV and
+//           pause toggles, surplus split slider, max current slider in A or W (locked while smart PV is
+//           on, sent on release), session chart and last sessions from 5-minute statistics, wallbox
+//           chips, unlock / reset buttons with hold + confirm.
 // Changes v1.13.0:
 //   NEW  – Editor help: a "?" next to every field, switch and section opens an explanation of what to
 //           enter (tap; also shown as tooltip on hover).
@@ -252,7 +259,7 @@ class FFlowCardEditor extends HTMLElement {
     this._fireChanged();
     if (key === '_show_battery' || key === '_show_battery2' || key === '_show_pv_extra' ||
         key === '_show_ev'      || key === 'battery_cap_unit' ||
-        key === '_show_consumers' || key === '_show_ventilation' || key === '_show_stats' || key === '_show_camera' || key === '_labels_custom_entities' ||
+        key === '_show_consumers' || key === '_show_ventilation' || key === '_show_stats' || key === '_show_camera' || key === '_show_evc' || key === '_labels_custom_entities' ||
         key === 'label_cell_temp_minmax' || key === 'label_bms_temp'         ||
         key === 'label_min_cell'         || key === 'label_max_cell'         ||
         key === 'label_batt_dis'         || key === 'label_total_pv_gen'     ||
@@ -949,6 +956,35 @@ class FFlowCardEditor extends HTMLElement {
       ], (n) => ({ name: '', entity: '', icon: 'mdi:power-plug', color: FFlowCard.PALETTE[n % FFlowCard.PALETTE.length] }), '＋ Aggiungi utilizzatore'),
     ], { toggleKey: '_show_consumers', toggleOn: showConsumers, hidden: !showConsumers }));
 
+    const showEvc = !!cfg._show_evc;
+    shell.appendChild(makeSection('evc', '⚡', 'Ricarica EV', [
+      textField('evc_car_name', 'Nome dell’auto (es. BYD Dolphin Surf)', ''),
+      picker('evc_charge_switch', 'Comando ricarica (es. switch.juicebox_charge_control)', true),
+      picker('evc_availability', 'Disponibilità wallbox (es. switch.juicebox_availability)', true),
+      picker('evc_status', 'Stato del connettore OCPP (es. sensor.juicebox_status_connector)', true),
+      numberField('evc_confirm_timeout', 'Attesa massima della conferma dalla wallbox', 10, 300, 5, 's'),
+      divider(),
+      picker('evc_power', 'Potenza di ricarica (es. sensor.consumi_wallbox; se vuoto: Potenza wallbox)', true),
+      picker('evc_current', 'Corrente di ricarica (es. sensor.juicebox_current_import)', true),
+      picker('evc_voltage', 'Tensione (es. sensor.juicebox_voltage)', true),
+      picker('evc_temp', 'Temperatura wallbox (es. sensor.juicebox_temperature)', true),
+      picker('evc_session_energy', 'Energia della sessione (es. sensor.juicebox_energy_session)', true),
+      picker('evc_session_time', 'Durata della sessione (es. sensor.juicebox_time_session)', true),
+      picker('evc_soc', 'Batteria dell’auto % (se vuoto: SOC batteria auto della sezione Wallbox)', true),
+      numberField('evc_consumption', 'Consumo medio dell’auto, per i km aggiunti', 5, 40, 0.5, 'kWh/100 km'),
+      divider(),
+      picker('evc_pv_auto', 'Carica intelligente FV (es. input_boolean.wb_pv_auto)', true),
+      picker('evc_pause_enabled', 'Pausa sotto 6 A (es. input_boolean.wb_pause_enabled)', true),
+      picker('evc_share', 'Ripartizione surplus auto / casa (es. input_number.wb_battery_share_pct)', true),
+      picker('evc_max_current', 'Corrente massima manuale (es. number.juicebox_maximum_current)', true),
+      picker('evc_offered_current', 'Corrente offerta dalla wallbox (es. sensor.juicebox_current_offered)', true),
+      numberField('evc_phases', 'Fasi (1 = monofase, 3 = trifase), per passare da A a W', 1, 3, 2),
+      divider(),
+      picker('evc_error', 'Codice di errore (es. sensor.juicebox_error_code)', true),
+      picker('evc_unlock', 'Sblocca cavo (es. button.juicebox_unlock)', true),
+      picker('evc_reset', 'Riavvio wallbox (es. button.juicebox_reset)', true),
+    ], { toggleKey: '_show_evc', toggleOn: showEvc, hidden: !showEvc }));
+
     const showCam = !!cfg._show_camera;
     shell.appendChild(makeSection('camera', '📹', 'Videocamera', [
       textField('camera_title', 'Titolo sezione', 'Videocamera'),
@@ -1290,12 +1326,17 @@ class FFlowCard extends HTMLElement {
       consumers_chart_total: true,
       consumers_chart_legend: true,
       grid_icon_style: 'modern',
-      sections_order: ['bms', 'inv', 'cons', 'vent', 'stats', 'cam'],
+      sections_order: ['bms', 'inv', 'cons', 'evc', 'vent', 'stats', 'cam'],
       sections_layout: 'tabs',
       performance_mode: 'normal',
       section_names: {},
       section_icons: {},
       more_info: [],
+      _show_evc: false,
+      evc_car_name: '', evc_charge_switch: '', evc_availability: '', evc_status: '', evc_power: '', evc_soc: '',
+      evc_current: '', evc_voltage: '', evc_temp: '', evc_session_energy: '', evc_session_time: '',
+      evc_pv_auto: '', evc_pause_enabled: '', evc_share: '', evc_max_current: '', evc_offered_current: '',
+      evc_error: '', evc_unlock: '', evc_reset: '', evc_phases: 1, evc_consumption: 14, evc_confirm_timeout: 60,
       background_opacity: 100,
       background_blur: false,
       tabs_start: 'none',
@@ -1630,7 +1671,7 @@ class FFlowCard extends HTMLElement {
 
   // ── v1.10.0: user-defined order of the sections below the flow ──
   static get SECTIONS() {
-    return [['bms', 'Statistiche batteria (JK BMS)'], ['inv', 'Inverter (riquadri giornalieri)'], ['cons', 'Utilizzatori e grafico'],
+    return [['bms', 'Statistiche batteria (JK BMS)'], ['inv', 'Inverter (riquadri giornalieri)'], ['cons', 'Utilizzatori e grafico'], ['evc', 'Ricarica EV'],
       ['vent', 'Ventilazione inverter'], ['stats', 'Statistiche'], ['cam', 'Videocamera']];
   }
   static sectionOrder(cfg) {
@@ -1813,6 +1854,29 @@ class FFlowCard extends HTMLElement {
       battery2_mos: 'Temperatura del BMS della seconda batteria.',
       battery2_full_ah: 'Capacità della seconda batteria in Ah, se diversa dalla prima.',
       battery2_full_wh: 'Capacità della seconda batteria in kWh, se diversa dalla prima.',
+      // Ricarica EV
+      evc_car_name: 'Nome mostrato sotto lo stato della ricarica (es. BYD Dolphin Surf). Facoltativo.',
+      evc_charge_switch: 'Switch che avvia e ferma la ricarica (es. switch.juicebox_charge_control). Per proteggere la wallbox: si tiene premuto il pulsante 1 secondo, si conferma, la card manda UN solo comando (turn_on per avviare, turn_off per fermare) e blocca il pulsante finché lo switch non resta stabile nello stato richiesto (conferma della box) o finché scade l’attesa massima.',
+      evc_availability: 'Switch o sensore che dice se la wallbox è disponibile. Quando è spento il comando di ricarica è bloccato.',
+      evc_status: 'Stato del connettore secondo OCPP (Available, Preparing, Charging, SuspendedEV, SuspendedEVSE, Finishing, Faulted…), mostrato in italiano. Se vuoto, lo stato si ricava dalla potenza.',
+      evc_confirm_timeout: 'Dopo un comando di avvio o stop, per quanti secondi al massimo la card aspetta la conferma della wallbox prima di sbloccare il pulsante (predefinito 60).',
+      evc_power: 'Potenza della ricarica in W o kW. Meglio un sensore che si aggiorna spesso (es. sensor.consumi_wallbox). Serve per il grafico della sessione e l’elenco delle ultime ricariche.',
+      evc_current: 'Corrente di ricarica in A.',
+      evc_voltage: 'Tensione della wallbox in V. Serve anche per convertire la corrente in watt (A × V × fasi); se vuota usa 230 V.',
+      evc_temp: 'Temperatura interna della wallbox.',
+      evc_session_energy: 'Energia caricata nella sessione in corso (kWh). Serve anche per i km aggiunti.',
+      evc_session_time: 'Durata della sessione in corso (secondi, minuti, ore o formato h:mm:ss).',
+      evc_soc: 'Percentuale della batteria dell’auto, dall’integrazione dell’auto. Colora le bolle: verde, arancione sotto il 40%, rosso sotto il 20%.',
+      evc_consumption: 'Consumo medio dell’auto in kWh ogni 100 km (es. 14): con l’energia della sessione calcola i km di autonomia aggiunti.',
+      evc_pv_auto: 'Interruttore della carica intelligente: la corrente segue la produzione fotovoltaica (comandata dal tuo script). Mentre è acceso il cursore della corrente manuale è bloccato.',
+      evc_pause_enabled: 'Interruttore che permette di mettere in pausa la ricarica quando il fotovoltaico non basta per i 6 A minimi.',
+      evc_share: 'input_number con la percentuale del surplus da dare all’auto (il resto va all’accumulo di casa). Nella card è una barra divisa in due da trascinare.',
+      evc_max_current: 'number della corrente massima di ricarica in A. Nella card è un cursore con A e W; il valore viene inviato solo quando lasci il cursore, per non intasare la wallbox.',
+      evc_offered_current: 'Corrente che la wallbox sta offrendo all’auto in questo momento (A), mostrata accanto al cursore.',
+      evc_phases: 'Numero di fasi della ricarica: 1 per monofase, 3 per trifase. Serve per passare da ampere a watt.',
+      evc_error: 'Codice di errore della wallbox. Compare solo quando c’è un errore.',
+      evc_unlock: 'Pulsante che sblocca il connettore. Si usa tenendo premuto 1 secondo e confermando.',
+      evc_reset: 'Pulsante che riavvia la wallbox. Si usa tenendo premuto 1 secondo e confermando; la ricarica in corso si interrompe.',
       // Wallbox
       charger_power: 'Potenza della wallbox o della presa dell’auto (W o kW). È l’unico campo necessario: sopra 50 W l’auto risulta "in carica".',
       charger_state: 'Stato della wallbox (es. charging, completed, connected). Facoltativo: se vuoto lo stato si ricava dalla potenza.',
@@ -1837,6 +1901,7 @@ class FFlowCard extends HTMLElement {
       grid: 'Scambio con la rete: potenza istantanea ed energia prelevata / immessa oggi.',
       battery1: 'Dati della batteria principale. Il segno della potenza decide se la card mostra CARICA o SCARICA.',
       battery2: 'Seconda batteria, se ne hai due: la card le mostra affiancate.',
+      evc: 'Scheda dedicata alla ricarica dell’auto con una wallbox (anche OCPP): stato, bolle colorate con la batteria dell’auto, avvio/stop protetto, carica intelligente, corrente massima, grafico della sessione e ultime ricariche.',
       ev: 'Wallbox e auto elettrica disegnate accanto alla casa. Basta la potenza della wallbox; il resto è facoltativo.',
     };
   }
@@ -1861,6 +1926,8 @@ class FFlowCard extends HTMLElement {
       charger_power: ['evPowerVal'], charger_soc: ['evSocVal', 'evSocBar'], charger_state: ['evStateVal'],
       grid_status_entity: ['gridStatusPill'], ems_mode_entity: ['emsBadge'],
       vent_state_entity: ['ventState', 'ventMainIco'], vent_status_entity: ['ventStatus'], vent_ambient_temp: ['ventAmb'],
+      evc_power: ['evcPow'], evc_current: ['evcCur'], evc_voltage: ['evcVolt'], evc_temp: ['evcTemp'],
+      evc_session_energy: ['evcEnergy'], evc_session_time: ['evcTime'], evc_soc: ['evcSoc'], evc_status: ['evcState'],
       vent_pwm: ['ventPwm'], vent_rpm_avg: ['ventRpm'], vent_inv_temp: ['ventTemps'], vent_dc_temp: ['ventTemps'],
     };
   }
@@ -1873,10 +1940,11 @@ class FFlowCard extends HTMLElement {
       cons: '<path d="M9 2.5v4.5M15 2.5v4.5"/><path d="M6.5 7h11v3.5a5.5 5.5 0 0 1-11 0z"/><path d="M12 16v5.5"/>',
       vent: '<circle cx="12" cy="12" r="1.6"/><path d="M12 10.4c-.6-3.4.8-6.4 3.2-6.4 2.6 0 2.9 3.6-1.2 6.2"/><path d="M13.4 12.8c3.2 1.3 4.9 4.1 3.7 6.2-1.3 2.2-4.6.7-4.9-4.1"/><path d="M10.6 12.8c-2.6 2.1-5.9 2.4-7.1.3-1.3-2.2 1.7-4.3 5.9-2.1"/>',
       stats: '<path d="M3.5 20.5h17"/><path d="M6.5 17v-4M11 17V8M15.5 17v-6M20 17V5"/>',
+      evc: '<path d="M5 20.5V5.5A2.5 2.5 0 0 1 7.5 3h5A2.5 2.5 0 0 1 15 5.5v15"/><path d="M3.5 20.5h13"/><path d="M15 9h1.5a2 2 0 0 1 2 2v4.5a1.5 1.5 0 0 0 3 0V8L19 5.5"/><path d="m10.8 7-2.3 3.7h3.1l-2.3 3.7"/>',
       cam: '<rect x="2.5" y="6.5" width="13" height="11" rx="2.5"/><path d="m15.5 10.5 5.5-3.3v9.6l-5.5-3.3z"/><circle cx="9" cy="12" r="2.2"/>',
     };
   }
-  static get TAB_LABELS() { return { bms: 'Batteria', inv: 'Inverter', cons: 'Utilizzatori', vent: 'Ventilazione', stats: 'Statistiche', cam: 'Video' }; }
+  static get TAB_LABELS() { return { evc: 'Ricarica EV', bms: 'Batteria', inv: 'Inverter', cons: 'Utilizzatori', vent: 'Ventilazione', stats: 'Statistiche', cam: 'Video' }; }
   _esc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
   // v1.13.0: name and icon chosen in the editor (section_names / section_icons), else defaults
   _secName(k, def) {
@@ -1945,6 +2013,7 @@ class FFlowCard extends HTMLElement {
     if (next === 'cons') this._renderChart();
     if (next === 'stats') this._renderStats();
     this._updateCamera();   // starts the stream when its tab opens, stops it otherwise
+    if (next === 'evc') { this._evcDrawn = false; this._updateEvc(); }
     this._startAnim();      // meters / fans of the opened panel
     this._gooTarget(instant);
   }
@@ -2072,6 +2141,7 @@ class FFlowCard extends HTMLElement {
         if (this._secOpen[key] && key === 'cons') this._renderChart();
         if (this._secOpen[key] && key === 'stats') this._renderStats();
         this._updateCamera(); this._startAnim();
+        if (this._secOpen[key] && key === 'evc') { this._evcDrawn = false; this._updateEvc(); }
       });
       cb.addEventListener('change', () => {
         this._lsSet('pin:' + key, cb.checked ? '1' : '0');
@@ -2858,6 +2928,444 @@ class FFlowCard extends HTMLElement {
     if (sunG && !sun.night) sunG.setAttribute('opacity', nClouds >= 4 ? '.45' : nClouds >= 2 ? '.75' : '1');
   }
 
+
+  // ── v1.14.0: "Ricarica EV" — charging control for an OCPP wallbox ───────────
+  _evcEnabled() { return !!this.config._show_evc; }
+  _evcPowerId() { return this.config.evc_power || this.config.charger_power || ''; }
+  _evcSocId() { return this.config.evc_soc || this.config.charger_soc || ''; }
+  // OCPP connector status → Italian label + colour
+  static get EVC_STATUS() {
+    return {
+      available: ['Scollegata', '#8b949e'], preparing: ['Collegata', '#f4d03f'], charging: ['In carica', '#3fb950'],
+      suspendedev: ['In pausa dall’auto', '#f39c4b'], suspendedevse: ['In pausa dalla wallbox', '#f39c4b'],
+      finishing: ['Completata', '#58a6ff'], reserved: ['Riservata', '#a78bfa'], unavailable: ['Non disponibile', '#6e7681'],
+      faulted: ['Errore', '#f85149'],
+    };
+  }
+  _evcSocColor(soc) { return soc === null ? '#6e7681' : soc < 20 ? '#f85149' : soc < 40 ? '#f39c4b' : '#3fb950'; }
+
+  _buildEvcHTML(esc) {
+    if (!this._evcEnabled()) return '';
+    const c = this.config;
+    const k = (id, l, u) => `<div class="ek"><div class="v" id="${id}">--<small>${u}</small></div><div class="l">${l}</div></div>`;
+    const tog = (id, ico, t, sub) => `<div class="etog" id="${id}"><div><div class="et">${ico} ${t}</div><div class="es">${sub}</div></div><span class="esw"></span></div>`;
+    const body = `
+      <div class="evh" id="evcHero">
+        <div class="evh-top">
+          <div><div class="evst" id="evcState">● --</div><div class="evsub" id="evcSub">${esc(c.evc_car_name || '')}</div></div>
+          <div class="evsoc"><span id="evcBolt">⚡</span><span id="evcSoc">--</span><small>%</small></div>
+        </div>
+        <div class="evbar" id="evcBub"></div>
+        <div class="ekpi">
+          ${k('evcPow', 'Potenza', 'kW')}${k('evcCur', 'Corrente', 'A')}${k('evcTime', 'Sessione', 'h')}${k('evcEta', 'A 100%', 'h')}
+          ${k('evcEnergy', 'Energia sess.', 'kWh')}${k('evcKm', 'Autonomia', 'km')}${k('evcVolt', 'Tensione', 'V')}${k('evcTemp', 'Temp. box', '°C')}
+        </div>
+      </div>
+      ${c.evc_charge_switch ? `<div class="esec"><div class="est"><span>Comando ricarica</span></div>
+        <div class="ecmd">
+          <button class="ebtn" id="evcBtn"><svg class="ering" viewBox="0 0 96 96"><circle cx="48" cy="48" r="45" fill="none" stroke="#21262d" stroke-width="3"/>
+            <circle id="evcRing" cx="48" cy="48" r="45" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-dasharray="0 283" transform="rotate(-90 48 48)"/></svg>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v9"/><path d="M6.3 7.3a8 8 0 1 0 11.4 0"/></svg>
+            <span id="evcBtnTxt">--</span></button>
+          <div class="ecmdtxt"><div id="evcCmdHint">Tieni premuto 1 s, poi conferma. La card manda <b>un solo comando</b> e blocca il pulsante finché la wallbox non risponde.</div>
+            <div class="elock" id="evcLock" style="display:none"></div></div>
+        </div></div>` : ''}
+      ${(c.evc_pv_auto || c.evc_pause_enabled || c.evc_share) ? `<div class="esec"><div class="est"><span>Modalità di ricarica</span></div>
+        ${c.evc_pv_auto ? tog('evcPv', '☀️', 'Carica intelligente FV', 'La corrente segue la produzione fotovoltaica') : ''}
+        ${c.evc_pause_enabled ? tog('evcPause', '⏸', 'Pausa sotto 6 A', 'Se il fotovoltaico non basta per 6 A, la carica va in pausa') : ''}
+        ${c.evc_share ? `<div class="eshare"><div class="eshr"><span>🔀 Ripartizione surplus</span><b id="evcShareTxt">--</b></div>
+          <div class="esplit"><div id="evcShareCar"></div><div id="evcShareHome"></div></div>
+          <input type="range" id="evcShare" class="erange">
+          <div class="es">Quanta parte del surplus va all’auto e quanta all’accumulo di casa</div></div>` : ''}
+      </div>` : ''}
+      ${c.evc_max_current ? `<div class="esec"><div class="est"><span>Corrente massima</span><span class="eunit" id="evcUnit"><span data-u="A">A</span><span data-u="W">W</span></span></div>
+        <div class="ecur"><div class="ebig" id="evcCurVal">--</div><div class="es" id="evcCurInfo" style="text-align:right"></div></div>
+        <input type="range" id="evcCurRange" class="erange">
+        <div class="es" id="evcCurNote">Il valore viene inviato quando lasci il cursore.</div></div>` : ''}
+      ${this._evcPowerId() ? `<div class="esec"><div class="est"><span id="evcChartTitle">Sessione</span><span id="evcChartInfo"></span></div>
+        <svg id="evcChart" viewBox="0 0 480 130" style="width:100%;display:block"></svg>
+        <div class="echips" id="evcChips"></div></div>
+      <div class="esec"><div class="est"><span>Ultime ricariche</span><span>7 giorni</span></div><div class="ehist" id="evcHist"><div class="es">Caricamento…</div></div></div>` : ''}
+      <div class="esec"><div class="est"><span>Wallbox</span></div>
+        <div class="echips" id="evcInfo"></div>
+        ${(c.evc_unlock || c.evc_reset) ? `<div class="eacts">
+          ${c.evc_unlock ? '<button class="eact" id="evcUnlock">🔓 Sblocca cavo</button>' : ''}
+          ${c.evc_reset ? '<button class="eact" id="evcReset">↻ Riavvia wallbox</button>' : ''}
+          <span class="es">tieni premuto 1 s</span></div>` : ''}
+      </div>
+      <div class="gmodal" id="evcModal"><div class="gbox"><div class="gtitle" id="evcModalTitle">Ricarica EV</div>
+        <div class="gtext" id="evcModalText"></div><div class="gbtns"><button id="evcNo">Annulla</button><button id="evcOk" class="ok">Procedi</button></div></div></div>`;
+    return '<div class="dv"></div>' + this._secHTML('evc', this._secTitle('evc', 'Ricarica EV'), body);
+  }
+
+  _evcSt(eid) { const s = eid && this._hass && this._hass.states[eid]; return s && s.state !== 'unavailable' && s.state !== 'unknown' ? s : null; }
+  _evcSvc(eid, service, data = {}) {
+    if (!eid || !this._hass) return Promise.resolve();
+    return this._hass.callService(eid.split('.')[0], service, { entity_id: eid, ...data });
+  }
+  // hold-to-arm helper shared by the charge button and the wallbox actions
+  _evcHold(el, onArmed, ms = 1000) {
+    if (!el) return;
+    let timer = null;
+    el.style.touchAction = 'none';
+    const start = (ev) => {
+      if (ev.button > 0 || el.disabled) return;
+      el.classList.add('holding');
+      timer = setTimeout(() => { timer = null; this._holdAt = Date.now(); el.classList.remove('holding'); onArmed(); }, ms);
+    };
+    const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } el.classList.remove('holding'); };
+    el.addEventListener('pointerdown', start);
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(e => el.addEventListener(e, cancel));
+    el.addEventListener('contextmenu', e => e.preventDefault());
+  }
+  _evcConfirm(title, text, mode, onOk) {
+    const root = this.shadowRoot, m = root.getElementById('evcModal');
+    if (!m) return;
+    root.getElementById('evcModalTitle').textContent = title;
+    root.getElementById('evcModalText').textContent = text;
+    m.dataset.mode = mode;
+    m.style.display = 'flex';
+    root.getElementById('evcOk').onclick = () => { m.style.display = 'none'; onOk(); };
+    root.getElementById('evcNo').onclick = () => { m.style.display = 'none'; };
+  }
+
+  _bindEvc() {
+    if (!this._evcEnabled()) return;
+    const root = this.shadowRoot, c = this.config;
+    // charge start / stop: one command, then locked until the wallbox confirms
+    this._evcHold(root.getElementById('evcBtn'), () => {
+      const sw = this._evcSt(c.evc_charge_switch);
+      if (!sw || this._evcPending || this._evcUnavailable) return;
+      const start = sw.state !== 'on';
+      this._evcConfirm(start ? 'Avvio ricarica' : 'Stop ricarica',
+        start ? 'Vuoi avviare la ricarica dell’auto? Il comando verrà inviato una sola volta alla wallbox.'
+              : 'Vuoi fermare la ricarica dell’auto? Il comando verrà inviato una sola volta alla wallbox.',
+        start ? 'ems' : 'off', () => {
+          const target = start ? 'on' : 'off';
+          this._evcPending = { target, since: Date.now(), okSince: 0, failed: false };
+          this._evcSvc(c.evc_charge_switch, start ? 'turn_on' : 'turn_off').catch(() => { this._evcPending = { ...this._evcPending, failed: true }; });
+          this._evcTick();
+        });
+    });
+    const act = (id, eid, title, text) => this._evcHold(root.getElementById(id), () => {
+      if (!eid || (this._evcActLock && this._evcActLock[id] > Date.now())) return;
+      this._evcConfirm(title, text, 'off', () => {
+        this._evcActLock = { ...(this._evcActLock || {}), [id]: Date.now() + 15000 };
+        const dom = eid.split('.')[0];
+        this._evcSvc(eid, dom === 'button' || dom === 'input_button' ? 'press' : 'turn_on');
+        this._updateEvc();
+        setTimeout(() => this._updateEvc(), 15100);
+      });
+    });
+    act('evcUnlock', c.evc_unlock, 'Sblocca cavo', 'Vuoi sbloccare il connettore della wallbox?');
+    act('evcReset', c.evc_reset, 'Riavvio wallbox', 'Vuoi riavviare la wallbox? La ricarica in corso si interromperà.');
+    // toggles: one tap = one toggle, then a short lock against repeated taps
+    [['evcPv', c.evc_pv_auto], ['evcPause', c.evc_pause_enabled]].forEach(([id, eid]) => {
+      const el = root.getElementById(id); if (!el || !eid) return;
+      el.addEventListener('click', () => {
+        if (el.classList.contains('busy')) return;
+        el.classList.add('busy');
+        const s = this._evcSt(eid);
+        this._evcSvc(eid, s && s.state === 'on' ? 'turn_off' : 'turn_on');
+        setTimeout(() => el.classList.remove('busy'), 1500);
+      });
+    });
+    // sliders: value sent only on release
+    const share = root.getElementById('evcShare');
+    if (share) {
+      share.addEventListener('input', () => this._evcShareView(Number(share.value)));
+      share.addEventListener('change', () => { this._evcShareSent = { v: Number(share.value), at: Date.now() }; this._evcSvc(c.evc_share, 'set_value', { value: Number(share.value) }); });
+    }
+    const cr = root.getElementById('evcCurRange');
+    if (cr) {
+      cr.addEventListener('input', () => { this._evcCurDrag = true; this._evcCurView(Number(cr.value)); });
+      cr.addEventListener('change', () => { this._evcCurDrag = false; this._evcCurSent = { v: Number(cr.value), at: Date.now() }; this._evcSvc(c.evc_max_current, 'set_value', { value: Number(cr.value) }); });
+    }
+    const unit = root.getElementById('evcUnit');
+    if (unit) unit.querySelectorAll('[data-u]').forEach(u => u.addEventListener('click', () => { this._lsSet('evcUnit', u.dataset.u); this._updateEvc(); }));
+    this._evcBubbleSoc = null;
+    this._updateEvc();
+  }
+  // re-check the pending command when nothing else triggers an update
+  _evcTick() {
+    if (this._evcTickT) clearTimeout(this._evcTickT);
+    this._updateEvc();
+    if (this._evcPending) this._evcTickT = setTimeout(() => this._evcTick(), 1000);
+  }
+
+  _evcVolt() { const v = this._val(this.config.evc_voltage); return v && v > 50 ? v : 230; }
+  _evcAtoW(a) { return a * this._evcVolt() * (Number(this.config.evc_phases) || 1); }
+  _evcShareView(v) {
+    const root = this.shadowRoot;
+    const set = (id, t) => { const e = root.getElementById(id); if (e) e.textContent = t; };
+    set('evcShareTxt', `${Math.round(v)}% auto · ${Math.round(100 - v)}% casa`);
+    const a = root.getElementById('evcShareCar'), b = root.getElementById('evcShareHome');
+    if (a) a.style.width = v + '%'; if (b) b.style.width = (100 - v) + '%';
+  }
+  _evcCurView(a) {
+    const root = this.shadowRoot, el = root.getElementById('evcCurVal');
+    if (!el) return;
+    const w = this._evcAtoW(a), unitW = this._lsGet('evcUnit') === 'W';
+    const fw = w >= 1000 ? (w / 1000).toFixed(2) + ' kW' : Math.round(w) + ' W';
+    el.innerHTML = unitW ? `${fw.replace(/ (k?W)/, '<small>$1</small>')} <span>≈ ${a} A</span>` : `${a}<small>A</small> <span>≈ ${fw}</span>`;
+  }
+
+  _evcSessionSecs(st) {
+    if (!st) return null;
+    const v = String(st.state), u = (st.attributes && st.attributes.unit_of_measurement) || '';
+    if (/^\d+:\d{1,2}(:\d{1,2})?$/.test(v)) { const p = v.split(':').map(Number); return p.length === 3 ? p[0] * 3600 + p[1] * 60 + p[2] : p[0] * 3600 + p[1] * 60; }
+    const n = parseFloat(v); if (!isFinite(n)) return null;
+    return u === 'h' ? n * 3600 : u === 'min' ? n * 60 : u === 'd' ? n * 86400 : n;
+  }
+  _evcFmtDur(sec) { if (sec === null || !isFinite(sec)) return '--'; const h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60); return h + ':' + String(m).padStart(2, '0'); }
+
+  _evcBubbles(soc, col) {
+    const svg = this.shadowRoot.getElementById('evcBub');
+    if (!svg) return;
+    const key = Math.round(soc || 0) + col + (this._lite() ? 'L' : '');
+    if (this._evcBubbleSoc === key) return;
+    this._evcBubbleSoc = key;
+    const W = 460, H = 64, fill = Math.max(0, Math.min(100, soc || 0)) / 100;
+    let seed = 11; const r = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+    const n = Math.round(30 + 160 * fill);
+    const groups = ['', '', ''];
+    for (let i = 0; i < n; i++) {
+      const x = 3 + r() * Math.max(4, W * fill - 6), y = 3 + r() * (H - 6), rad = 1.4 + r() * 5.2, op = (0.35 + r() * 0.6).toFixed(2);
+      groups[i % 3] += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${rad.toFixed(1)}" fill="url(#evcBubG)" opacity="${op}"/>`;
+    }
+    // Each twinkle group is its own <svg> layer animated through CSS opacity: the compositor fades it
+    // without repainting ~150 gradient circles per frame (an SMIL/attribute animation repaints them all).
+    const lite = this._lite();
+    const grad = (i) => `<defs><radialGradient id="evcBubG${i}"><stop offset="0" stop-color="${col}" stop-opacity="1"/><stop offset=".55" stop-color="${col}" stop-opacity=".85"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></radialGradient></defs>`;
+    const layer = (inner) => `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${inner}</svg>`;
+    svg.innerHTML = groups.map((g, i) => layer(grad(i) + g.replace(/url\(#evcBubG\)/g, `url(#evcBubG${i})`))).join('')
+      + (fill > 0 && fill < 1 ? layer(`<rect x="${(W * fill).toFixed(1)}" y="2" width="1.5" height="${H - 4}" fill="${col}" opacity=".6"/>`) : '');
+    if (!lite && svg.animate) {
+      [...svg.children].slice(0, 3).forEach((el, i) => {
+        el.style.willChange = 'opacity';
+        const dur = (2.4 + i * 0.9) * 1000;
+        const a = el.animate([{ opacity: 1 }, { opacity: 0.45 }, { opacity: 1 }], { duration: dur, iterations: Infinity, delay: -i * 1000 });
+        if (this._paused) a.pause();
+      });
+    }
+  }
+
+  _updateEvc() {
+    if (!this._evcEnabled() || !this._hass) return;
+    const root = this.shadowRoot, c = this.config;
+    if (!root.getElementById('evcHero')) return;
+    const g = (id) => root.getElementById(id);
+    const setV = (id, v, u) => { const e = g(id); if (e) e.innerHTML = (v === null || v === undefined ? '--' : v) + (u ? `<small>${u}</small>` : ''); };
+    const pW = this._val(this._evcPowerId(), true), cur = this._val(c.evc_current), volt = this._val(c.evc_voltage);
+    const soc = this._val(this._evcSocId()), temp = this._val(c.evc_temp);
+    const eS = this._val(c.evc_session_energy), tS = this._evcSessionSecs(this._evcSt(c.evc_session_time));
+    // status
+    const stRaw = this._evcSt(c.evc_status);
+    const key = stRaw ? String(stRaw.state).toLowerCase().replace(/[\s_-]/g, '') : '';
+    const avail = this._evcSt(c.evc_availability);
+    this._evcUnavailable = !!(avail && avail.state === 'off');
+    let [lbl, col] = FFlowCard.EVC_STATUS[key] || (stRaw ? [String(stRaw.state), '#c9d1d9'] : (pW !== null && pW > 50 ? ['In carica', '#3fb950'] : ['--', '#8b949e']));
+    if (this._evcUnavailable) [lbl, col] = ['Wallbox non disponibile', '#6e7681'];
+    const charging = key === 'charging' || (!stRaw && pW !== null && pW > 50);
+    const hero = g('evcHero'); if (hero) hero.style.setProperty('--ec', col);
+    const se = g('evcState'); if (se) { se.textContent = '● ' + lbl.toUpperCase(); se.style.color = col; }
+    const socCol = this._evcSocColor(soc);
+    const so = g('evcSoc'); if (so) { so.textContent = soc === null ? '--' : Math.round(soc); }
+    const sw = root.querySelector('.evsoc'); if (sw) sw.style.color = socCol;
+    const bolt = g('evcBolt'); if (bolt) bolt.style.visibility = charging ? 'visible' : 'hidden';
+    this._evcBubbles(soc, socCol);
+    setV('evcPow', pW === null ? null : (pW / 1000).toFixed(2), 'kW');
+    setV('evcCur', cur === null ? null : cur.toFixed(1), 'A');
+    setV('evcTime', this._evcFmtDur(tS), 'h');
+    setV('evcEnergy', eS === null ? null : eS.toFixed(1), 'kWh');
+    const cons = Number(c.evc_consumption) || 14;
+    setV('evcKm', eS === null ? null : '+' + Math.round(eS / cons * 100), 'km');
+    setV('evcVolt', volt === null ? null : Math.round(volt), 'V');
+    setV('evcTemp', temp === null ? null : Math.round(temp), '°C');
+    const capWh = Number(c.charger_battery_capacity_wh) || 0;
+    const eta = charging && capWh && soc !== null && pW > 50 ? capWh * (100 - soc) / 100 / pW * 3600 : null;
+    setV('evcEta', eta === null ? null : this._evcFmtDur(eta), 'h');
+    // charge command + lock
+    const btn = g('evcBtn');
+    if (btn) {
+      const swSt = this._evcSt(c.evc_charge_switch);
+      const p = this._evcPending;
+      if (p) {
+        const okNow = swSt && swSt.state === p.target;
+        if (okNow && !p.okSince) p.okSince = Date.now();
+        if (!okNow) p.okSince = 0;
+        const timeout = (Number(c.evc_confirm_timeout) || 60) * 1000;
+        if (p.okSince && Date.now() - p.okSince >= 3000) { this._evcPending = null; this._evcMsg = null; }
+        else if (p.failed || Date.now() - p.since > timeout) { this._evcPending = null; this._evcMsg = 'Nessuna conferma dalla wallbox: controlla lo stato e riprova.'; this._evcMsgAt = Date.now(); }
+      }
+      const pend = this._evcPending;
+      const on = swSt && swSt.state === 'on';
+      btn.disabled = !!pend || this._evcUnavailable || !swSt;
+      btn.classList.toggle('stop', !!on && !pend);
+      g('evcBtnTxt').textContent = pend ? 'ATTESA' : on ? 'FERMA' : 'AVVIA';
+      const lock = g('evcLock');
+      if (lock) {
+        let msg = '';
+        if (pend) msg = `⏳ ${pend.target === 'on' ? 'Avvio' : 'Stop'} inviato: in attesa di conferma dalla wallbox… (pulsante bloccato)`;
+        else if (this._evcUnavailable) msg = '⛔ Wallbox non disponibile: comando bloccato';
+        else if (this._evcMsg && Date.now() - this._evcMsgAt < 30000) msg = '⚠️ ' + this._evcMsg;
+        lock.style.display = msg ? '' : 'none'; lock.textContent = msg;
+      }
+    }
+    // toggles
+    [['evcPv', c.evc_pv_auto], ['evcPause', c.evc_pause_enabled]].forEach(([id, eid]) => {
+      const el = g(id); if (!el) return;
+      const s = this._evcSt(eid); el.classList.toggle('on', !!s && s.state === 'on'); el.classList.toggle('na', !s);
+    });
+    // share slider
+    const sh = g('evcShare'), shSt = this._evcSt(c.evc_share);
+    if (sh && shSt && document.activeElement !== sh && this.shadowRoot.activeElement !== sh) {
+      const a = shSt.attributes || {};
+      sh.min = a.min !== undefined ? a.min : 0; sh.max = a.max !== undefined ? a.max : 100; sh.step = a.step || 1;
+      let v = parseFloat(shSt.state);
+      const sent = this._evcShareSent;
+      if (sent && v !== sent.v && Date.now() - sent.at < 10000) v = sent.v; else this._evcShareSent = null;
+      sh.value = v;
+      this._evcShareView(v);
+    }
+    // max current slider (locked while the smart PV mode drives it)
+    const cr = g('evcCurRange'), crSt = this._evcSt(c.evc_max_current);
+    if (cr && crSt) {
+      const a = crSt.attributes || {};
+      cr.min = a.min !== undefined ? a.min : 6; cr.max = a.max !== undefined ? a.max : 32; cr.step = a.step || 1;
+      const pv = this._evcSt(c.evc_pv_auto), locked = !!pv && pv.state === 'on';
+      cr.disabled = locked;
+      if (!this._evcCurDrag && this.shadowRoot.activeElement !== cr) {
+        let v = parseFloat(crSt.state);
+        const sent = this._evcCurSent;
+        if (sent && v !== sent.v && Date.now() - sent.at < 10000) v = sent.v; else this._evcCurSent = null;
+        cr.value = v; this._evcCurView(v);
+      }
+      const off = this._val(c.evc_offered_current);
+      const info = g('evcCurInfo'); if (info) info.innerHTML = `min ${cr.min} A · max ${cr.max} A` + (off !== null ? `<br>offerta dalla box: ${off} A` : '');
+      const note = g('evcCurNote'); if (note) note.textContent = locked ? '🔒 Comandata dalla carica intelligente FV: spegnila per regolare a mano.' : 'Il valore viene inviato quando lasci il cursore.';
+      const unit = g('evcUnit'); if (unit) unit.querySelectorAll('[data-u]').forEach(u => u.classList.toggle('on', u.dataset.u === (this._lsGet('evcUnit') || 'A')));
+    }
+    // wallbox info chips
+    const info = g('evcInfo');
+    if (info) {
+      const chips = [];
+      if (avail) chips.push(avail.state === 'on' ? '🟢 Disponibile' : '⛔ Non disponibile');
+      if (stRaw) chips.push('Connettore: ' + lbl);
+      const err = this._evcSt(c.evc_error);
+      if (err && !/^(noerror|none|ok|0)$/i.test(String(err.state).replace(/[\s_-]/g, ''))) chips.push('⚠️ Errore: ' + err.state);
+      const offA = this._val(c.evc_offered_current);
+      if (offA !== null) { const w = this._evcAtoW(offA); chips.push(`Offerta: ${offA} A · ${(w / 1000).toFixed(1)} kW`); }
+      info.innerHTML = chips.map(t => `<span class="echip">${this._esc(t)}</span>`).join('') || '<span class="es">Nessun dato</span>';
+    }
+    ['evcUnlock', 'evcReset'].forEach(id => { const b = g(id); if (b) b.disabled = !!(this._evcActLock && this._evcActLock[id] > Date.now()); });
+    this._maybeLoadEvc();
+  }
+
+  // session chart + last sessions from HA long-term statistics (5-minute means), history as fallback
+  _maybeLoadEvc() {
+    const pid = this._evcPowerId();
+    if (!pid || !this._hass || typeof this._hass.callWS !== 'function') return;
+    const panel = this.shadowRoot.getElementById('evcChart');
+    if (!panel || panel.getBoundingClientRect().width === 0) return;   // only while the tab / section is open
+    const now = Date.now();
+    if (this._evcLoading || (this._evcData && now - this._evcData.fetched < (this._lite() ? 15 : 5) * 60000)) { if (this._evcData && !this._evcDrawn) this._renderEvc(); return; }
+    this._evcLoading = true;
+    const start = now - 7 * 86400000, sid = this._evcSocId();
+    const ws = (m) => this._hass.callWS(m);
+    const stats = ws({ type: 'recorder/statistics_during_period', start_time: new Date(start).toISOString(), end_time: new Date(now).toISOString(),
+      statistic_ids: [pid], period: '5minute', types: ['mean'] }).catch(() => null);
+    const soc = sid ? ws({ type: 'history/history_during_period', start_time: new Date(start).toISOString(), end_time: new Date(now).toISOString(),
+      entity_ids: [sid], minimal_response: true, no_attributes: true, significant_changes_only: false }).catch(() => null) : Promise.resolve(null);
+    Promise.all([stats, soc]).then(async ([st, sh]) => {
+      let pts = st && st[pid] ? st[pid].map(x => ({ t: typeof x.start === 'number' ? x.start : Date.parse(x.start), w: Number(x.mean) })) : [];
+      const unit = (this._hass.states[pid]?.attributes?.unit_of_measurement || '').trim();
+      if (unit === 'kW') pts = pts.map(p => ({ ...p, w: p.w * 1000 }));
+      if (!pts.length) {
+        // no statistics for this sensor: 2 days of history, bucketed to 5 minutes
+        const h = await ws({ type: 'history/history_during_period', start_time: new Date(now - 2 * 86400000).toISOString(), end_time: new Date(now).toISOString(),
+          entity_ids: [pid], minimal_response: true, no_attributes: true, significant_changes_only: false }).catch(() => null);
+        const s0 = now - 2 * 86400000, n = 576;
+        const b = this._bucketize(h && h[pid], pid, s0, now, n, { until: now });
+        pts = Array.from(b, (w, i) => ({ t: s0 + i * 300000, w }));
+      }
+      const socPts = (sh && sh[sid] || []).map(p => ({ t: p.lu != null ? p.lu * 1000 : Date.parse(p.last_updated || 0), v: parseFloat(p.s != null ? p.s : p.state) })).filter(p => isFinite(p.v) && p.v > 0);
+      this._evcData = { pts, socPts, fetched: Date.now() };
+    }).finally(() => { this._evcLoading = false; this._renderEvc(); });
+  }
+  _evcSessions(pts) {
+    const out = []; let cur = null, gap = 0;
+    pts.forEach(p => {
+      if (p.w > 100) { if (!cur) cur = { start: p.t, end: p.t + 300000, wh: 0, n: 0 }; cur.end = p.t + 300000; cur.wh += p.w * 5 / 60; cur.n++; gap = 0; }
+      else if (cur) { gap++; if (gap > 2) { if (cur.n >= 2) out.push(cur); cur = null; gap = 0; } }
+    });
+    if (cur && cur.n >= 2) { cur.open = Date.now() - cur.end < 15 * 60000; out.push(cur); }
+    return out;
+  }
+  _evcSocAt(t) {
+    const s = this._evcData && this._evcData.socPts; if (!s || !s.length) return null;
+    let v = null; for (const p of s) { if (p.t <= t) v = p.v; else break; } return v;
+  }
+  _renderEvc() {
+    const root = this.shadowRoot, svg = root.getElementById('evcChart');
+    if (!svg) return;
+    const d = this._evcData;
+    if (!d) { svg.innerHTML = '<text x="240" y="70" text-anchor="middle" font-size="12" fill="#8b949e">Caricamento storico…</text>'; return; }
+    this._evcDrawn = true;
+    const sessions = this._evcSessions(d.pts);
+    const fmtW = (w) => w >= 1000 ? (w / 1000).toFixed(1) + ' kW' : Math.round(w) + ' W';
+    const hhmm = (t) => { const x = new Date(t); return String(x.getHours()).padStart(2, '0') + ':' + String(x.getMinutes()).padStart(2, '0'); };
+    const day = (t) => new Date(t).toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short' });
+    const last = sessions[sessions.length - 1];
+    const title = root.getElementById('evcChartTitle'), info = root.getElementById('evcChartInfo'), chips = root.getElementById('evcChips');
+    if (!last) {
+      svg.innerHTML = '<text x="240" y="70" text-anchor="middle" font-size="12" fill="#8b949e">Nessuna ricarica negli ultimi giorni</text>';
+      if (title) title.textContent = 'Sessione'; if (chips) chips.innerHTML = '';
+    } else {
+      const s0 = last.start, s1 = last.open ? Date.now() : last.end;
+      const pts = d.pts.filter(p => p.t >= s0 - 300000 && p.t <= s1);
+      const L = 40, R = 30, T = 8, B = 20, W = 480, H = 130, pw = W - L - R, ph = H - T - B;
+      const maxW = Math.max(1000, ...pts.map(p => p.w));
+      const step = this._niceStep(maxW * 1.05 / 3), top = step * Math.ceil(maxW * 1.05 / step);
+      const X = (t) => (L + (t - s0) / Math.max(1, s1 - s0) * pw).toFixed(1), Y = (w) => (T + ph - Math.min(w, top) / top * ph).toFixed(1);
+      let g = '';
+      for (let v = 0; v <= top + 1; v += step) g += `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="#21262d"/><text x="${L - 4}" y="${(+Y(v) + 3.5).toFixed(1)}" text-anchor="end" font-size="10" fill="#8b949e">${fmtW(v)}</text>`;
+      [s0, (s0 + s1) / 2, s1].forEach((t, i) => { g += `<text x="${X(t)}" y="${H - 5}" text-anchor="${['start', 'middle', 'end'][i]}" font-size="10" fill="#8b949e">${hhmm(t)}</text>`; });
+      if (pts.length) {
+        let line = 'M' + X(pts[0].t) + ',' + Y(pts[0].w);
+        pts.forEach(p => { line += 'L' + X(p.t) + ',' + Y(p.w); });
+        g += `<defs><linearGradient id="evcPg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3fb950" stop-opacity=".5"/><stop offset="1" stop-color="#3fb950" stop-opacity="0"/></linearGradient></defs>`;
+        g += `<path d="${line}L${X(pts[pts.length - 1].t)},${Y(0)}L${X(pts[0].t)},${Y(0)}Z" fill="url(#evcPg)"/><path d="${line}" fill="none" stroke="#3fb950" stroke-width="1.6" stroke-linejoin="round"/>`;
+      }
+      const soc = (d.socPts || []).filter(p => p.t >= s0 && p.t <= s1);
+      const s0v = this._evcSocAt(s0);
+      if (s0v !== null) soc.unshift({ t: s0, v: s0v });
+      if (soc.length) {
+        const YS = (v) => (T + ph - Math.max(0, Math.min(100, v)) / 100 * ph).toFixed(1);
+        let sl = ''; soc.forEach((p, i) => { sl += (i ? 'L' : 'M') + X(p.t) + ',' + YS(p.v); });
+        sl += 'L' + X(s1) + ',' + YS(soc[soc.length - 1].v);
+        g += `<path d="${sl}" fill="none" stroke="#e6edf3" stroke-width="1.5" stroke-dasharray="4 3"/>`;
+        [0, 50, 100].forEach(v => { g += `<text x="${W - 2}" y="${(+YS(v) + 3.5).toFixed(1)}" text-anchor="end" font-size="10" fill="#c9d1d9">${v}%</text>`; });
+      }
+      svg.innerHTML = g;
+      if (title) title.textContent = last.open ? 'Sessione in corso' : 'Ultima sessione · ' + day(last.start);
+      if (info) info.textContent = `${hhmm(s0)}–${last.open ? 'ora' : hhmm(s1)}`;
+      const sA = s0v, sB = this._evcSocAt(s1);
+      const avg = last.wh / Math.max(1, (last.end - last.start) / 3600000);
+      if (chips) chips.innerHTML = [`<span class="echip"><i class="ld"></i>potenza</span>`, soc.length ? '<span class="echip"><i class="ls"></i>SOC auto</span>' : '',
+        sA !== null && sB !== null ? `<span class="echip">${Math.round(sA)}% → ${Math.round(sB)}%</span>` : '',
+        `<span class="echip">${(last.wh / 1000).toFixed(1)} kWh</span>`, `<span class="echip">media ${fmtW(avg)}</span>`].join('');
+    }
+    const hist = root.getElementById('evcHist');
+    if (hist) {
+      const rows = sessions.slice(-6).reverse().map(s => {
+        const a = this._evcSocAt(s.start), b = this._evcSocAt(s.end);
+        return `<div><span>${day(s.start)} · ${hhmm(s.start)}–${s.open ? 'ora' : hhmm(s.end)}</span><b>${(s.wh / 1000).toFixed(1)} kWh · ${this._evcFmtDur((s.end - s.start) / 1000)} h${a !== null && b !== null ? ` · ${Math.round(a)}→${Math.round(b)}%` : ''}</b></div>`;
+      });
+      hist.innerHTML = rows.join('') || '<div class="es">Nessuna ricarica negli ultimi 7 giorni</div>';
+    }
+  }
+
   // ── v1.3.0: inverter ventilation ─────────────────────────────────
   _fanSVG(id, size) {
     const blade = 'M0,-2.2 C2.6,-3.6 4.8,-8.6 1.2,-10.6 C-1.6,-9 -2.4,-5 0,-2.2Z';
@@ -3015,6 +3523,7 @@ class FFlowCard extends HTMLElement {
   }
 
   _updateExtraSections() {
+    this._updateEvc();
     this._updateCamera();
     const sp = this._spin; if (!sp) return;
     this._maybeLoadHistory();
@@ -3459,6 +3968,59 @@ class FFlowCard extends HTMLElement {
       .dv{height:1px;background:#21262d;margin:8px 0}
       .ct{font-size:.68rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#8b949e;margin-bottom:10px;display:flex;align-items:center;gap:7px}
       .ct::after{content:'';flex:1;height:1px;background:#21262d}
+      .evh{--ec:#8b949e;background:linear-gradient(160deg,color-mix(in srgb,var(--ec) 12%,#0d1117),#0d1117 70%);border:1px solid color-mix(in srgb,var(--ec) 40%,#21262d);border-radius:14px;padding:11px 12px;transition:border-color .5s}
+      .evh-top{display:flex;justify-content:space-between;align-items:flex-end;gap:8px}
+      .evst{font-size:.76rem;font-weight:800;letter-spacing:.6px}
+      .evsub{font-size:.62rem;letter-spacing:1px;color:#8b949e;text-transform:uppercase;margin-top:2px}
+      .evsoc{font-size:1.9rem;font-weight:800;line-height:1;display:flex;align-items:baseline;gap:2px}
+      .evsoc small{font-size:.8rem;color:#8b949e;font-weight:700}
+      .evsoc #evcBolt{font-size:1.1rem;margin-right:2px}
+      .evbar{position:relative;height:64px;margin:10px 0 9px;border-radius:12px;background:#0b0f14;border:1px solid #21262d;overflow:hidden}
+      .evbar svg{position:absolute;inset:0;width:100%;height:100%}
+      .ekpi{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+      .ek{background:#0d1117;border:1px solid #21262d;border-radius:9px;padding:6px 3px;text-align:center;min-width:0}
+      .ek .v{font-size:.9rem;font-weight:800;color:#e6edf3;white-space:nowrap}.ek .v small{font-size:.62rem;color:#8b949e;margin-left:1px}
+      .ek .l{font-size:.56rem;letter-spacing:1px;color:#8b949e;text-transform:uppercase;margin-top:1px}
+      .esec{margin-top:9px;background:#0d1117;border:1px solid #21262d;border-radius:12px;padding:9px 11px}
+      .est{font-size:.64rem;letter-spacing:1.4px;text-transform:uppercase;color:#8b949e;margin-bottom:7px;display:flex;justify-content:space-between;align-items:center}
+      .es{font-size:.64rem;color:#8b949e;line-height:1.4}
+      .ecmd{display:flex;align-items:center;gap:12px}
+      .ebtn{position:relative;flex:0 0 auto;width:84px;height:84px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;
+            font:inherit;font-size:.68rem;font-weight:800;letter-spacing:.6px;color:#3fb950;background:radial-gradient(circle at 50% 35%,#1d3b2a,#0f1a14);border:1px solid rgba(63,185,80,.5);touch-action:none;user-select:none;-webkit-user-select:none}
+      .ebtn.stop{color:#f39c4b;background:radial-gradient(circle at 50% 35%,#3a2a17,#1a130b);border-color:rgba(243,156,75,.5)}
+      .ebtn:disabled{color:#6e7681;background:#161b22;border-color:#30363d;cursor:default}
+      .ebtn .ering{position:absolute;inset:-5px;width:94px;height:94px}
+      .ebtn #evcRing{transition:stroke-dasharray .1s}
+      .ebtn.holding #evcRing{stroke-dasharray:283 283;transition:stroke-dasharray 1s linear}
+      .ecmdtxt{font-size:.74rem;line-height:1.45;color:#c9d1d9}.ecmdtxt b{color:#e6edf3}
+      .elock{display:inline-block;margin-top:6px;font-size:.66rem;color:#f4d03f;background:rgba(244,208,63,.1);border:1px solid rgba(244,208,63,.35);border-radius:8px;padding:3px 8px}
+      .etog{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid #21262d;cursor:pointer;-webkit-tap-highlight-color:transparent}
+      .etog:first-of-type{border-top:none}
+      .etog .et{font-size:.78rem;color:#e6edf3}
+      .esw{width:38px;height:21px;border-radius:11px;background:#30363d;position:relative;flex-shrink:0;transition:background .2s}
+      .esw::after{content:'';position:absolute;top:3px;left:3px;width:15px;height:15px;border-radius:50%;background:#fff;transition:left .2s}
+      .etog.on .esw{background:#3fb950}.etog.on .esw::after{left:20px}
+      .etog.busy{opacity:.6;pointer-events:none}.etog.na{opacity:.45}
+      .eshare{padding-top:7px;border-top:1px solid #21262d}
+      .eshr{display:flex;justify-content:space-between;font-size:.78rem;color:#e6edf3}.eshr b{font-weight:700}
+      .esplit{display:flex;height:10px;border-radius:5px;overflow:hidden;margin:6px 0 2px;background:#21262d}
+      .esplit div:first-child{background:#29c4f6;transition:width .2s}.esplit div:last-child{background:#3fb950;transition:width .2s}
+      .erange{width:100%;margin:6px 0 4px;accent-color:#3fb950;cursor:pointer}
+      .erange:disabled{opacity:.45;cursor:not-allowed}
+      .ecur{display:flex;justify-content:space-between;align-items:flex-end;gap:8px}
+      .ebig{font-size:1.5rem;font-weight:800;color:#e6edf3}.ebig small{font-size:.8rem;color:#8b949e;margin-left:2px}.ebig span{font-size:.78rem;color:#8b949e;font-weight:600;margin-left:4px}
+      .eunit{display:inline-flex;border:1px solid #30363d;border-radius:8px;overflow:hidden;font-size:.64rem;font-weight:700;letter-spacing:0}
+      .eunit span{padding:2px 9px;color:#8b949e;cursor:pointer}.eunit span.on{background:#1f6feb;color:#fff}
+      .echips{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
+      .echip{display:inline-flex;align-items:center;gap:4px;font-size:.64rem;padding:3px 8px;border-radius:8px;border:1px solid #30363d;background:#161b22;color:#c9d1d9}
+      .echip .ld{width:10px;height:3px;background:#3fb950;border-radius:2px}.echip .ls{width:10px;border-top:2px dashed #e6edf3}
+      .ehist div{display:flex;justify-content:space-between;gap:8px;font-size:.7rem;padding:5px 0;border-top:1px solid #21262d;color:#c9d1d9}
+      .ehist div:first-child{border-top:none}.ehist b{color:#e6edf3;font-weight:600;text-align:right}
+      .eacts{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px}
+      .eact{font:inherit;font-size:.7rem;font-weight:700;padding:6px 11px;border-radius:9px;border:1px solid #30363d;background:#161b22;color:#c9d1d9;cursor:pointer;touch-action:none;user-select:none;position:relative;overflow:hidden}
+      .eact::before{content:'';position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(243,156,75,.3)}
+      .eact.holding::before{width:100%;transition:width 1s linear}
+      .eact:disabled{opacity:.45}
       .mi{cursor:pointer}
       svg .mi{pointer-events:bounding-box}
       .pvi.mi:hover,.st.mi:hover,.vk.mi:hover{border-color:#58a6ff}
@@ -3787,7 +4349,7 @@ class FFlowCard extends HTMLElement {
         <div class="pvi"><div class="ico">⚡</div><div class="lbl">Residua</div><div class="val" id="invRemCap">-- Ah</div><div class="val" id="invRemKwh" style="font-size:.74rem;color:#8b949e;margin-top:1px">-- kWh</div></div>
         <div class="pvi"><div class="ico">🏡</div><div class="lbl">Consumo Oggi</div><div class="val" id="invTodayLoad">-- kWh</div></div>
       </div>`),
-      cons: this._buildConsumersHTML(esc), vent: this._buildVentHTML(esc), stats: this._buildStatsHTML(esc), cam: this._buildCameraHTML(esc) })}
+      cons: this._buildConsumersHTML(esc), evc: this._buildEvcHTML(esc), vent: this._buildVentHTML(esc), stats: this._buildStatsHTML(esc), cam: this._buildCameraHTML(esc) })}
     </div>`;
     this._bindExtraSections();
     this._bindGridSwitch();
@@ -3795,6 +4357,7 @@ class FFlowCard extends HTMLElement {
     this._bindSections();
     this._bindTabs();
     this._bindMoreInfo();
+    this._bindEvc();
     if (this._lite()) {
       const keep = '#flowBattIn,#flowBattOut,#flowGridIn,#flowGridOut,#flowInvLoad,#flowHomeEV,#pvFlowGroup';
       this.shadowRoot.querySelectorAll('animate,animateTransform,animateMotion').forEach(a => { if (!a.closest(keep)) a.remove(); });

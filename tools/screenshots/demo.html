@@ -66,6 +66,16 @@
     'sensor.inverter_temp': st(40.9, '°C'), 'sensor.dc_temp': st(46.9, '°C'),
     'sensor.today_pv': st(14.7, 'kWh'), 'sensor.today_batt_chg': st(11.0, 'kWh'), 'sensor.today_batt_dis': st(3.42, 'kWh'),
     'sensor.today_import': st(0.35, 'kWh'), 'sensor.today_export': st(1.12, 'kWh'), 'sensor.today_load': st(9.6, 'kWh'),
+    // JuiceBox (OCPP) wallbox
+    'switch.juicebox_charge_control': st('on'), 'switch.juicebox_availability': st('on'),
+    'sensor.juicebox_status_connector': st('Charging'), 'sensor.juicebox_current_import': st(15.0, 'A'),
+    'sensor.juicebox_voltage': st(231, 'V'), 'sensor.juicebox_temperature': st(31, '°C'),
+    'sensor.juicebox_energy_session': st(5.8, 'kWh'), 'sensor.juicebox_time_session': st(5760, 's'),
+    'sensor.juicebox_current_offered': st(16, 'A'), 'sensor.juicebox_error_code': st('NoError'),
+    'input_boolean.wb_pv_auto': st('on'), 'input_boolean.wb_pause_enabled': st('on'),
+    'input_number.wb_battery_share_pct': { state: '70', attributes: { min: 0, max: 100, step: 5, unit_of_measurement: '%' } },
+    'number.juicebox_maximum_current': { state: '16', attributes: { min: 6, max: 32, step: 1, unit_of_measurement: 'A' } },
+    'button.juicebox_unlock': st('unknown'), 'button.juicebox_reset': st('unknown'),
     'camera.tetto': { state: 'streaming', attributes: { access_token: 'demo', friendly_name: 'Tetto' } },
     'binary_sensor.grid': st('on'), 'select.ems_mode': { state: 'Zero Export To CT', attributes: { options: ['Selling First', 'Zero Export To Load', 'Zero Export To CT'] } },
     // Solcast-like forecast: half-hourly pv_estimate (kW) for today in the attributes
@@ -98,6 +108,22 @@
     callService: async () => {},
     callWS: async (msg) => {
       const start = Date.parse(msg.start_time), end = Date.parse(msg.end_time), out = {};
+      if (msg.type === 'recorder/statistics_during_period') {
+        // 5-minute means: a charging session most days, the current one started 1 h 36 m ago
+        for (const id of msg.statistic_ids) {
+          const rows = [];
+          for (let t = Math.ceil(start / 300000) * 300000; t <= end; t += 300000) {
+            const ago = (end - t) / 60000, d = new Date(t), h = d.getHours() + d.getMinutes() / 60, dayN = d.getDate();
+            let w = 0;
+            if (ago <= 96) w = 3300 + Math.sin(ago / 9) * 250 - (ago < 8 ? 400 : 0);
+            else if (dayN % 2 === 0 && h > 14.6 && h < 17) w = 3400 + Math.sin(h * 3) * 300;
+            else if (dayN % 3 === 0 && h > 1.2 && h < 4) w = 3500;
+            rows.push({ start: t, mean: kwEntities[id] ? w / 1000 : w });
+          }
+          out[id] = rows;
+        }
+        return out;
+      }
       for (const id of msg.entity_ids) {
         const pts = [];
         for (let t = start; t <= end; t += 60000) {
@@ -110,6 +136,15 @@
           else if (id === 'sensor.pv2_power') v = 2100 * Math.pow(Math.max(0, Math.sin((h - 8) / 10 * Math.PI)), 1.2) * cloud;   // Nord-Ovest: afternoon
           else if (id === 'sensor.battery_power') v = h < 7 ? -420 : h < 13 ? 1400 * sun : h < 17 ? 150 : h < 19 ? -900 : -520;
           else if (id === 'sensor.battery_soc') v = h < 7 ? 62 - h * 4 : h < 13 ? Math.min(100, 34 + (h - 7) * 11) : h < 17 ? 100 : 100 - (h - 17) * 6;
+          else if (id === 'sensor.car_soc') {
+            // rises during the mocked sessions (even days 14:36-17:00, every 3rd day 01:12-04:00), drains slowly otherwise
+            const ago = (end - t) / 60000, dn = d.getDate();
+            if (ago <= 96) v = Math.round(64 - ago * 0.4);
+            else if (ago <= 600) v = 26;
+            else if (dn % 2 === 0 && h > 14.6) v = Math.round(38 + (Math.min(h, 17) - 14.6) * 15);
+            else if (dn % 3 === 0 && h > 1.2) v = Math.round(30 + (Math.min(h, 4) - 1.2) * 16);
+            else v = 40 - Math.round((h % 12));
+          }
           else v = profile[id] ? profile[id](h) : 0;
           pts.push({ s: String(kwEntities[id] ? v / 1000 : v), lu: t / 1000 });
         }
@@ -130,6 +165,12 @@
     grid_status_entity: 'binary_sensor.grid', grid_switch_to_off: 'switch.off_grid', grid_switch_to_on: 'switch.on_grid',
     ems_mode_entity: 'select.ems_mode',
     _show_energy_supply: true, _show_backup_panel: true, _show_battery_stats: false, _daily_tiles_extended: true,
+    _show_evc: true, evc_car_name: 'BYD Dolphin Surf', evc_charge_switch: 'switch.juicebox_charge_control', evc_availability: 'switch.juicebox_availability',
+    evc_status: 'sensor.juicebox_status_connector', evc_power: 'sensor.c_wallbox', evc_current: 'sensor.juicebox_current_import',
+    evc_voltage: 'sensor.juicebox_voltage', evc_temp: 'sensor.juicebox_temperature', evc_session_energy: 'sensor.juicebox_energy_session',
+    evc_session_time: 'sensor.juicebox_time_session', evc_pv_auto: 'input_boolean.wb_pv_auto', evc_pause_enabled: 'input_boolean.wb_pause_enabled',
+    evc_share: 'input_number.wb_battery_share_pct', evc_max_current: 'number.juicebox_maximum_current', evc_offered_current: 'sensor.juicebox_current_offered',
+    evc_error: 'sensor.juicebox_error_code', evc_unlock: 'button.juicebox_unlock', evc_reset: 'button.juicebox_reset',
     _show_ev: true, charger_power: 'sensor.c_wallbox', charger_soc: 'sensor.car_soc', charger_battery_capacity_wh: 43200,
     _show_stats: true, stats_forecast_entity: 'sensor.pv_forecast',
     sections_layout: 'stack',   // detail pictures use the stacked layout; the "tabs" scene shows the menu
@@ -153,6 +194,7 @@
     // classic JK BMS stat tiles visible, no extra sections
     // tab menu with the Inverter panel open
     tabs: { ...base, sections_layout: 'tabs', tabs_start: 'inv' },
+    evc: { ...base, sections_layout: 'tabs', tabs_start: 'evc' },
     // night, clear sky (stars) — sun set 2 h ago
     night: { ...base, weather_entity: 'weather.casa' },
     // daytime thunderstorm with rain

@@ -96,6 +96,16 @@ const MDI = JSON.parse(fs.readFileSync(path.join(__dirname, 'icons.json'), 'utf8
   await page.evaluate(() => { cancelAnimationFrame(window._card._gooRaf); window._card._gooRaf = null; });
   await shot('tabs-goo.png', '#tScroll');
 
+  // EV charging tab: hero with bubbles, protected command, modes, current, session chart, history
+  await open('evc');
+  await page.waitForTimeout(800);
+  await shot('ev-charging.png', '.tpanel:not([hidden]) .evh', '.tpanel:not([hidden]) .ehist');
+  // hold-to-arm confirmation dialog for the charge command
+  await page.evaluate(() => window._card._evcConfirm('Stop ricarica', 'Vuoi fermare la ricarica dell’auto? Il comando verrà inviato una sola volta alla wallbox.', 'off', () => {}));
+  await page.waitForTimeout(150);
+  await shot('ev-confirm.png', '#evcModal .gbox');
+  await page.evaluate(() => { window._card.shadowRoot.getElementById('evcModal').style.display = 'none'; });
+
   // night sky with stars, and a thunderstorm by day
   await open('night');
   await page.waitForTimeout(1200);

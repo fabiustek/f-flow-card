@@ -2,12 +2,12 @@
 
 # F-Flow Card
 
-**Card per Home Assistant con i flussi energetici in tempo reale**: fotovoltaico, batteria, rete, casa, utilizzatori e ventilazione dell'inverter, tutto in un'unica card animata, con interfaccia in italiano.
+**Card per Home Assistant con i flussi energetici in tempo reale**: fotovoltaico, batteria, rete, casa, utilizzatori, ricarica dell'auto e ventilazione dell'inverter, tutto in un'unica card animata, con interfaccia in italiano.
 
 [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
 [![Release](https://img.shields.io/github/v/release/fabiustek/f-flow-card)](https://github.com/fabiustek/f-flow-card/releases)
 
-Versione attuale: **v1.13.0** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
+Versione attuale: **v1.14.0** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/card-overview.png" alt="F-Flow Card con tutte le sezioni attive" width="480">
@@ -37,6 +37,7 @@ Versione attuale: **v1.13.0** · Fork di [k-flow-card](https://github.com/thekha
   - [Cielo di notte e meteo](#cielo-di-notte-e-meteo)
   - [Statistiche batteria (JK BMS)](#statistiche-batteria-jk-bms)
   - [Auto elettrica / Wallbox](#auto-elettrica--wallbox)
+  - [Ricarica EV](#ricarica-ev)
   - [Da telefono](#da-telefono)
   - [Menu a schede](#menu-a-schede)
   - [Sezioni richiudibili](#sezioni-richiudibili)
@@ -67,6 +68,7 @@ Versione attuale: **v1.13.0** · Fork di [k-flow-card](https://github.com/thekha
 - **Ventilazione inverter** con livelli termici, temperature, PWM e ventole animate
 - **Autonomia** fino a un SOC minimo a scelta (es. 20%) e **tempo alla ricarica**, energia residua, barra delle fonti di energia, modalità EMS
 - **Wallbox e auto** disegnate accanto alla casa, con stato, potenza, SOC dell'auto e tempo alla carica completa
+- **Ricarica EV**: scheda dedicata per wallbox OCPP (es. JuiceBox) con avvio/stop **protetto** (un solo comando, tieni premuto + conferma), carica intelligente FV, ripartizione del surplus, corrente massima in A o W, grafico della sessione e ultime ricariche
 - **Leggibile anche da telefono**: se la card è stretta, i riquadri vanno su 3 colonne e le etichette si ingrandiscono
 - **Menu a schede** con la goccia luminosa animata, oppure **sezioni richiudibili** con riepilogo su una riga e flag 📌
 - Supporto per **due batterie** e **stringhe FV aggiuntive** (FV3 sulla falda sinistra, FV4 sulla destra)
@@ -126,7 +128,7 @@ Accanto al nome di ogni campo, interruttore e sezione dell'editor c'è un **?**:
 
 Accanto alle entità che compaiono nella card c'è la casella **📈 apri al tocco**. Se la spunti, toccando quel valore nella card si apre la finestra di Home Assistant con i dettagli e i **grafici** dell'entità (la "more-info"). Per esempio, spuntandola su **Consumo casa** e toccando la casa (o il valore sotto) vedi il grafico del consumo.
 
-Funziona per: produzione FV (etichetta vicino al sole) e stringhe FV1–FV4, potenza ed energie della rete (traliccio e valori), consumo casa (casa e valore), batteria (icona, potenza, corrente, tensione), temperatura e riquadro dell'inverter, riquadri giornalieri, riquadri JK BMS, wallbox (potenza, SOC, stato), indicatore IN RETE / FUORI RETE, badge EMS e valori della ventilazione. Per gli **utilizzatori** e le **ventole** la casella è dentro ogni elemento dell'elenco (gli utilizzatori la hanno attiva di partenza, come prima).
+Funziona per: produzione FV (etichetta vicino al sole) e stringhe FV1–FV4, potenza ed energie della rete (traliccio e valori), consumo casa (casa e valore), batteria (icona, potenza, corrente, tensione), temperatura e riquadro dell'inverter, riquadri giornalieri, riquadri JK BMS, wallbox (potenza, SOC, stato), scheda **Ricarica EV** (potenza, corrente, tensione, temperatura, energia e durata della sessione, SOC, stato), indicatore IN RETE / FUORI RETE, badge EMS e valori della ventilazione. Per gli **utilizzatori** e le **ventole** la casella è dentro ogni elemento dell'elenco (gli utilizzatori la hanno attiva di partenza, come prima).
 
 Sull'indicatore della rete e sul badge EMS il **tocco breve** apre la scheda, mentre **tenere premuto** continua ad aprire la commutazione o la scelta della modalità.
 
@@ -355,15 +357,85 @@ Stati riconosciuti (non importano maiuscole e minuscole):
 | altro (es. `disconnected`, `idle`) | SCOLLEGATA | grigio |
 | nessuno stato configurato e potenza ≤ 50 W | IN ATTESA | grigio |
 
+### Ricarica EV
+
+<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/ev-charging.png" alt="Scheda Ricarica EV con barra a bolle, comando protetto, modalità, corrente, sessione e storico" width="480"></p>
+
+Una scheda dedicata alla **ricarica dell'auto** con una wallbox **OCPP** (pensata per JuiceBox con l'integrazione OCPP, funziona con qualsiasi wallbox che esponga entità simili). Dall'alto in basso:
+
+- **Stato e batteria dell'auto**: stato del connettore tradotto in italiano (Scollegata, Collegata, In carica, In pausa, Completata, Errore…), nome dell'auto e una **barra a bolle** che si riempie fino al SOC. Bolle e ⚡% cambiano colore con il livello: **verde** sopra il 40%, **arancione** fra 20% e 40%, **rosso** sotto il 20%.
+- **8 riquadri**: potenza, corrente, durata della sessione, tempo al 100%, energia della sessione, **km aggiunti** (energia ÷ consumo dell'auto), tensione e temperatura della wallbox.
+- **Comando ricarica** protetto (vedi sotto).
+- **Modalità di ricarica**: interruttori **Carica intelligente FV** e **Pausa sotto 6 A**, e il cursore **Ripartizione surplus** (quanta parte del surplus va all'auto e quanta alla batteria di casa).
+- **Corrente massima** con il cursore e il selettore **A / W** (i watt sono calcolati come A × tensione × fasi). Mentre la carica intelligente FV è accesa il cursore è **bloccato** 🔒, perché la corrente la decide l'automazione: spegnila per regolare a mano.
+- **Sessione in corso**: grafico della potenza con la linea tratteggiata del SOC dell'auto, SOC iniziale → attuale, energia e potenza media.
+- **Ultime ricariche** degli ultimi 7 giorni, ricavate dallo storico della potenza: giorno, orario, energia, durata e SOC da → a.
+- **Wallbox**: disponibilità, stato del connettore, corrente offerta, eventuale codice di errore (nascosto se è `NoError`) e i pulsanti **Sblocca cavo** e **Riavvia wallbox**.
+
+#### Comando protetto: un solo comando alla wallbox
+
+<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/ev-confirm.png" alt="Conferma prima di fermare la ricarica" width="420"></p>
+
+Alcune wallbox si bloccano se ricevono più comandi di fila. Per questo il pulsante **AVVIA / FERMA** funziona così:
+1. Il **tocco breve non fa nulla**: bisogna **tenere premuto 1 secondo** (un anello si riempie intorno al pulsante).
+2. Compare la **conferma**. Solo con **Procedi** la card invia **un solo comando** (`switch.turn_on` per avviare, `switch.turn_off` per fermare).
+3. Il pulsante resta **bloccato** ("ATTESA") finché lo stato dell'interruttore non arriva al valore richiesto **e resta stabile per 3 secondi**. Se l'interruttore torna indietro per un momento (con JuiceBox spesso torna su *off* e si riaccende quando la wallbox conferma), la card continua ad aspettare e **non invia altri comandi**.
+4. Se la conferma non arriva entro l'**attesa massima** (60 s di partenza) il pulsante si sblocca e compare "Nessuna conferma dalla wallbox: controlla lo stato e riprova".
+5. Se la **disponibilità** della wallbox è spenta o non raggiungibile, il pulsante è disattivato.
+
+**Sblocca cavo** e **Riavvia wallbox** seguono lo stesso percorso (tieni premuto 1 s + conferma) e dopo l'invio restano bloccati per 15 secondi. Gli interruttori ignorano i doppi tocchi e i cursori inviano il valore **solo quando lasci il dito**.
+
+#### Configurazione passo passo
+
+Nell'editor apri **⚡ Ricarica EV** → **＋ Attiva**, poi:
+1. **Nome dell'auto** (facoltativo), es. `BYD Dolphin Surf`.
+2. **Comando ricarica**: l'interruttore che avvia e ferma la carica, es. `switch.juicebox_charge_control`.
+3. **Disponibilità wallbox** (es. `switch.juicebox_availability`) e **Stato del connettore OCPP** (es. `sensor.juicebox_status_connector`).
+4. **Attesa massima della conferma**: quanti secondi aspettare la risposta della wallbox (10–300, predefinito 60).
+5. **Potenza di ricarica**: il sensore più affidabile che hai (es. `sensor.consumi_wallbox`). Se lo lasci vuoto usa **Potenza wallbox** della sezione 🚗.
+6. Corrente, tensione, temperatura, energia e durata della sessione (tutti facoltativi). La durata può essere in secondi, minuti, ore o `h:mm:ss`.
+7. **Batteria dell'auto %**: se vuoto usa il **SOC batteria auto** della sezione 🚗. **Consumo medio** (predefinito 14 kWh/100 km) per i km aggiunti.
+8. **Carica intelligente FV**, **Pausa sotto 6 A** (`input_boolean`), **Ripartizione surplus** (`input_number`), **Corrente massima manuale** (`number`) e **Corrente offerta dalla wallbox**.
+9. **Fasi**: 1 per monofase, 3 per trifase (serve per passare da A a W).
+10. **Codice di errore**, **Sblocca cavo** e **Riavvio wallbox** (pulsanti `button.*`).
+
+La scheda compare nel menu (o tra le sezioni impilate) con il nome **Ricarica EV**; puoi spostarla, rinominarla e cambiarne l'icona in **🎨 Layout e intestazione** → **Sezioni sotto il disegno**. La sezione 🚗 Auto elettrica / Wallbox nel disegno dei flussi resta indipendente.
+
+Esempio YAML con JuiceBox (OCPP):
+
+```yaml
+_show_evc: true
+evc_car_name: BYD Dolphin Surf
+evc_charge_switch: switch.juicebox_charge_control
+evc_availability: switch.juicebox_availability
+evc_status: sensor.juicebox_status_connector
+evc_power: sensor.consumi_wallbox
+evc_current: sensor.juicebox_current_import
+evc_voltage: sensor.juicebox_voltage
+evc_temp: sensor.juicebox_temperature
+evc_session_energy: sensor.juicebox_energy_session
+evc_session_time: sensor.juicebox_time_session
+evc_offered_current: sensor.juicebox_current_offered
+evc_error: sensor.juicebox_error_code
+evc_pv_auto: input_boolean.wb_pv_auto
+evc_pause_enabled: input_boolean.wb_pause_enabled
+evc_share: input_number.wb_battery_share_pct
+evc_max_current: number.juicebox_maximum_current
+evc_unlock: button.juicebox_unlock
+evc_reset: button.juicebox_reset
+evc_phases: 1
+evc_consumption: 14
+```
+
 ### Menu a schede
 
 <p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/tabs.png" alt="Menu a schede con la sezione Inverter aperta" width="480"><br><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/tabs-goo.png" alt="La goccia luminosa mentre passa da una scheda all'altra" width="480"></p>
 
-Sotto il disegno dei flussi c'è una **barra di schede**, una per ogni sezione attiva: Batteria, Inverter, Utilizzatori, Ventilazione, Statistiche, Video (nell'ordine scelto in **Ordine delle sezioni**).
+Sotto il disegno dei flussi c'è una **barra di schede**, una per ogni sezione attiva: Batteria, Inverter, Utilizzatori, Ricarica EV, Ventilazione, Statistiche, Video (nell'ordine scelto in **Ordine delle sezioni**).
 
 - **All'apertura della pagina le sezioni sono chiuse**: tocca una scheda per aprirla. Si apre una sezione alla volta; toccando di nuovo la scheda aperta la chiudi.
 - **Animazione**: la scheda attiva è segnata da una **bolla di vetro liquido** con bordo argentato e alone viola. **A riposo** un riflesso **perlescente** (rosa, viola, azzurro) le gira continuamente intorno. **Quando cambi scheda** la bolla si comporta come una goccia: il bulbo davanti corre verso la nuova scheda schiacciandosi per la velocità, dietro resta una coda che si assottiglia con un collo sottile in mezzo, e qualche contorno sfumato fa da scia; all'arrivo fa un piccolo rimbalzo gelatinoso. È un filtro SVG "gooey" mosso da una simulazione a molle. Il contenuto entra scorrendo dal lato della nuova scheda e l'altezza della card si adatta con un'animazione.
-- Le schede e i titoli delle sezioni usano **icone a linea** (batteria, inverter, spina, ventola, grafico, videocamera) invece delle emoji.
+- Le schede e i titoli delle sezioni usano **icone a linea** (batteria, inverter, spina, colonnina, ventola, grafico, videocamera) invece delle emoji.
 - Se le schede non stanno in una riga (per esempio su telefono), la barra si scorre col dito.
 
 Nell'editor, in **🎨 Layout e intestazione**:
@@ -385,7 +457,7 @@ Il flag **📌** a destra decide come si presenta la sezione quando apri o ricar
 - **📌 spuntato**: la sezione si apre **sempre aperta** (bloccata aperta).
 - **📌 senza spunta**: puoi aprirla quando vuoi, ma a ogni ricaricamento della pagina la trovi **chiusa**.
 
-**Ordine, nome e icona delle sezioni**: in **🎨 Layout e intestazione** → **Sezioni sotto il disegno** sposti con **▲ ▼** le parti sotto il disegno dei flussi; sotto ogni riga puoi scrivere il **nome** da mostrare sulla scheda (e nel titolo delle sezioni impilate) e scegliere un'**icona** `mdi:` al posto di quella disegnata. Lasciando vuoti restano nome e icona predefiniti. Le parti sono: statistiche batteria (JK BMS), Inverter, Utilizzatori e grafico, Ventilazione, Statistiche, Videocamera. Le sezioni non attive non compaiono nella card ma tengono il loro posto nell'elenco.
+**Ordine, nome e icona delle sezioni**: in **🎨 Layout e intestazione** → **Sezioni sotto il disegno** sposti con **▲ ▼** le parti sotto il disegno dei flussi; sotto ogni riga puoi scrivere il **nome** da mostrare sulla scheda (e nel titolo delle sezioni impilate) e scegliere un'**icona** `mdi:` al posto di quella disegnata. Lasciando vuoti restano nome e icona predefiniti. Le parti sono: statistiche batteria (JK BMS), Inverter, Utilizzatori e grafico, Ricarica EV, Ventilazione, Statistiche, Videocamera. Le sezioni non attive non compaiono nella card ma tengono il loro posto nell'elenco.
 
 Di partenza tutte le sezioni hanno il flag spuntato, quindi la card si presenta come prima finché non togli la spunta. Il flag e la scelta delle ore del grafico vengono salvati **sul dispositivo** (nel browser o nell'app): sul telefono e sul computer puoi avere impostazioni diverse.
 
@@ -449,6 +521,18 @@ _show_ev: true
 charger_power: sensor.wallbox_power
 charger_soc: sensor.auto_livello_batteria
 charger_battery_capacity_wh: 43200
+
+# Ricarica EV (scheda dedicata, wallbox OCPP)
+_show_evc: true
+evc_car_name: BYD Dolphin Surf
+evc_charge_switch: switch.juicebox_charge_control
+evc_availability: switch.juicebox_availability
+evc_status: sensor.juicebox_status_connector
+evc_power: sensor.consumi_wallbox
+evc_pv_auto: input_boolean.wb_pv_auto
+evc_pause_enabled: input_boolean.wb_pause_enabled
+evc_share: input_number.wb_battery_share_pct
+evc_max_current: number.juicebox_maximum_current
 
 # Utilizzatori e grafico
 _show_consumers: true
@@ -518,7 +602,7 @@ Tutte le opzioni si impostano dall'editor visuale; qui trovi le chiavi YAML corr
 | `section_names` | `{}` | Nome personalizzato per scheda/sezione, es. `{inv: Il mio Deye, cons: Elettrodomestici}` |
 | `section_icons` | `{}` | Icona `mdi:` per scheda/sezione, es. `{cons: mdi:fridge}` |
 | `more_info` | `[]` | Entità che aprono la scheda di Home Assistant al tocco nella card (chiavi della configurazione, es. `[consump, battery_soc]`) |
-| `sections_order` | `[bms, inv, cons, vent, stats, cam]` | Ordine delle sezioni sotto il disegno (bms = statistiche batteria, inv = Inverter, cons = Utilizzatori, vent = Ventilazione, stats = Statistiche, cam = Videocamera) |
+| `sections_order` | `[bms, inv, cons, evc, vent, stats, cam]` | Ordine delle sezioni sotto il disegno (bms = statistiche batteria, inv = Inverter, cons = Utilizzatori, evc = Ricarica EV, vent = Ventilazione, stats = Statistiche, cam = Videocamera) |
 | `grid_icon_style` | `modern` | `modern` (traliccio luminoso) o `classic` (immagine) |
 | `home_icon_style` | `modern` | `modern` (casa a due falde) o `classic` (immagine) |
 | `sun` | `sun.sun` | Entità del sole |
@@ -638,6 +722,34 @@ Tutte le opzioni si impostano dall'editor visuale; qui trovi le chiavi YAML corr
 | `charger_eta` | Minuti alla carica completa (facoltativo) |
 | `charger_battery_capacity_wh` | Capacità della batteria dell'auto (Wh), per stimare il tempo |
 
+### Ricarica EV
+
+| Chiave | Predefinito | Descrizione |
+|---|---|---|
+| `_show_evc` | `false` | Mostra la scheda Ricarica EV |
+| `evc_car_name` | `''` | Nome dell'auto sotto lo stato |
+| `evc_charge_switch` | `''` | Interruttore che avvia/ferma la ricarica (un solo comando, tieni premuto + conferma) |
+| `evc_availability` | `''` | Disponibilità della wallbox: se è spenta il pulsante è disattivato |
+| `evc_status` | `''` | Stato del connettore OCPP (`Available`, `Preparing`, `Charging`, `SuspendedEV`, `SuspendedEVSE`, `Finishing`, `Faulted`…) |
+| `evc_confirm_timeout` | `60` | Secondi di attesa della conferma prima di sbloccare il pulsante |
+| `evc_power` | `''` | Potenza di ricarica (W o kW); se vuoto usa `charger_power` |
+| `evc_current` | `''` | Corrente di ricarica (A) |
+| `evc_voltage` | `''` | Tensione (V); se manca si usano 230 V per passare da A a W |
+| `evc_temp` | `''` | Temperatura della wallbox |
+| `evc_session_energy` | `''` | Energia della sessione (kWh o Wh) |
+| `evc_session_time` | `''` | Durata della sessione (s, min, h, d oppure `h:mm:ss`) |
+| `evc_soc` | `''` | SOC dell'auto (%); se vuoto usa `charger_soc` |
+| `evc_consumption` | `14` | Consumo medio dell'auto in kWh/100 km, per i km aggiunti |
+| `evc_pv_auto` | `''` | Carica intelligente FV (`input_boolean`/`switch`); quando è accesa blocca la corrente manuale |
+| `evc_pause_enabled` | `''` | Pausa sotto 6 A (`input_boolean`/`switch`) |
+| `evc_share` | `''` | Ripartizione del surplus auto/casa in % (`input_number`/`number`) |
+| `evc_max_current` | `''` | Corrente massima manuale (`number`/`input_number`), mostrata in A o W |
+| `evc_offered_current` | `''` | Corrente offerta dalla wallbox (A) |
+| `evc_phases` | `1` | Fasi dell'impianto (1 o 3), per il calcolo A → W |
+| `evc_error` | `''` | Codice di errore (nascosto se `NoError`) |
+| `evc_unlock` | `''` | Sblocca cavo (`button`, `script` o `switch`), con conferma |
+| `evc_reset` | `''` | Riavvio wallbox (`button`, `script` o `switch`), con conferma |
+
 ### Etichette
 
 | Chiave | Predefinito | Descrizione |
@@ -668,6 +780,7 @@ Nella sezione Etichette la scelta di un'entità alternativa si sblocca solo dopo
 | **Flusso batteria** | sempre blu; la direzione dei trattini indica carica o scarica |
 | **Statistiche** | FV1 arancione · FV2 blu · FV3 viola · FV4 verde · consumi verde → giallo → rosso · batteria blu carica / arancione scarica |
 | **Wallbox e auto** | azzurro in carica · verde carica completa · giallo collegata · grigio scollegata / in attesa |
+| **Ricarica EV (bolle e ⚡%)** | <20% rosso · <40% arancione · ≥40% verde; comando: verde AVVIA · arancione FERMA · grigio in attesa / non disponibile |
 
 ---
 
@@ -698,7 +811,7 @@ Misure su un telefono di fascia bassa simulato (processore 6 volte più lento, 2
 
 A ogni nuova versione viene creata automaticamente una **release** su GitHub e HACS ti propone l'aggiornamento in Home Assistant. Dopo l'aggiornamento ricarica il browser con `Ctrl + Shift + R`.
 
-Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.13.0**.
+Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.14.0**.
 
 ### Icona nella notifica di aggiornamento
 
@@ -750,6 +863,18 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 - Controlla il sensore **Potenza wallbox**: è l'unico necessario. Senza **Stato wallbox**, la card mostra "IN CARICA" solo quando la potenza supera 50 W, altrimenti "IN ATTESA".
 - Se hai configurato lo stato ma il valore non è tra quelli riconosciuti (vedi [Auto elettrica / Wallbox](#auto-elettrica--wallbox)), la card mostra "SCOLLEGATA": in quel caso lascia vuoto lo stato.
 
+**Ricarica EV: il pulsante resta su "ATTESA"**
+- È voluto: dopo il comando la card aspetta che **Comando ricarica** arrivi allo stato richiesto e ci resti 3 secondi, così non invia un secondo comando. Se la wallbox non risponde, dopo l'**attesa massima della conferma** (60 s di partenza) il pulsante si sblocca con un avviso. Controlla lo stato della wallbox prima di riprovare.
+
+**Ricarica EV: il pulsante è grigio e non si preme**
+- La **Disponibilità wallbox** è spenta o `unavailable`: la wallbox non è raggiungibile o non accetta comandi.
+
+**Ricarica EV: il cursore della corrente è bloccato 🔒**
+- La **Carica intelligente FV** è accesa e la corrente la regola l'automazione. Spegnila per impostare la corrente a mano.
+
+**Ricarica EV: "Ultime ricariche" è vuoto**
+- L'elenco nasce dallo storico del sensore di **Potenza di ricarica**: non deve essere escluso dal `recorder`. Con le statistiche a lungo termine (sensore con `state_class: measurement`) la card vede 7 giorni, altrimenti solo gli ultimi 2.
+
 **Toccando un valore non si apre nulla**
 - Spunta **📈 apri al tocco** accanto a quell'entità nell'editor. Sull'indicatore della rete e sul badge EMS il tocco deve essere breve: tenendo premuto si apre la commutazione / la scelta della modalità.
 
@@ -796,6 +921,13 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 ---
 
 ## Registro delle modifiche
+
+### v1.14.0
+- Nuova scheda **Ricarica EV** per wallbox OCPP (es. JuiceBox): stato del connettore in italiano, barra a bolle colorata dal SOC dell'auto, 8 riquadri (potenza, corrente, sessione, tempo al 100%, energia, km aggiunti, tensione, temperatura).
+- **Avvio / stop protetto**: tieni premuto 1 s + conferma, un solo comando alla wallbox e pulsante bloccato finché lo stato non è confermato e stabile (o fino all'attesa massima).
+- Carica intelligente FV, pausa sotto 6 A, ripartizione del surplus auto/casa, corrente massima in A o W (bloccata durante la carica intelligente).
+- Grafico della sessione in corso con il SOC e storico delle ricariche degli ultimi 7 giorni.
+- Sblocca cavo e riavvio wallbox con conferma; codice di errore mostrato solo se presente.
 
 ### v1.13.0
 - **Aiuto nell'editor**: un **?** accanto a ogni campo, interruttore e sezione apre la spiegazione di cosa inserire (tocco, oppure passaggio del mouse).
@@ -902,4 +1034,4 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 
 ---
 
-*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.13.0*
+*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.14.0*
