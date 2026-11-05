@@ -4096,16 +4096,19 @@ class FFlowCard extends HTMLElement {
       <polygon id="roofR" points="${quad(Rq)}" fill="#1b2230" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" style="transition:stroke .5s,fill .5s"/>
       ${cells(Lq, 'L')}${cells(Rq, 'R')}
     </g>
-    ${pv1Show ? `<text class="sm" id="pv1label" x="210" y="365" text-anchor="end" font-size="10.5" fill="#8b949e" letter-spacing="1">${this._pvName(1)}</text>
+    ${pv1Show ? `<rect class="fpanel" x="114" y="346" width="100" height="40" rx="8" fill="rgba(22,27,34,.55)" stroke="rgba(139,148,158,.28)" stroke-width="1"/>
+    <text class="sm" id="pv1label" x="164" y="359" text-anchor="middle" font-size="10.5" fill="#8b949e" letter-spacing="1">${this._pvName(1)}</text>
     ${this.config.pv1_voltage
-      ? '<text x="210" y="381" text-anchor="end" font-weight="700"><tspan id="pv1FlowVal" font-size="14.5" fill="#ffe83c">-- W</tspan><tspan id="pv1Volt" dx="5" font-size="10" font-weight="600" fill="#c9a227">-- V</tspan></text>'
-      : '<text id="pv1FlowVal" x="210" y="381" text-anchor="end" font-size="14.5" font-weight="700" fill="#ffe83c">-- W</text>'}` : ''}
-    ${pv2Show ? `<text class="sm" id="pv2label" x="310" y="365" font-size="10.5" fill="#8b949e" letter-spacing="1">${this._pvName(2)}</text>
+      ? '<text x="164" y="378" text-anchor="middle" font-weight="700"><tspan id="pv1FlowVal" font-size="14.5" fill="#ffe83c">-- W</tspan><tspan id="pv1Volt" dx="5" font-size="10" font-weight="600" fill="#c9a227">-- V</tspan></text>'
+      : '<text id="pv1FlowVal" x="164" y="378" text-anchor="middle" font-size="14.5" font-weight="700" fill="#ffe83c">-- W</text>'}` : ''}
+    ${pv2Show ? `<rect class="fpanel" x="306" y="346" width="100" height="40" rx="8" fill="rgba(22,27,34,.55)" stroke="rgba(139,148,158,.28)" stroke-width="1"/>
+    <text class="sm" id="pv2label" x="356" y="359" text-anchor="middle" font-size="10.5" fill="#8b949e" letter-spacing="1">${this._pvName(2)}</text>
     ${this.config.pv2_voltage
-      ? '<text x="310" y="381" font-weight="700"><tspan id="pv2FlowVal" font-size="14.5" fill="#ffe83c">-- W</tspan><tspan id="pv2Volt" dx="5" font-size="10" font-weight="600" fill="#c9a227">-- V</tspan></text>'
-      : '<text id="pv2FlowVal" x="310" y="381" font-size="14.5" font-weight="700" fill="#ffe83c">-- W</text>'}` : ''}
-    <text id="fcLoadVal" x="${cx}" y="497" text-anchor="middle" font-size="15.5" font-weight="700" fill="#F7F6D3">-- W</text>
-    ${this.config.load_voltage || this.config.load_frequency ? `<text class="sm" id="loadVF" x="${cx + 38}" y="491" font-size="9.5" font-weight="600" fill="#8b949e"><tspan id="loadV" x="${cx + 38}">-- V</tspan><tspan id="loadF" x="${cx + 38}" dy="11">-- Hz</tspan></text>` : ''}`;
+      ? '<text x="356" y="378" text-anchor="middle" font-weight="700"><tspan id="pv2FlowVal" font-size="14.5" fill="#ffe83c">-- W</tspan><tspan id="pv2Volt" dx="5" font-size="10" font-weight="600" fill="#c9a227">-- V</tspan></text>'
+      : '<text id="pv2FlowVal" x="356" y="378" text-anchor="middle" font-size="14.5" font-weight="700" fill="#ffe83c">-- W</text>'}` : ''}
+    ${(() => { const vf = this.config.load_voltage || this.config.load_frequency; return `<rect class="fpanel" x="${cx - 56}" y="483" width="112" height="${vf ? 33 : 22}" rx="8" fill="rgba(22,27,34,.55)" stroke="rgba(139,148,158,.28)" stroke-width="1"/>`; })()}
+    <text id="fcLoadVal" x="${cx}" y="499" text-anchor="middle" font-size="15.5" font-weight="700" fill="#F7F6D3">-- W</text>
+    ${this.config.load_voltage || this.config.load_frequency ? `<text class="lg" id="loadVF" x="${cx}" y="511" text-anchor="middle" font-size="9" font-weight="600" fill="#8b949e"><tspan id="loadV"></tspan><tspan id="loadSep">${this.config.load_voltage && this.config.load_frequency ? ' · ' : ''}</tspan><tspan id="loadF"></tspan></text>` : ''}`;
   }
 
   _buildStaticSVG() {
@@ -4152,9 +4155,10 @@ class FFlowCard extends HTMLElement {
       <text class="md" id="invLoadPctFlow" x="260" y="244" text-anchor="middle" font-size="14" font-weight="700" fill="#3ce878">--%</text>`;
 
     // Energy supply stacked bar (right side, between grid and EV/home row)
-    const supDy = (this.config.grid_voltage || this.config.grid_frequency) ? 9 : 0;
+    const supDy = 21;   // below the framed grid box
     const showSelf = this.config._show_self_stats !== false;
     const supplyBlock = showSupply ? `<g id="supplyGroup" transform="translate(0,${supDy})">
+      <rect class="fpanel" x="340" y="280" width="178" height="${showSelf ? 66 : 44}" rx="8" fill="rgba(22,27,34,.55)" stroke="rgba(139,148,158,.28)" stroke-width="1"/>
       <text class="sm" x="431" y="291" text-anchor="middle" font-size="10" fill="#8b949e" letter-spacing="1.2">FONTI ENERGIA</text>
       <text class="lg" x="364" y="305" text-anchor="middle" font-size="8.5" font-weight="700" fill="#f4d03f">SOLARE</text>
       <text class="lg" x="408" y="305" text-anchor="middle" font-size="8.5" font-weight="700" fill="#3fb950">CARICA</text>
@@ -4167,9 +4171,9 @@ class FFlowCard extends HTMLElement {
       <rect id="supGrid"  x="352" y="311" width="0" height="7" fill="#f85149"/>
       ${showSelf ? `<g id="selfGroup" style="display:none">
         <text id="selfSuff" x="391" y="334" text-anchor="middle" font-size="13" font-weight="800" fill="#3fb950">--</text>
-        <text class="lg" x="391" y="343" text-anchor="middle" font-size="8" font-weight="600" fill="#8b949e" letter-spacing=".5">AUTOSUFF.</text>
+        <text class="lg" x="391" y="342" text-anchor="middle" font-size="8" font-weight="600" fill="#8b949e" letter-spacing=".5">AUTOSUFF.</text>
         <text id="selfCons" x="471" y="334" text-anchor="middle" font-size="13" font-weight="800" fill="#f4d03f">--</text>
-        <text class="lg" x="471" y="343" text-anchor="middle" font-size="8" font-weight="600" fill="#8b949e" letter-spacing=".5">AUTOCONS.</text>
+        <text class="lg" x="471" y="342" text-anchor="middle" font-size="8" font-weight="600" fill="#8b949e" letter-spacing=".5">AUTOCONS.</text>
       </g>` : ''}
     </g>` : '';
 
@@ -4224,10 +4228,11 @@ class FFlowCard extends HTMLElement {
       </g>
       <rect x="427" y="482" width="80" height="3.5" rx="1.75" fill="#21262d"/>
       <rect id="evSocBar" x="427" y="482" width="0" height="3.5" rx="1.75" fill="currentColor"/>
-      <text id="evPowerVal" x="467" y="390" text-anchor="middle" font-size="16" font-weight="800" fill="currentColor">-- W</text>
-      <text class="sm" id="evStateVal" x="467" y="405" text-anchor="middle" font-size="10.5" font-weight="700" letter-spacing="1" fill="currentColor">--</text>
-      <text class="md" id="evSocVal" x="467" y="421" text-anchor="middle" font-size="12.5" font-weight="700" fill="#e6edf3">-- %</text>
-      <text class="sm" id="evEtaVal" x="467" y="434" text-anchor="middle" font-size="11" font-weight="600" fill="#c9d1d9"></text>
+      <rect class="fpanel" x="412" y="372" width="106" height="68" rx="8" fill="rgba(22,27,34,.55)" stroke="rgba(139,148,158,.28)" stroke-width="1"/>
+      <text id="evPowerVal" x="465" y="390" text-anchor="middle" font-size="16" font-weight="800" fill="currentColor">-- W</text>
+      <text class="sm" id="evStateVal" x="465" y="405" text-anchor="middle" font-size="10.5" font-weight="700" letter-spacing="1" fill="currentColor">--</text>
+      <text class="md" id="evSocVal" x="465" y="421" text-anchor="middle" font-size="12.5" font-weight="700" fill="#e6edf3">-- %</text>
+      <text class="lg" id="evEtaVal" x="465" y="434" text-anchor="middle" font-size="11" font-weight="600" fill="#c9d1d9"></text>
     </g>` : '';
 
     // Battery current/power placed OUTSIDE the transformed group, above/below the flow bar (center y=175)
@@ -4537,7 +4542,7 @@ class FFlowCard extends HTMLElement {
           <div class="ems-opts" id="emsOpts"></div>
           <div class="gbtns"><button id="emsNo">Annulla</button><button id="emsOk" class="ok">Applica</button></div>
         </div></div>` : ''}
-      <div style="width:100%;max-width:520px;margin:0 auto"><svg id="flowSvg" viewBox="-16 ${showEms ? -26 : 0} 536 ${showEms ? 534 : 508}" style="width:100%;display:block">
+      <div style="width:100%;max-width:520px;margin:0 auto"><svg id="flowSvg" viewBox="-16 ${showEms ? -26 : 0} 536 ${showEms ? 574 : 548}" style="width:100%;display:block">
       <defs>
         <filter id="arcSunF" x="-150%" y="-150%" width="400%" height="400%"><feGaussianBlur stdDeviation="7"/></filter>
         <filter id="arcSunF2" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="3"/></filter>
@@ -4604,14 +4609,14 @@ class FFlowCard extends HTMLElement {
 
       ${battGhostPath}
       <path d="M 399,175 C 350,175 375,202 315,202" fill="none" stroke="#1e3a5f" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>
-      <path d="M 260,265 V 358" fill="none" stroke="#1e3a5f" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+      <path d="M 260,265 V 388" fill="none" stroke="#1e3a5f" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
 
       <path id="flowGridIn" d="M 432,175 C 350,175 375,202 315,202" fill="none" stroke="#FF2929" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="12 6" filter="url(#flowGlow)" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="0" to="-24" dur="0.8s" repeatCount="indefinite"/></path>
       <path id="flowGridOut" d="M 432,175 C 350,175 375,202 315,202" fill="none" stroke="#2ecc71" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="12 6" filter="url(#flowGlow)" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="-24" to="0" dur="0.8s" repeatCount="indefinite"/></path>
 
       ${battFlowPaths}
 
-      <path id="flowInvLoad" d="M 260,358 V 265" fill="none" stroke="#29c4f6" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="12 6" filter="url(#flowGlow)" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="-24" to="0" dur="0.8s" repeatCount="indefinite"/></path>
+      <path id="flowInvLoad" d="M 260,388 V 265" fill="none" stroke="#29c4f6" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="12 6" filter="url(#flowGlow)" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="-24" to="0" dur="0.8s" repeatCount="indefinite"/></path>
 
       <!-- Battery current/power placed above/below flow bar -->
       ${showBatt1 ? (dual ? battTextDual : battTextSingle) : ''}
@@ -4641,8 +4646,9 @@ class FFlowCard extends HTMLElement {
           <path d="M84,59 Q102,68 119,63"><animate attributeName="stroke-dashoffset" from="0" to="-34" dur="1.2s" repeatCount="indefinite"/></path>
         </g>
       </g>`}
-      <text id="fcGridVal" x="445" y="271" text-anchor="middle" font-size="15" font-weight="700" fill="#e05c00">-- W</text>
-      ${this.config.grid_voltage || this.config.grid_frequency ? '<text class="sm" id="gridVF" x="445" y="284" text-anchor="middle" font-size="9.5" font-weight="600" fill="#8b949e">--</text>' : ''}
+      <rect class="fpanel" x="398" y="255" width="94" height="${this.config.grid_voltage || this.config.grid_frequency ? 36 : 24}" rx="8" fill="rgba(22,27,34,.55)" stroke="rgba(139,148,158,.28)" stroke-width="1"/>
+      <text id="fcGridVal" x="445" y="272" text-anchor="middle" font-size="15" font-weight="700" fill="#e05c00">-- W</text>
+      ${this.config.grid_voltage || this.config.grid_frequency ? '<text class="lg" id="gridVF" x="445" y="285" text-anchor="middle" font-size="9" font-weight="600" fill="#8b949e">--</text>' : ''}
       <text class="md" id="gridImportVal" x="393" y="164" text-anchor="middle" font-size="12" font-weight="600" fill="#cde">-- kWh</text>
       <text class="md" id="gridExportVal" x="393" y="194" text-anchor="middle" font-size="12" font-weight="600" fill="#cde" style="display:none">-- kWh</text>
 
@@ -4655,12 +4661,14 @@ class FFlowCard extends HTMLElement {
       ${battBadge}
       ${supplyBlock}
       ${backupBlock}
+      <g id="houseRow" transform="translate(0,30)">
       ${pv3txt}
       ${pv4txt}
 
       ${modernHome ? this._buildHouseSVG(pv1Show, pv2Show) : `<g id="homeIconImg" transform="translate(179,339)" style="opacity:1"><image href="${iconPath}/home-icon.png" x="0" y="0" width="160" height="160" preserveAspectRatio="xMidYMid meet"/></g>
       <text id="fcLoadVal" x="174" y="420" text-anchor="end" font-size="13" font-weight="700" fill="#F7F6D3">-- W</text>`}
       ${evtxt}
+      </g>
       </svg></div>`+
 
       `<div style="display:flex;gap:8px;align-items:center;margin-top:10px">
