@@ -1,5 +1,9 @@
-// f-flow-card.js – Unified Edition v1.15.2
-const FFC_VERSION = '1.15.2';
+// f-flow-card.js – Unified Edition v1.15.3
+const FFC_VERSION = '1.15.3';
+// Changes v1.15.3:
+//   FIX  – EMS mode badge moved from the sky to the header, right of the IN RETE pill (same hold-to-change).
+//   FIX  – PV production bubble next to the sun sized to its text, text centred in it.
+//   FIX  – Wallbox and car 14 px lower with a soft S-curve flow from the house; grid box centred on the pylon.
 // Changes v1.15.2:
 //   FIX  – Flow drawing tidied up: thin framed boxes group the grid (power + V/Hz), "Fonti energia"
 //           (title → autosuff./autocons.), each PV string, the house consumption (power + V/Hz, centred)
@@ -3895,9 +3899,7 @@ class FFlowCard extends HTMLElement {
     badge.addEventListener('pointerdown', start);
     ['pointerup', 'pointerleave', 'pointercancel'].forEach(e => badge.addEventListener(e, cancel));
     badge.addEventListener('contextmenu', e => e.preventDefault());
-    const t = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-    t.textContent = 'Tieni premuto per cambiare la modalità EMS';
-    badge.appendChild(t);
+    badge.title = 'Tieni premuto per cambiare la modalità EMS';
   }
   _openEms() {
     const root = this.shadowRoot;
@@ -4118,7 +4120,7 @@ class FFlowCard extends HTMLElement {
 
   _buildStaticSVG() {
     // the DOM is rebuilt: force the next update to redraw cached parts (sun wave, PV blocks)
-    this._prevPvTotal = -1; this._prevSunPos = { bx: -1, by: -1 }; this._prevPvBlocksTotal = -1;
+    this._prevPvTotal = -1; this._prevSunPos = { bx: -1, by: -1 }; this._prevPvBlocksTotal = -1; this._pvLblW = 0;
     const dual = !!(this.config._show_battery2);
     const showBatt1 = !!(this.config._show_battery !== false);
     const ev   = !!(this.config._show_ev);
@@ -4208,10 +4210,11 @@ class FFlowCard extends HTMLElement {
     const carBody = 'M2,34 Q2,24 12,22 L30,20 Q42,6 62,5 L80,5 Q94,6 104,18 L114,22 Q120,24 120,32 L120,38 Q120,40 117,40 L106,40 A11,11 0 0 0 84,40 L36,40 A11,11 0 0 0 14,40 L5,40 Q2,40 2,37 Z';
     // EV drawing: wallbox at x≈398–417, car at x≈420–514 (scaled), info right above the car
     const evtxt = ev ? `<g id="evGroup" style="color:#6e7681;transition:color .5s">
-      <path d="M 316,452 C 350,452 370,452 398,452" fill="none" stroke="#6e7681" stroke-width="1.5" stroke-linecap="round" opacity="0.55"/>
-      <path id="flowHomeEV" d="M 316,452 C 350,452 370,452 398,452" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="12 8" filter="url(#flowGlow)" opacity="0">
+      <path d="M 316,452 C 352,452 362,466 398,466" fill="none" stroke="#6e7681" stroke-width="1.5" stroke-linecap="round" opacity="0.55"/>
+      <path id="flowHomeEV" d="M 316,452 C 352,452 362,466 398,466" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="12 8" filter="url(#flowGlow)" opacity="0">
         <animate attributeName="stroke-dashoffset" from="20" to="0" dur="0.8s" repeatCount="indefinite"/>
       </path>
+      <g id="evDevices" transform="translate(0,14)">
       <g transform="translate(398,430) scale(.8)">
         <ellipse cx="12" cy="56" rx="13" ry="2.6" fill="currentColor" fill-opacity=".25"/>
         <rect x="10" y="34" width="4" height="22" rx="1" fill="currentColor" fill-opacity=".55"/>
@@ -4233,6 +4236,7 @@ class FFlowCard extends HTMLElement {
       </g>
       <rect x="427" y="482" width="80" height="3.5" rx="1.75" fill="#21262d"/>
       <rect id="evSocBar" x="427" y="482" width="0" height="3.5" rx="1.75" fill="currentColor"/>
+      </g>
       <rect class="fpanel" x="412" y="364" width="106" height="66" rx="8" fill="rgba(22,27,34,.55)" stroke="rgba(139,148,158,.28)" stroke-width="1"/>
       <text id="evPowerVal" x="465" y="382" text-anchor="middle" font-size="16" font-weight="800" fill="currentColor">-- W</text>
       <text class="sm" id="evStateVal" x="465" y="397" text-anchor="middle" font-size="10.5" font-weight="700" letter-spacing="1" fill="currentColor">--</text>
@@ -4473,8 +4477,9 @@ class FFlowCard extends HTMLElement {
       .eo{font:inherit;font-size:.82rem;font-weight:600;text-align:left;padding:9px 12px;border-radius:9px;border:1px solid #30363d;background:#0d1117;color:#c9d1d9;cursor:pointer}
       .eo small{font-size:.66rem;color:#8b949e;margin-left:6px;font-weight:500}
       .eo.on{border-color:#3fb950;background:rgba(63,185,80,.12);color:#e6edf3}
-      .emsb .emsh{transform-box:fill-box;transform-origin:left center;transform:scaleX(0);transition:transform .1s}
-      .emsb.holding .emsh{transform:scaleX(1);transition:transform .8s linear}
+      .hdr .pill.emsp{text-transform:none;letter-spacing:.3px;font-size:.66rem;cursor:pointer;white-space:nowrap;max-width:60%;overflow:hidden;text-overflow:ellipsis}
+      .hdr .pill.emsp .emsk{font-size:.56rem;letter-spacing:1px;color:#8b949e;font-weight:700}
+      .ct.hdr{flex-wrap:wrap;row-gap:5px}
       .gtitle{font-size:.74rem;letter-spacing:1.5px;text-transform:uppercase;color:#8b949e;margin:6px 0 4px}
       .gtext{font-size:.92rem;font-weight:600;color:#e6edf3;line-height:1.4}
       .gbtns{display:flex;gap:8px;margin-top:14px}
@@ -4541,13 +4546,14 @@ class FFlowCard extends HTMLElement {
       </div>` : ''}
       <div class="ct hdr">⚡ <span id="cardTitle">${cardTitle}</span>
         ${showGridStatus ? `<span id="gridStatusPill" class="pill"><span class="hold"></span><span class="dot"></span><span id="gridStatusText">--</span></span>` : ''}
+        ${showEms ? `<span id="emsBadge" class="pill emsp"><span class="hold"></span><span>☆ <b class="emsk">EMS</b> <span id="emsModeVal">--</span></span></span>` : ''}
         <span id="battStatusBadge" style="margin-left:auto;font-size:.64rem;font-weight:700;letter-spacing:1.5px;padding:1px 8px;border-radius:8px;background:#21262d;color:#8b949e;text-transform:uppercase">RIPOSO</span></div>
       ${showEms ? `<div class="gmodal" id="emsModal"><div class="gbox ems-box">
           <div class="gtitle">Modalità EMS</div>
           <div class="ems-opts" id="emsOpts"></div>
           <div class="gbtns"><button id="emsNo">Annulla</button><button id="emsOk" class="ok">Applica</button></div>
         </div></div>` : ''}
-      <div style="width:100%;max-width:520px;margin:0 auto"><svg id="flowSvg" viewBox="-16 ${showEms ? -26 : 0} 536 ${showEms ? 574 : 548}" style="width:100%;display:block">
+      <div style="width:100%;max-width:520px;margin:0 auto"><svg id="flowSvg" viewBox="-16 0 536 548" style="width:100%;display:block">
       <defs>
         <filter id="arcSunF" x="-150%" y="-150%" width="400%" height="400%"><feGaussianBlur stdDeviation="7"/></filter>
         <filter id="arcSunF2" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="3"/></filter>
@@ -4582,13 +4588,6 @@ class FFlowCard extends HTMLElement {
       </defs>
       <ellipse id="skyAura" cx="260" cy="84" rx="230" ry="110" fill="url(#dynAuraG)"/>
       ${this._buildSkySVG()}
-      ${showEms ? `<g id="emsBadge" class="emsb" style="cursor:pointer">
-        <rect id="emsRect" x="-12" y="-22" width="120" height="19" rx="9.5" fill="rgba(13,17,23,.75)" stroke="#3fb950" stroke-opacity=".55" stroke-width="1"/>
-        <rect id="emsHold" x="-12" y="-22" width="120" height="19" rx="9.5" fill="#3fb950" opacity=".25" class="emsh"/>
-        <text x="-3" y="-8.5" font-size="11" fill="#3fb950">☆</text>
-        <text id="emsLbl" x="10" y="-9" font-size="8.5" font-weight="700" letter-spacing="1" fill="#8b949e">EMS</text>
-        <text id="emsModeVal" x="34" y="-8.5" font-size="10.5" font-weight="700" fill="#3fb950">--</text>
-      </g>` : ''}
       <path d="M 35,78 Q 260,-45 485,78 Z" fill="rgba(30,100,200,.05)"/>
       <line x1="8" y1="78" x2="512" y2="78" stroke="rgba(255,255,255,.12)" stroke-width="1" stroke-dasharray="3,8"/>
       <circle cx="35" cy="78" r="3.5" fill="rgba(255,200,80,.7)"/>
@@ -4609,7 +4608,7 @@ class FFlowCard extends HTMLElement {
         <circle id="moonDot" cx="260" cy="72" r="6" fill="rgba(220,235,255,.92)" stroke="rgba(240,248,255,.9)" stroke-width="1.2"/>
       </g>
       <rect id="arcPvLabelRect" x="162" y="22" width="100" height="28" rx="14" fill="rgba(255,200,50,.22)" stroke="rgba(255,210,60,.5)" stroke-width="1.2"/>
-      <text id="arcPvLabelText" x="210" y="39" text-anchor="middle" fill="rgba(255,235,110,.98)" font-size="15" font-weight="800">0 W ⚡</text>
+      <text id="arcPvLabelText" x="210" y="36" text-anchor="middle" dominant-baseline="central" fill="rgba(255,235,110,.98)" font-size="15" font-weight="800">0 W ⚡</text>
       <g id="pvFlowGroup"></g>
 
       ${battGhostPath}
@@ -4651,9 +4650,9 @@ class FFlowCard extends HTMLElement {
           <path d="M84,59 Q102,68 119,63"><animate attributeName="stroke-dashoffset" from="0" to="-34" dur="1.2s" repeatCount="indefinite"/></path>
         </g>
       </g>`}
-      <rect class="fpanel" x="398" y="255" width="94" height="${this.config.grid_voltage || this.config.grid_frequency ? 36 : 24}" rx="8" fill="rgba(22,27,34,.55)" stroke="rgba(139,148,158,.28)" stroke-width="1"/>
-      <text id="fcGridVal" x="445" y="272" text-anchor="middle" font-size="15" font-weight="700" fill="#e05c00">-- W</text>
-      ${this.config.grid_voltage || this.config.grid_frequency ? '<text class="lg" id="gridVF" x="445" y="285" text-anchor="middle" font-size="9" font-weight="600" fill="#8b949e">--</text>' : ''}
+      <rect class="fpanel" x="413" y="255" width="94" height="${this.config.grid_voltage || this.config.grid_frequency ? 36 : 24}" rx="8" fill="rgba(22,27,34,.55)" stroke="rgba(139,148,158,.28)" stroke-width="1"/>
+      <text id="fcGridVal" x="460" y="272" text-anchor="middle" font-size="15" font-weight="700" fill="#e05c00">-- W</text>
+      ${this.config.grid_voltage || this.config.grid_frequency ? '<text class="lg" id="gridVF" x="460" y="285" text-anchor="middle" font-size="9" font-weight="600" fill="#8b949e">--</text>' : ''}
       <text class="md" id="gridImportVal" x="393" y="164" text-anchor="middle" font-size="12" font-weight="600" fill="#cde">-- kWh</text>
       <text class="md" id="gridExportVal" x="396" y="207" text-anchor="middle" font-size="12" font-weight="600" fill="#cde" style="display:none">-- kWh</text>
 
@@ -4830,8 +4829,18 @@ class FFlowCard extends HTMLElement {
     const pvTxt = (pvTotal >= 1000 ? (pvTotal / 1000).toFixed(2) + ' kW' : pvTotal.toFixed(0) + ' W') + ' ⚡';
     const pvLabelRect = getEl('arcPvLabelRect');
     const pvLabelText = getEl('arcPvLabelText');
-    if (pvLabelRect) { pvLabelRect.setAttribute('x', sun.t < 0.5 ? Math.max(4, sun.bx - 108) : Math.min(sun.bx + 14, 420)); pvLabelRect.setAttribute('y', Math.max(2, sun.by - 28)); }
-    if (pvLabelText) { pvLabelText.setAttribute('x', sun.t < 0.5 ? Math.max(52, sun.bx - 60) : Math.min(sun.bx + 62, 468)); pvLabelText.setAttribute('y', Math.max(19, sun.by - 11)); pvLabelText.textContent = pvTxt; }
+    // production bubble: sized to its text and the text centred inside it (both ways)
+    if (pvLabelRect && pvLabelText) {
+      if (pvLabelText.textContent !== pvTxt || !this._pvLblW) {
+        pvLabelText.textContent = pvTxt;
+        try { this._pvLblW = Math.max(60, pvLabelText.getComputedTextLength() + 26); } catch (e) { this._pvLblW = 100; }
+      }
+      const w = this._pvLblW, h = 28;
+      const cx = sun.t < 0.5 ? Math.max(4 + w / 2, sun.bx - 8 - w / 2) : Math.min(sun.bx + 14 + w / 2, 516 - w / 2);
+      const top = Math.max(2, sun.by - 28);
+      pvLabelRect.setAttribute('x', (cx - w / 2).toFixed(1)); pvLabelRect.setAttribute('y', top); pvLabelRect.setAttribute('width', w.toFixed(1));
+      pvLabelText.setAttribute('x', cx.toFixed(1)); pvLabelText.setAttribute('y', (top + h / 2).toFixed(1));
+    }
     setText('arcRiseLabel', sun.rise);
     setText('arcSetLabel', sun.set);
 
@@ -5080,9 +5089,6 @@ class FFlowCard extends HTMLElement {
       const st = this._hass.states[this.config.ems_mode_entity];
       const v = st && st.state !== 'unavailable' && st.state !== 'unknown' ? String(st.state) : '--';
       setText('emsModeVal', this._emsLabel(v));
-      // size the badge to its text
-      const t = getEl('emsModeVal'), r = getEl('emsRect'), h = getEl('emsHold');
-      try { const w = 46 + t.getComputedTextLength() + 10; if (r) r.setAttribute('width', w.toFixed(1)); if (h) h.setAttribute('width', w.toFixed(1)); } catch (e) { /* not rendered yet */ }
     }
 
     // ── v1.2.0: energy supply bar — share of current power by source/sink ──
