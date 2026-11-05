@@ -1,5 +1,10 @@
-// f-flow-card.js – Unified Edition v1.15.4
-const FFC_VERSION = '1.15.4';
+// f-flow-card.js – Unified Edition v1.16.0
+const FFC_VERSION = '1.16.0';
+// Changes v1.16.0:
+//   NEW  – battery_liquid (on by default): the modern home battery fills like a glass tube with a moving
+//           liquid (surface wave, light swirls, fine bubbles), livelier while charging; colour blends
+//           red → orange → green → cyan with the SOC. Canvas under the SVG shell, ~30 fps adaptive,
+//           stopped while hidden; the 10 segments stay in light mode or with the option off.
 // Changes v1.15.4:
 //   FIX  – "Fonti energia" bar: shares only the real sources (solar, battery discharge, grid import);
 //           CARICA is the part of them going into the battery, no longer added on top of the total.
@@ -890,6 +895,7 @@ class FFlowCardEditor extends HTMLElement {
       divider(),
       switchRow('grid_icon_classic', 'Icona rete classica', 'Usa la vecchia immagine del traliccio invece di quella luminosa'),
       switchRow('battery_style_classic', 'Batteria stile classico', 'Usa la vecchia icona della batteria invece di quella a segmenti'),
+      switchRow('battery_liquid', 'Batteria a liquido', 'La batteria si riempie come un tubo di vetro con il liquido che si muove (al posto delle 10 tacche)', true),
       switchRow('_show_battery_stats',   'Riquadri statistiche batteria', 'Temp. celle, temp. BMS, celle min/max, autonomia (JK BMS)', true),
     ]));
 
@@ -1380,6 +1386,7 @@ class FFlowCard extends HTMLElement {
       _show_battery_stats: true,
       _daily_tiles_extended: false,
       battery_style: 'modern',
+      battery_liquid: true,
       _show_consumers: false,
       consumers_title: 'Utilizzatori',
       consumers_meter_speed: 1,
@@ -1561,6 +1568,7 @@ class FFlowCard extends HTMLElement {
     this._paused = p;
     if (!p && this._evcB) setTimeout(() => this._evcKick(), 0);   // EV bubbles resume
     if (!p && this._heat) setTimeout(() => this._heatKick(), 0);  // roof heat shimmer resumes
+    if (!p && this._bl) setTimeout(() => this._battLiqKick(), 0); // battery liquid resumes
     const root = this.shadowRoot;
     root.querySelectorAll('svg').forEach(svg => { try { p ? svg.pauseAnimations() : svg.unpauseAnimations(); } catch (e) { /* not an outer svg */ } });
     try { (root.getAnimations ? root.getAnimations() : []).forEach(an => p ? an.pause() : an.play()); } catch (e) { /* older browser */ }
@@ -1823,6 +1831,7 @@ class FFlowCard extends HTMLElement {
       sections_order: 'Ordine delle sezioni sotto il disegno dei flussi, con ▲ ▼. Per ognuna puoi scrivere il nome che compare sulla scheda e scegliere un’icona mdi:. Se lasci vuoti, restano nome e icona predefiniti.',
       grid_icon_classic: 'Usa la vecchia immagine del traliccio invece di quello luminoso disegnato.',
       battery_style_classic: 'Usa la vecchia icona della batteria invece di quella a 10 segmenti.',
+      battery_liquid: 'Batteria come “liquido nel vetro”: il liquido sale fino al SOC, con onda in superficie, riflessi e bollicine; più vivace in carica (in proporzione alla potenza), lento in scarica, calmo a riposo. Il colore sfuma dal rosso all’azzurro con il SOC. Se spento, o in modalità leggera, restano le 10 tacche.',
       _show_battery_stats: 'Riquadri con temperatura celle, temperatura BMS, tensione cella min/max, scarica di oggi e autonomia. Sono pensati per un BMS JK: se non hai quei sensori, spegnili.',
       // Utilizzatori
       consumers_title: 'Titolo della sezione Utilizzatori (anche il nome della scheda si può cambiare in Layout → Ordine delle sezioni).',
@@ -4046,6 +4055,77 @@ class FFlowCard extends HTMLElement {
     this._heatRaf = requestAnimationFrame(step);
   }
 
+  // ── v1.16.0: home battery as "liquid in glass" (canvas under the SVG shell) ──────────────
+  // Liquid up to the SOC with a moving surface, light swirls and fine bubbles; livelier while
+  // charging (with the power), slow while discharging, calm at rest. ~30 fps, slower on weak
+  // devices, stopped while paused/hidden; not used in light mode (the 10 segments stay).
+  _battLiqKick() {
+    if (this._blRaf) return;
+    const P = [[0, [248, 81, 73]], [20, [248, 81, 73]], [40, [243, 156, 75]], [60, [63, 185, 80]], [80, [0, 200, 255]], [100, [0, 200, 255]]];
+    const col = (v) => { v = Math.max(0, Math.min(100, v)); for (let i = 1; i < P.length; i++) if (v <= P[i][0]) { const [a, ca] = P[i - 1], [b, cb] = P[i], t = (v - a) / (b - a || 1); return ca.map((x, k) => Math.round(x + (cb[k] - x) * t)); } return P[P.length - 1][1]; };
+    let last = 0;
+    const step = (now) => {
+      this._blRaf = null;
+      const cv = this.shadowRoot.getElementById('mbLiquid'), b = this._bl;
+      if (!cv || !b || !cv.isConnected || this._paused || document.hidden) return;
+      const cw = cv.clientWidth; if (!cw) return;
+      if (!b.gap) b.gap = 42;
+      if (now - last < b.gap - 4) { this._blRaf = requestAnimationFrame(step); return; }
+      const dt = last ? Math.min(0.1, (now - last) / 1000) : 0; last = now;
+      const W = 46, H = 107, dpr = Math.min(3, (cw / W) * (window.devicePixelRatio || 1));
+      if (b.cv !== cv || b.dpr !== dpr) {
+        b.cv = cv; b.dpr = dpr; b.gk = null; b.side = null; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); b.g = cv.getContext('2d');
+        if (!b.blobs) {
+          b.blobs = Array.from({ length: 9 }, () => ({ x: Math.random() * W, y: H * (0.3 + Math.random() * 0.7), r: 7 + Math.random() * 10, vx: (Math.random() - 0.5) * 5, vy: (Math.random() - 0.5) * 8, a: 0.08 + Math.random() * 0.12 }));
+          b.fizz = Array.from({ length: 34 }, () => ({ x: Math.random() * W, y: Math.random() * H, v: 8 + Math.random() * 18, r: 0.4 + Math.random() * 0.8, ph: Math.random() * 6.28 }));
+          const sp = document.createElement('canvas'), R = 32; sp.width = sp.height = R * 2;
+          const sg = sp.getContext('2d'), gr = sg.createRadialGradient(R, R, 0, R, R, R);
+          gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); sg.fillStyle = gr; sg.fillRect(0, 0, R * 2, R * 2); b.swirl = sp;
+        }
+      }
+      const c0t = performance.now();
+      if (b.fill == null) b.fill = 0;
+      b.fill += (b.soc - b.fill) * Math.min(1, dt * 2.5);
+      const g = b.g, t = now / 1000, lvl = H - H * b.fill / 100, c0 = col(b.fill), c1 = col(Math.max(0, b.fill - 12));
+      const live = b.pw > 50 ? 0.5 + Math.min(1, b.pw / 3000) : b.pw < -50 ? 0.25 : 0.12;
+      const surf = (x) => lvl + Math.sin(x * 0.22 + t * 2.2) * 1.3 * (0.5 + live) + Math.sin(x * 0.5 - t * 3.1) * 0.5;
+      g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+      if (b.fill > 0.3) {
+        g.save();
+        g.beginPath(); g.moveTo(0, H); for (let x = 0; x <= W; x += 2) g.lineTo(x, surf(x)); g.lineTo(W, H); g.closePath(); g.clip();
+        const gk = Math.round(b.fill * 2);
+        if (b.gk !== gk) {   // gradients rebuilt only when the level/colour changes
+          b.gk = gk;
+          b.body = g.createLinearGradient(0, lvl, 0, H); b.body.addColorStop(0, `rgba(${c0},.85)`); b.body.addColorStop(1, `rgba(${c1},.85)`);
+          if (!b.side) { b.side = g.createLinearGradient(0, 0, W, 0); b.side.addColorStop(0, 'rgba(0,0,0,.25)'); b.side.addColorStop(0.5, 'rgba(0,0,0,0)'); b.side.addColorStop(1, 'rgba(0,0,0,.3)'); }
+        }
+        g.fillStyle = b.body; g.fillRect(0, lvl - 4, W, H - lvl + 4);
+        g.globalCompositeOperation = 'lighter';
+        for (const o of b.blobs) {
+          o.x += o.vx * dt * (0.4 + live); o.y += o.vy * dt * (0.4 + live);
+          if (o.x < -8 || o.x > W + 8) o.vx = -o.vx; if (o.y < lvl - 6 || o.y > H + 6) o.vy = -o.vy;
+          g.globalAlpha = o.a; g.drawImage(b.swirl, o.x - o.r, o.y - o.r, o.r * 2, o.r * 2);
+        }
+        g.globalCompositeOperation = 'source-over'; g.fillStyle = '#fff';
+        for (const f of b.fizz) {
+          f.y -= f.v * dt * (0.3 + live * 1.6); f.x += Math.sin(t * 4 + f.ph) * 0.12;
+          if (f.y < lvl) { f.y = H; f.x = Math.random() * W; }
+          g.globalAlpha = 0.3 + 0.45 * (1 - (f.y - lvl) / Math.max(1, H - lvl)); g.fillRect(f.x - f.r, f.y - f.r, f.r * 2, f.r * 2);
+        }
+        g.globalAlpha = 1;
+        g.fillStyle = b.side; g.fillRect(0, 0, W, H);
+        g.restore();
+        g.beginPath(); for (let x = 0; x <= W; x += 2) { const y = surf(x); x ? g.lineTo(x, y) : g.moveTo(x, y); }
+        g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = 0.9; g.stroke();
+      }
+      // slow device: if a frame costs more than ~3 ms, draw less often (down to ~12 fps)
+      b.cost = (b.cost || 0) * 0.9 + (performance.now() - c0t) * 0.1;
+      if (b.cost > 3 && b.gap < 80) b.gap += 8; else if (b.cost < 1 && b.gap > 42) b.gap -= 4;
+      this._blRaf = requestAnimationFrame(step);
+    };
+    this._blRaf = requestAnimationFrame(step);
+  }
+
   _buildHouseSVG(pv1Show, pv2Show) {
     const cx = 260;
     const Lq = { a: [cx, 352], b: [184, 410], c: [197, 420], d: [cx, 373] };
@@ -4269,6 +4349,11 @@ class FFlowCard extends HTMLElement {
       <path id="flowBattIn"  d="M 59,175 C 140,175 120,205 205,205" fill="none" stroke="#8b949e" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="12 6" filter="url(#flowGlow)" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="-24" to="0"   dur="4.0s" repeatCount="indefinite"/></path>
       <path id="flowBattOut" d="M 59,175 C 140,175 120,205 205,205" fill="none" stroke="#8b949e" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="12 6" filter="url(#flowGlow)" opacity="0" style="display:none"><animate attributeName="stroke-dashoffset" from="0"   to="-24" dur="4.0s" repeatCount="indefinite"/></path>` : '';
     const modernBatt = showBatt1 && !dual && this.config.battery_style !== 'classic';
+    // v1.16.0 "liquid in glass" battery: drawn on an HTML canvas laid under the SVG (not a
+    // foreignObject: WebKit misplaces those in scaled SVGs); the shell gets a hole to show it.
+    const battLiquid = modernBatt && this.config.battery_liquid !== false && !this._lite();
+    const battLiquidHtml = battLiquid ? `<canvas id="mbLiquid" style="position:absolute;left:${(27 / 536 * 100).toFixed(3)}%;top:${(132 / 548 * 100).toFixed(3)}%;width:${(46 / 536 * 100).toFixed(3)}%;height:${(107 / 548 * 100).toFixed(3)}%;border-radius:21.7%/9.35%;background:#0b0f14;pointer-events:none"></canvas>` : '';
+    const rrp = (x, y, w, h, r) => `M${x + r},${y}H${x + w - r}A${r},${r} 0 0 1 ${x + w},${y + r}V${y + h - r}A${r},${r} 0 0 1 ${x + w - r},${y + h}H${x + r}A${r},${r} 0 0 1 ${x},${y + h - r}V${y + r}A${r},${r} 0 0 1 ${x + r},${y}Z`;
     let mbSegs = '';
     for (let i = 0; i < 10; i++) {
       const y = (236 - (i + 1) * 8.6 - i * 1.6).toFixed(1);
@@ -4277,9 +4362,10 @@ class FFlowCard extends HTMLElement {
     const battIconSection = !showBatt1 ? '' : modernBatt ? `
       <g id="battIconWrap">
         <rect x="24" y="123" width="20" height="8" rx="3" fill="url(#mbCapGrad)"/>
-        <rect x="8" y="129" width="52" height="113" rx="13" fill="url(#mbShellGrad)" stroke="#3a424d" stroke-width="1.5"/>
+        ${battLiquid ? `<path d="${rrp(8, 129, 52, 113, 13)} ${rrp(11, 132, 46, 107, 10)}" fill-rule="evenodd" fill="url(#mbShellGrad)" stroke="#3a424d" stroke-width="1.5"/>
+        <rect x="11" y="132" width="46" height="107" rx="10" fill="none" stroke="rgba(0,0,0,.35)" stroke-width="1"/>` : `<rect x="8" y="129" width="52" height="113" rx="13" fill="url(#mbShellGrad)" stroke="#3a424d" stroke-width="1.5"/>
         <rect x="11" y="132" width="46" height="107" rx="10" fill="#0b0f14"/>
-        ${mbSegs}
+        ${mbSegs}`}
         <g clip-path="url(#mbClip)">
           <rect id="mbSheenUp" x="11" y="240" width="46" height="26" fill="url(#mbSheenGrad)" opacity="0"><animate attributeName="y" from="240" to="106" dur="1.8s" repeatCount="indefinite"/></rect>
           <rect id="mbSheenDown" x="11" y="106" width="46" height="26" fill="url(#mbSheenGrad)" opacity="0"><animate attributeName="y" from="106" to="240" dur="1.8s" repeatCount="indefinite"/></rect>
@@ -4556,7 +4642,7 @@ class FFlowCard extends HTMLElement {
           <div class="ems-opts" id="emsOpts"></div>
           <div class="gbtns"><button id="emsNo">Annulla</button><button id="emsOk" class="ok">Applica</button></div>
         </div></div>` : ''}
-      <div style="width:100%;max-width:520px;margin:0 auto"><svg id="flowSvg" viewBox="-16 0 536 548" style="width:100%;display:block">
+      <div style="width:100%;max-width:520px;margin:0 auto;position:relative">${battLiquidHtml}<svg id="flowSvg" viewBox="-16 0 536 548" style="width:100%;display:block;position:relative">
       <defs>
         <filter id="arcSunF" x="-150%" y="-150%" width="400%" height="400%"><feGaussianBlur stdDeviation="7"/></filter>
         <filter id="arcSunF2" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="3"/></filter>
@@ -4977,7 +5063,14 @@ class FFlowCard extends HTMLElement {
       setText('battPwrFlow', absPwr1.toFixed(0) + ' W');
       setText('battCurrFlow', battCurr1.toFixed(1) + ' A');
       const bolt = getEl('battBoltGroup'); if (bolt) bolt.setAttribute('opacity', battPwr1 > 10 ? '1' : '0');
-      if (getEl('mbSeg0')) {
+      if (getEl('mbLiquid')) {
+        setAttr('fcBattVal', 'fill', '#fff');
+        this._bl = { ...(this._bl || { fill: null }), soc: Math.max(0, Math.min(100, battSoc1)), pw: battPwr1 };
+        this._battLiqKick();
+        // the light sheen still runs up while charging and down while discharging, over the liquid
+        setAttr('mbSheenUp', 'opacity', battPwr1 >= 50 ? '1' : '0');
+        setAttr('mbSheenDown', 'opacity', battPwr1 <= -50 ? '1' : '0');
+      } else if (getEl('mbSeg0')) {
         const soc = Math.max(0, Math.min(100, battSoc1));
         const col = soc <= 20 ? '#f85149' : soc <= 40 ? '#f39c4b' : soc <= 75 ? '#3fb950' : '#00c8ff';
         for (let i = 0; i < 10; i++) {
