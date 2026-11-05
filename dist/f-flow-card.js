@@ -4158,7 +4158,7 @@ class FFlowCard extends HTMLElement {
     const supDy = 21;   // below the framed grid box
     const showSelf = this.config._show_self_stats !== false;
     const supplyBlock = showSupply ? `<g id="supplyGroup" transform="translate(0,${supDy})">
-      <rect class="fpanel" x="340" y="280" width="178" height="${showSelf ? 66 : 44}" rx="8" fill="rgba(22,27,34,.55)" stroke="rgba(139,148,158,.28)" stroke-width="1"/>
+      <rect class="fpanel" x="340" y="280" width="178" height="${showSelf ? 70 : 44}" rx="8" fill="rgba(22,27,34,.55)" stroke="rgba(139,148,158,.28)" stroke-width="1"/>
       <text class="sm" x="431" y="291" text-anchor="middle" font-size="10" fill="#8b949e" letter-spacing="1.2">FONTI ENERGIA</text>
       <text class="lg" x="364" y="305" text-anchor="middle" font-size="8.5" font-weight="700" fill="#f4d03f">SOLARE</text>
       <text class="lg" x="408" y="305" text-anchor="middle" font-size="8.5" font-weight="700" fill="#3fb950">CARICA</text>
@@ -4171,9 +4171,9 @@ class FFlowCard extends HTMLElement {
       <rect id="supGrid"  x="352" y="311" width="0" height="7" fill="#f85149"/>
       ${showSelf ? `<g id="selfGroup" style="display:none">
         <text id="selfSuff" x="391" y="334" text-anchor="middle" font-size="13" font-weight="800" fill="#3fb950">--</text>
-        <text class="lg" x="391" y="342" text-anchor="middle" font-size="8" font-weight="600" fill="#8b949e" letter-spacing=".5">AUTOSUFF.</text>
+        <text class="lg" x="391" y="346" text-anchor="middle" font-size="8" font-weight="600" fill="#8b949e" letter-spacing=".5">AUTOSUFF.</text>
         <text id="selfCons" x="471" y="334" text-anchor="middle" font-size="13" font-weight="800" fill="#f4d03f">--</text>
-        <text class="lg" x="471" y="342" text-anchor="middle" font-size="8" font-weight="600" fill="#8b949e" letter-spacing=".5">AUTOCONS.</text>
+        <text class="lg" x="471" y="346" text-anchor="middle" font-size="8" font-weight="600" fill="#8b949e" letter-spacing=".5">AUTOCONS.</text>
       </g>` : ''}
     </g>` : '';
 
@@ -4228,11 +4228,11 @@ class FFlowCard extends HTMLElement {
       </g>
       <rect x="427" y="482" width="80" height="3.5" rx="1.75" fill="#21262d"/>
       <rect id="evSocBar" x="427" y="482" width="0" height="3.5" rx="1.75" fill="currentColor"/>
-      <rect class="fpanel" x="412" y="372" width="106" height="68" rx="8" fill="rgba(22,27,34,.55)" stroke="rgba(139,148,158,.28)" stroke-width="1"/>
-      <text id="evPowerVal" x="465" y="390" text-anchor="middle" font-size="16" font-weight="800" fill="currentColor">-- W</text>
-      <text class="sm" id="evStateVal" x="465" y="405" text-anchor="middle" font-size="10.5" font-weight="700" letter-spacing="1" fill="currentColor">--</text>
-      <text class="md" id="evSocVal" x="465" y="421" text-anchor="middle" font-size="12.5" font-weight="700" fill="#e6edf3">-- %</text>
-      <text class="lg" id="evEtaVal" x="465" y="434" text-anchor="middle" font-size="11" font-weight="600" fill="#c9d1d9"></text>
+      <rect class="fpanel" x="412" y="364" width="106" height="66" rx="8" fill="rgba(22,27,34,.55)" stroke="rgba(139,148,158,.28)" stroke-width="1"/>
+      <text id="evPowerVal" x="465" y="382" text-anchor="middle" font-size="16" font-weight="800" fill="currentColor">-- W</text>
+      <text class="sm" id="evStateVal" x="465" y="397" text-anchor="middle" font-size="10.5" font-weight="700" letter-spacing="1" fill="currentColor">--</text>
+      <text class="md" id="evSocVal" x="465" y="413" text-anchor="middle" font-size="12.5" font-weight="700" fill="#e6edf3">-- %</text>
+      <text class="lg" id="evEtaVal" x="465" y="425" text-anchor="middle" font-size="11" font-weight="600" fill="#c9d1d9"></text>
     </g>` : '';
 
     // Battery current/power placed OUTSIDE the transformed group, above/below the flow bar (center y=175)
