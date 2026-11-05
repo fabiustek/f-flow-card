@@ -1,4 +1,4 @@
-<img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/brand/icon-256.png" alt="Icona F-Flow Card" width="96" align="right">
+<img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/brand/icon-256.png?v=1.15.2" alt="Icona F-Flow Card" width="96" align="right">
 
 # F-Flow Card
 
@@ -10,7 +10,7 @@
 Versione attuale: **v1.15.2** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/card-overview.png" alt="F-Flow Card con tutte le sezioni attive" width="480">
+  <img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/card-overview.png?v=1.15.2" alt="F-Flow Card con il disegno dei flussi e il menu a schede" width="480">
 </p>
 
 > Le immagini di questa pagina sono generate dalla card vera con dati di esempio (`tools/screenshots/`) e vengono aggiornate a ogni versione.
@@ -119,7 +119,7 @@ Tutte le funzioni aggiuntive sono facoltative: se non le attivi, non compaiono.
 
 ### Aiuto nell'editor
 
-<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/editor-help.png" alt="Editor con le spiegazioni aperte e le caselle apri al tocco" width="460"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/editor-help.png?v=1.15.2" alt="Editor con le spiegazioni aperte e le caselle apri al tocco" width="460"></p>
 
 Accanto al nome di ogni campo, interruttore e sezione dell'editor c'è un **?**:
 - **toccalo** (anche da telefono o tablet) per aprire sotto il campo la spiegazione di cosa inserire, con esempi; toccalo di nuovo per chiuderla;
@@ -139,7 +139,7 @@ Sull'indicatore della rete e sul badge EMS il **tocco breve** apre la scheda, me
 
 ### Flussi di energia
 
-<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/flow.png" alt="Area dei flussi di energia" width="480"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/flow.png?v=1.15.2" alt="Area dei flussi di energia" width="480"></p>
 
 - **In alto**: titolo e indicatore **IN RETE / FUORI RETE**. La **modalità EMS** (se configurata) è un piccolo badge nel cielo, in alto a sinistra sopra l'arco del sole.
 - **Arco del sole**: alba, mezzogiorno e tramonto di oggi; l'etichetta gialla mostra la produzione fotovoltaica totale.
@@ -172,7 +172,7 @@ Esempio: SOC 45%, soglia 20%, batteria da 16 kWh, scarica a 1533 W → 25% di 16
 
 ### Tensioni, frequenza, autosufficienza e autoconsumo
 
-<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/flow.png" alt="Tensioni delle stringhe, tensione e frequenza di casa e rete, autosufficienza e autoconsumo" width="480"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/flow.png?v=1.15.2" alt="Tensioni delle stringhe, tensione e frequenza di casa e rete, autosufficienza e autoconsumo" width="480"></p>
 
 Tutti facoltativi: se non configuri un'entità, quella scritta non compare.
 
@@ -215,7 +215,7 @@ Se nel tuo impianto le stringhe sono al contrario, basta scambiare i sensori FV1
 
 ### Commutazione IN RETE / FUORI RETE
 
-<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/grid-switch.png" alt="Richiesta di conferma per passare fuori rete" width="480"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/grid-switch.png?v=1.15.2" alt="Richiesta di conferma per passare fuori rete" width="480"></p>
 
 Se l'impianto può staccarsi e riattaccarsi alla rete (per esempio con un modulo di sgancio e riaggancio), puoi comandarlo dalla card.
 
@@ -242,7 +242,7 @@ Sotto i flussi ci sono i totali di oggi. Con **6 riquadri giornalieri** attivo (
 
 ### Utilizzatori
 
-<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/consumers-chart.png" alt="Utilizzatori e grafico dei consumi" width="480"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/consumers-chart.png?v=1.15.2" alt="Utilizzatori e grafico dei consumi" width="480"></p>
 
 Un riquadro per ogni elettrodomestico, quanti ne vuoi.
 
@@ -257,7 +257,7 @@ Nella card:
 
 ### Grafico dei consumi
 
-<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/chart-tooltip.png" alt="Dettaglio del grafico dei consumi" width="480"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/chart-tooltip.png?v=1.15.2" alt="Dettaglio del grafico dei consumi" width="480"></p>
 
 Sotto gli utilizzatori c'è il grafico dei consumi. Ogni utilizzatore è un'**area del suo colore**, impilata sulle altre: si vede subito **cosa ha consumato e quando**.
 
@@ -274,7 +274,7 @@ Sotto gli utilizzatori c'è il grafico dei consumi. Ogni utilizzatore è un'**ar
 
 ### Ventilazione inverter
 
-<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/ventilation.png" alt="Sezione ventilazione inverter" width="480"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/ventilation.png?v=1.15.2" alt="Sezione ventilazione inverter" width="480"></p>
 
 Per chi ha una ventilazione ausiliaria dell'inverter. Sezione **🌀 Ventilazione inverter** → **＋ Attiva**. Tutti i sensori sono facoltativi.
 
@@ -305,7 +305,7 @@ Se lo stato ha un valore diverso, la card lo mostra così com'è.
 
 ### Statistiche
 
-<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/statistics.png" alt="Sezione statistiche: produzione FV, consumi casa, batteria" width="480"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/statistics.png?v=1.15.2" alt="Sezione statistiche: produzione FV, consumi casa, batteria" width="480"></p>
 
 Sezione **📈 Statistiche** → **＋ Attiva**. Ci sono tre grafici, ognuno attivabile o disattivabile; i dati arrivano dallo storico di Home Assistant e si aggiornano ogni 5 minuti. Toccando un grafico (o passandoci sopra col mouse) compare il dettaglio di quell'orario. Come le altre sezioni, si può chiudere e ha il flag 📌.
 
@@ -328,7 +328,7 @@ Sezione **📈 Statistiche** → **＋ Attiva**. Ci sono tre grafici, ognuno att
 
 ### Videocamera
 
-<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/camera.png" alt="Sezione videocamera con le frecce di movimento" width="480"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/camera.png?v=1.15.2" alt="Sezione videocamera con le frecce di movimento" width="480"></p>
 
 Sezione **📹 Videocamera** → **＋ Attiva**:
 1. **Videocamera**: scegli la tua entità `camera.*`. Il video in diretta usa il lettore di Home Assistant (lo stesso delle card ufficiali: HLS, WebRTC o MJPEG, in base a cosa supporta la videocamera).
@@ -350,7 +350,7 @@ Nella card le frecce compaiono sopra il video, in basso a destra. **Un tocco** m
 
 ### Cielo di notte e meteo
 
-<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/sky-night.png" alt="Cielo stellato di notte" width="480"><br><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/sky-storm.png" alt="Temporale con pioggia e nuvole" width="480"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/sky-night.png?v=1.15.2" alt="Cielo stellato di notte" width="480"><br><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/sky-storm.png?v=1.15.2" alt="Temporale con pioggia e nuvole" width="480"></p>
 
 - **Di notte** (dal tramonto all'alba, da `sun.sun`) il cielo si riempie di **stelle** che brillano, con una **stella cadente** ogni tanto. Non serve configurare nulla.
 - **Meteo**: in **🎨 Layout e intestazione** scegli la tua entità **Meteo** (`weather.*`, per esempio quella di Met.no o di OpenWeatherMap). Il cielo si anima in base alle condizioni:
@@ -368,13 +368,13 @@ Nella card le frecce compaiono sopra il video, in basso a destra. **Un tocco** m
 
 ### Statistiche batteria (JK BMS)
 
-<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/card-bms.png" alt="Card con le statistiche della batteria JK BMS" width="480"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/card-bms.png?v=1.15.2" alt="Card con le statistiche della batteria JK BMS" width="480"></p>
 
 Con **Riquadri statistiche batteria** attivo (predefinito) compaiono: temperatura celle min/max, temperatura BMS, produzione FV totale, tensione cella minima e massima, scarica di oggi e il riquadro **autonomia** con l'orario stimato ("Fino a lun 21:45"). Le etichette si possono rinominare nella sezione **🏷️ Etichette**, che permette anche di mostrare un'altra entità al posto di quella predefinita.
 
 ### Auto elettrica / Wallbox
 
-<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/wallbox.png" alt="Wallbox e auto in carica" width="480"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/wallbox.png?v=1.15.2" alt="Wallbox e auto in carica" width="480"></p>
 
 A destra della casa, staccate dalle stringhe FV2/FV4, compaiono la **colonnina** e l'**auto**. Tra casa e colonnina c'è sempre una linea grigia; quando l'auto si carica diventa un flusso azzurro e il cavo si anima. Sopra l'auto ci sono la potenza di ricarica, lo stato, il SOC dell'auto (anche come barra sotto l'auto), la corrente e il tempo alla carica completa.
 
@@ -397,7 +397,7 @@ Stati riconosciuti (non importano maiuscole e minuscole):
 
 ### Ricarica EV
 
-<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/ev-charging.png" alt="Scheda Ricarica EV con barra a bolle, comando protetto, modalità, corrente, sessione e storico" width="480"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/ev-charging.png?v=1.15.2" alt="Scheda Ricarica EV con barra a bolle, comando protetto, modalità, corrente, sessione e storico" width="480"></p>
 
 Una scheda dedicata alla **ricarica dell'auto** con una wallbox **OCPP** (pensata per JuiceBox con l'integrazione OCPP, funziona con qualsiasi wallbox che esponga entità simili). Dall'alto in basso:
 
@@ -412,7 +412,7 @@ Una scheda dedicata alla **ricarica dell'auto** con una wallbox **OCPP** (pensat
 
 #### Comando protetto: un solo comando alla wallbox
 
-<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/ev-confirm.png" alt="Conferma prima di fermare la ricarica" width="420"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/ev-confirm.png?v=1.15.2" alt="Conferma prima di fermare la ricarica" width="420"></p>
 
 Alcune wallbox si bloccano se ricevono più comandi di fila. Per questo il pulsante **AVVIA / FERMA** funziona così:
 1. Il **tocco breve non fa nulla**: bisogna **tenere premuto 1 secondo** (un anello si riempie intorno al pulsante).
@@ -467,7 +467,7 @@ evc_consumption: 14
 
 ### Menu a schede
 
-<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/tabs.png" alt="Menu a schede con la sezione Inverter aperta" width="480"><br><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/tabs-goo.png" alt="La goccia luminosa mentre passa da una scheda all'altra" width="480"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/tabs.png?v=1.15.2" alt="Menu a schede con la sezione Inverter aperta" width="480"><br><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/tabs-goo.png?v=1.15.2" alt="La goccia luminosa mentre passa da una scheda all'altra" width="480"></p>
 
 Sotto il disegno dei flussi c'è una **barra di schede**, una per ogni sezione attiva: Batteria, Inverter, Utilizzatori, Ricarica EV, Ventilazione, Statistiche, Video (nell'ordine scelto in **Ordine delle sezioni**).
 
@@ -484,7 +484,7 @@ Nell'editor, in **🎨 Layout e intestazione**:
 
 Con **Sezioni impilate (vecchio stile)** attivo:
 
-<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/sections-closed.png" alt="Sezioni chiuse con riepilogo e flag per tenerle aperte" width="480"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/sections-closed.png?v=1.15.2" alt="Sezioni chiuse con riepilogo e flag per tenerle aperte" width="480"></p>
 
 Le sezioni **Inverter** (riquadri giornalieri), **Utilizzatori** e **Ventilazione inverter** si aprono e si chiudono toccando il titolo. Da chiuse occupano una sola riga, con un riepilogo:
 - **Inverter**: produzione FV e consumo di oggi.
@@ -501,7 +501,7 @@ Di partenza tutte le sezioni hanno il flag spuntato, quindi la card si presenta 
 
 ### Da telefono
 
-<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/phone.png" alt="La card in una colonna stretta, come da telefono" width="340"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/phone.png?v=1.15.2" alt="La card in una colonna stretta, come da telefono" width="340"></p>
 
 La card si adatta alla **propria larghezza**, non a quella dello schermo: se è stretta (sotto 440 px, come su un telefono o in una colonna stretta della plancia), i 6 riquadri giornalieri vanno su 3 colonne e le etichette del disegno (orari, autonomia, FV1/FV2, wallbox…) diventano più grandi.
 

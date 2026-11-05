@@ -42,8 +42,10 @@ const MDI = JSON.parse(fs.readFileSync(path.join(__dirname, 'icons.json'), 'utf8
     console.log('✓', file);
   };
 
-  await open('overview');
+  // README hero: the card as most people see it (tab menu, Inverter open), not every section stacked
+  await open('tabs');
   await shot('card-overview.png');
+  await open('overview');
   await shot('flow.png', '.hdr', '#pvBlocks');
   await shot('consumers-chart.png', '.cons', '.cch');
 
