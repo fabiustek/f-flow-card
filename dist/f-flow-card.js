@@ -1,5 +1,8 @@
-// f-flow-card.js – Unified Edition v1.15.3
-const FFC_VERSION = '1.15.3';
+// f-flow-card.js – Unified Edition v1.15.4
+const FFC_VERSION = '1.15.4';
+// Changes v1.15.4:
+//   FIX  – "Fonti energia" bar: shares only the real sources (solar, battery discharge, grid import);
+//           CARICA is the part of them going into the battery, no longer added on top of the total.
 // Changes v1.15.3:
 //   FIX  – EMS mode badge moved from the sky to the header, right of the IN RETE pill (same hold-to-change).
 //   FIX  – PV production bubble next to the sun sized to its text, text centred in it.
@@ -5098,9 +5101,15 @@ class FFlowCard extends HTMLElement {
       const sChg = bSum > 10 ? bSum : 0;
       const sDis = bSum < -10 ? -bSum : 0;
       const sGrid = gridActive > 10 ? gridActive : 0;
-      const tot = sSolar + sChg + sDis + sGrid;
+      // v1.15.4: the bar shares out the real SOURCES only (solar + battery discharge + grid import).
+      // Battery charging is not a source: it is the part of those sources going into the battery,
+      // taken from solar first and then from the grid (it used to be added on top, so 2.3 kW of sun
+      // with 1.9 kW of charge showed as ~55 % solar / 45 % charge).
+      const tot = sSolar + sDis + sGrid;
+      const chgSolar = Math.min(sChg, sSolar), chgGrid = Math.min(Math.max(0, sChg - sSolar), sGrid);
+      const segSolar = sSolar - chgSolar, segChg = chgSolar + chgGrid, segGrid = sGrid - chgGrid;
       let x = 352; const W = 158;
-      [['supSolar', sSolar], ['supChg', sChg], ['supDis', sDis], ['supGrid', sGrid]].forEach(([id, v]) => {
+      [['supSolar', segSolar], ['supChg', segChg], ['supDis', sDis], ['supGrid', segGrid]].forEach(([id, v]) => {
         const w = tot > 0 ? (v / tot) * W : 0;
         setAttr(id, 'x', x.toFixed(1)); setAttr(id, 'width', w.toFixed(1)); x += w;
       });
