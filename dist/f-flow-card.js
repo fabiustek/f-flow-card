@@ -2,6 +2,7 @@
 const FFC_VERSION = '1.15.3';
 // Changes v1.15.3:
 //   FIX  – EMS mode badge moved from the sky to the header, right of the IN RETE pill (same hold-to-change).
+//   FIX  – PV production bubble next to the sun sized to its text, text centred in it.
 //   FIX  – Wallbox and car 14 px lower with a soft S-curve flow from the house; grid box centred on the pylon.
 // Changes v1.15.2:
 //   FIX  – Flow drawing tidied up: thin framed boxes group the grid (power + V/Hz), "Fonti energia"
@@ -4119,7 +4120,7 @@ class FFlowCard extends HTMLElement {
 
   _buildStaticSVG() {
     // the DOM is rebuilt: force the next update to redraw cached parts (sun wave, PV blocks)
-    this._prevPvTotal = -1; this._prevSunPos = { bx: -1, by: -1 }; this._prevPvBlocksTotal = -1;
+    this._prevPvTotal = -1; this._prevSunPos = { bx: -1, by: -1 }; this._prevPvBlocksTotal = -1; this._pvLblW = 0;
     const dual = !!(this.config._show_battery2);
     const showBatt1 = !!(this.config._show_battery !== false);
     const ev   = !!(this.config._show_ev);
@@ -4607,7 +4608,7 @@ class FFlowCard extends HTMLElement {
         <circle id="moonDot" cx="260" cy="72" r="6" fill="rgba(220,235,255,.92)" stroke="rgba(240,248,255,.9)" stroke-width="1.2"/>
       </g>
       <rect id="arcPvLabelRect" x="162" y="22" width="100" height="28" rx="14" fill="rgba(255,200,50,.22)" stroke="rgba(255,210,60,.5)" stroke-width="1.2"/>
-      <text id="arcPvLabelText" x="210" y="39" text-anchor="middle" fill="rgba(255,235,110,.98)" font-size="15" font-weight="800">0 W ⚡</text>
+      <text id="arcPvLabelText" x="210" y="36" text-anchor="middle" dominant-baseline="central" fill="rgba(255,235,110,.98)" font-size="15" font-weight="800">0 W ⚡</text>
       <g id="pvFlowGroup"></g>
 
       ${battGhostPath}
@@ -4828,8 +4829,18 @@ class FFlowCard extends HTMLElement {
     const pvTxt = (pvTotal >= 1000 ? (pvTotal / 1000).toFixed(2) + ' kW' : pvTotal.toFixed(0) + ' W') + ' ⚡';
     const pvLabelRect = getEl('arcPvLabelRect');
     const pvLabelText = getEl('arcPvLabelText');
-    if (pvLabelRect) { pvLabelRect.setAttribute('x', sun.t < 0.5 ? Math.max(4, sun.bx - 108) : Math.min(sun.bx + 14, 420)); pvLabelRect.setAttribute('y', Math.max(2, sun.by - 28)); }
-    if (pvLabelText) { pvLabelText.setAttribute('x', sun.t < 0.5 ? Math.max(52, sun.bx - 60) : Math.min(sun.bx + 62, 468)); pvLabelText.setAttribute('y', Math.max(19, sun.by - 11)); pvLabelText.textContent = pvTxt; }
+    // production bubble: sized to its text and the text centred inside it (both ways)
+    if (pvLabelRect && pvLabelText) {
+      if (pvLabelText.textContent !== pvTxt || !this._pvLblW) {
+        pvLabelText.textContent = pvTxt;
+        try { this._pvLblW = Math.max(60, pvLabelText.getComputedTextLength() + 26); } catch (e) { this._pvLblW = 100; }
+      }
+      const w = this._pvLblW, h = 28;
+      const cx = sun.t < 0.5 ? Math.max(4 + w / 2, sun.bx - 8 - w / 2) : Math.min(sun.bx + 14 + w / 2, 516 - w / 2);
+      const top = Math.max(2, sun.by - 28);
+      pvLabelRect.setAttribute('x', (cx - w / 2).toFixed(1)); pvLabelRect.setAttribute('y', top); pvLabelRect.setAttribute('width', w.toFixed(1));
+      pvLabelText.setAttribute('x', cx.toFixed(1)); pvLabelText.setAttribute('y', (top + h / 2).toFixed(1));
+    }
     setText('arcRiseLabel', sun.rise);
     setText('arcSetLabel', sun.set);
 
