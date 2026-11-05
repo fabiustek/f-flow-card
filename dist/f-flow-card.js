@@ -4650,7 +4650,7 @@ class FFlowCard extends HTMLElement {
       <text id="fcGridVal" x="445" y="272" text-anchor="middle" font-size="15" font-weight="700" fill="#e05c00">-- W</text>
       ${this.config.grid_voltage || this.config.grid_frequency ? '<text class="lg" id="gridVF" x="445" y="285" text-anchor="middle" font-size="9" font-weight="600" fill="#8b949e">--</text>' : ''}
       <text class="md" id="gridImportVal" x="393" y="164" text-anchor="middle" font-size="12" font-weight="600" fill="#cde">-- kWh</text>
-      <text class="md" id="gridExportVal" x="393" y="194" text-anchor="middle" font-size="12" font-weight="600" fill="#cde" style="display:none">-- kWh</text>
+      <text class="md" id="gridExportVal" x="396" y="207" text-anchor="middle" font-size="12" font-weight="600" fill="#cde" style="display:none">-- kWh</text>
 
       ${invBlock}
 
