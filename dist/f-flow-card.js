@@ -1,5 +1,8 @@
-// f-flow-card.js – Unified Edition v1.15.3
-const FFC_VERSION = '1.15.3';
+// f-flow-card.js – Unified Edition v1.15.4
+const FFC_VERSION = '1.15.4';
+// Changes v1.15.4:
+//   FIX  – "Fonti energia" bar: shares only the real sources (solar, battery discharge, grid import);
+//           CARICA is the part of them going into the battery, no longer added on top of the total.
 // Changes v1.15.3:
 //   FIX  – EMS mode badge moved from the sky to the header, right of the IN RETE pill (same hold-to-change).
 //   FIX  – PV production bubble next to the sun sized to its text, text centred in it.
@@ -1810,7 +1813,7 @@ class FFlowCard extends HTMLElement {
       background_opacity: 'Quanto è pieno lo sfondo della card: 100 = pieno, 0 = trasparente (si vede lo sfondo della plancia). Valori intermedi come 60 danno un effetto vetro.',
       background_blur: 'Sfoca ciò che sta dietro la card (effetto vetro smerigliato). Si nota solo con opacità sotto 100. Su dispositivi lenti può pesare: in modalità leggera è disattivato.',
       inverter_image: 'Indirizzo di un’immagine da mostrare al posto del riquadro "INV" disegnato, ad esempio la foto del tuo inverter. Mettila in /config/www/ e scrivi /local/nomefile.png.',
-      _show_energy_supply: 'Mostra a destra la barra "Fonti energia": quanta parte della potenza in questo momento arriva da solare, carica batteria, scarica batteria e rete.',
+      _show_energy_supply: 'Mostra a destra la barra "Fonti energia": da dove arriva in questo momento l’energia (sole, scarica della batteria, rete). CARICA è la parte di queste fonti che sta andando in batteria; SOLARE è il sole usato subito in casa o immesso.',
       _show_backup_panel: 'Mostra sotto la batteria il pannello con autonomia (in scarica) o tempo alla ricarica (in carica) ed energia residua in kWh. Serve la capacità della batteria.',
       _daily_tiles_extended: 'Acceso: 6 riquadri giornalieri (FV, carica, scarica, prelievo, immissione, consumo). Spento: 4 riquadri (FV, carica/scarica, energia residua, consumo).',
       roof_heat: 'Effetto “superficie rovente” sui pannelli della casa a due falde: i pannelli tremolano come l’aria sopra l’asfalto d’estate e onde di luce gialla risalgono la falda. Ogni falda segue la propria stringa: più produce, più l’effetto è forte e veloce; a 0 W sparisce. Escluso in modalità leggera.',
@@ -5098,9 +5101,15 @@ class FFlowCard extends HTMLElement {
       const sChg = bSum > 10 ? bSum : 0;
       const sDis = bSum < -10 ? -bSum : 0;
       const sGrid = gridActive > 10 ? gridActive : 0;
-      const tot = sSolar + sChg + sDis + sGrid;
+      // v1.15.4: the bar shares out the real SOURCES only (solar + battery discharge + grid import).
+      // Battery charging is not a source: it is the part of those sources going into the battery,
+      // taken from solar first and then from the grid (it used to be added on top, so 2.3 kW of sun
+      // with 1.9 kW of charge showed as ~55 % solar / 45 % charge).
+      const tot = sSolar + sDis + sGrid;
+      const chgSolar = Math.min(sChg, sSolar), chgGrid = Math.min(Math.max(0, sChg - sSolar), sGrid);
+      const segSolar = sSolar - chgSolar, segChg = chgSolar + chgGrid, segGrid = sGrid - chgGrid;
       let x = 352; const W = 158;
-      [['supSolar', sSolar], ['supChg', sChg], ['supDis', sDis], ['supGrid', sGrid]].forEach(([id, v]) => {
+      [['supSolar', segSolar], ['supChg', segChg], ['supDis', sDis], ['supGrid', segGrid]].forEach(([id, v]) => {
         const w = tot > 0 ? (v / tot) * W : 0;
         setAttr(id, 'x', x.toFixed(1)); setAttr(id, 'width', w.toFixed(1)); x += w;
       });
