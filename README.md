@@ -7,7 +7,7 @@
 [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
 [![Release](https://img.shields.io/github/v/release/fabiustek/f-flow-card)](https://github.com/fabiustek/f-flow-card/releases)
 
-Versione attuale: **v1.15.1** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
+Versione attuale: **v1.15.2** · Fork di [k-flow-card](https://github.com/thekhan1122/k-flow-card) di Khan Automation (thekhan1122), licenza MIT.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/fabiustek/f-flow-card/main/docs/images/card-overview.png" alt="F-Flow Card con tutte le sezioni attive" width="480">
@@ -151,7 +151,8 @@ Sull'indicatore della rete e sul badge EMS il **tocco breve** apre la scheda, me
 - **Flussi**: curve morbide con linee tratteggiate sottili e luminose che scorrono nella direzione dell'energia, più veloci quando la potenza sale. Il flusso della batteria è sempre blu, come la batteria.
 - **Inverter** al centro: temperatura e percentuale di carico. Si può sostituire con una foto (`inverter_image`).
 - **Rete** a destra: potenza istantanea, energia prelevata (▼) e immessa (▲) oggi e, se configurate, **tensione e frequenza di rete** sotto la potenza. Sotto, la barra **Fonti energia** mostra in proporzione solare, carica, scarica e rete, con sotto l'**autosufficienza** e l'**autoconsumo** di oggi.
-- **Casa**: consumo istantaneo sotto la casa e, se configurate, **tensione e frequenza erogate** accanto. Sotto la potenza di ogni stringa può comparire la sua **tensione**.
+- **Casa**: consumo istantaneo sotto la casa e, se configurate, **tensione e frequenza erogate**, nello stesso riquadro.
+- **Riquadri**: ogni gruppo di informazioni (rete, fonti energia, stringhe, casa, wallbox) ha un suo riquadro sottile, così si capisce a cosa appartiene ogni valore. Accanto alla potenza di ogni stringa può comparire la sua **tensione**.
 - **Barre FV / POT**: produzione rispetto alla potenza massima dell'impianto e potenza della batteria rispetto a quella dell'inverter.
 
 Nella sezione **🎨 Layout e intestazione** puoi cambiare titolo, attivare la barra delle fonti, il pannello autonomia, l'immagine dell'inverter e tornare alle icone classiche (batteria, rete, casa).
@@ -859,7 +860,7 @@ Misure su un telefono di fascia bassa simulato (processore 6 volte più lento, 2
 
 A ogni nuova versione viene creata automaticamente una **release** su GitHub e HACS ti propone l'aggiornamento in Home Assistant. Dopo l'aggiornamento ricarica il browser con `Ctrl + Shift + R`.
 
-Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.15.1**.
+Per sapere quale versione stai usando, apri la console del browser (`F12`): compare la scritta **F-FLOW-CARD v1.15.2**.
 
 ### Icona nella notifica di aggiornamento
 
@@ -984,6 +985,10 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 ---
 
 ## Registro delle modifiche
+
+### v1.15.2
+- **Disegno dei flussi più ordinato**: le scritte sono raccolte in **riquadri** sottili per gruppo: rete (potenza, tensione e frequenza), **Fonti energia** (dal titolo ad autosufficienza e autoconsumo), ogni **stringa FV** (nome, potenza, tensione), **consumo della casa** (potenza, tensione e frequenza centrate) e **wallbox** (potenza, stato, SOC, tempo alla carica).
+- **Casa e wallbox più in basso** per dare aria al disegno; l'energia immessa non tocca più la linea della rete.
 
 ### v1.15.1
 - **Ricarica EV**: la barra a bolle diventa un **liquido nel vetro** (riflesso del vetro, liquido torbido in movimento, bollicine fini), più vivace mentre l'auto carica; nella parte Wallbox tolta la voce *Connettore*, già indicata in alto.
@@ -1124,4 +1129,4 @@ In alternativa, senza YAML: apri l'entità di aggiornamento → ⚙️ **Imposta
 
 ---
 
-*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.15.1*
+*F-Flow Card · fork di k-flow-card (Khan Automation) · licenza MIT · aggiornato alla v1.15.2*

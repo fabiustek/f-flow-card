@@ -1,5 +1,10 @@
-// f-flow-card.js – Unified Edition v1.15.1
-const FFC_VERSION = '1.15.1';
+// f-flow-card.js – Unified Edition v1.15.2
+const FFC_VERSION = '1.15.2';
+// Changes v1.15.2:
+//   FIX  – Flow drawing tidied up: thin framed boxes group the grid (power + V/Hz), "Fonti energia"
+//           (title → autosuff./autocons.), each PV string, the house consumption (power + V/Hz, centred)
+//           and the wallbox values; house and wallbox 30 px lower for more air (taller viewBox);
+//           grid export label moved off the grid flow line.
 // Changes v1.15.1:
 //   NEW  – Ricarica EV: the bubble bar becomes a "liquid in glass" canvas (glass reflection, cloudy
 //           liquid, fine rising bubbles; livelier with the charging power). Connector chip removed.
