@@ -1813,7 +1813,7 @@ class FFlowCard extends HTMLElement {
       background_opacity: 'Quanto è pieno lo sfondo della card: 100 = pieno, 0 = trasparente (si vede lo sfondo della plancia). Valori intermedi come 60 danno un effetto vetro.',
       background_blur: 'Sfoca ciò che sta dietro la card (effetto vetro smerigliato). Si nota solo con opacità sotto 100. Su dispositivi lenti può pesare: in modalità leggera è disattivato.',
       inverter_image: 'Indirizzo di un’immagine da mostrare al posto del riquadro "INV" disegnato, ad esempio la foto del tuo inverter. Mettila in /config/www/ e scrivi /local/nomefile.png.',
-      _show_energy_supply: 'Mostra a destra la barra "Fonti energia": quanta parte della potenza in questo momento arriva da solare, carica batteria, scarica batteria e rete.',
+      _show_energy_supply: 'Mostra a destra la barra "Fonti energia": da dove arriva in questo momento l’energia (sole, scarica della batteria, rete). CARICA è la parte di queste fonti che sta andando in batteria; SOLARE è il sole usato subito in casa o immesso.',
       _show_backup_panel: 'Mostra sotto la batteria il pannello con autonomia (in scarica) o tempo alla ricarica (in carica) ed energia residua in kWh. Serve la capacità della batteria.',
       _daily_tiles_extended: 'Acceso: 6 riquadri giornalieri (FV, carica, scarica, prelievo, immissione, consumo). Spento: 4 riquadri (FV, carica/scarica, energia residua, consumo).',
       roof_heat: 'Effetto “superficie rovente” sui pannelli della casa a due falde: i pannelli tremolano come l’aria sopra l’asfalto d’estate e onde di luce gialla risalgono la falda. Ogni falda segue la propria stringa: più produce, più l’effetto è forte e veloce; a 0 W sparisce. Escluso in modalità leggera.',
