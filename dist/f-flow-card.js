@@ -1,5 +1,9 @@
-// f-flow-card.js – Unified Edition v1.16.0
-const FFC_VERSION = '1.16.0';
+// f-flow-card.js – Unified Edition v1.17.0
+const FFC_VERSION = '1.17.0';
+// Changes v1.17.0:
+//   NEW  – Statistics: "Casa · da dove arriva l'energia" (stats_mix, on by default): 24 h stacked chart of
+//           the house load split into solar / battery / grid above zero, battery charge and export below,
+//           with the load line, kWh totals per source and a tooltip per 5 minutes.
 // Changes v1.16.0:
 //   NEW  – battery_liquid (on by default): the modern home battery fills like a glass tube with a moving
 //           liquid (surface wave, light swirls, fine bubbles), livelier while charging; colour blends
@@ -1061,6 +1065,7 @@ class FFlowCardEditor extends HTMLElement {
       picker('stats_forecast_entity', 'Sensore di stima produzione (Solcast, Forecast.Solar…)', true),
       switchRow('stats_load', 'Consumi casa ultime 24 ore', 'Usa il sensore "Consumo casa"; picco evidenziato', true),
       switchRow('stats_battery', 'Batteria ultime 24 ore', 'Carica, scarica e SOC', true),
+      switchRow('stats_mix', 'Casa: da dove arriva l’energia (24 ore)', 'Sopra lo zero: solare, batteria, rete; sotto: carica batteria e immissione', true),
     ], { toggleKey: '_show_stats', toggleOn: showStats, hidden: !showStats }));
 
     const showVent = !!cfg._show_ventilation;
@@ -1426,6 +1431,7 @@ class FFlowCard extends HTMLElement {
       stats_pv: true,
       stats_load: true,
       stats_battery: true,
+      stats_mix: true,
       weather_entity: '',
       _show_camera: false,
       camera_title: 'Videocamera',
@@ -1865,6 +1871,7 @@ class FFlowCard extends HTMLElement {
       stats_forecast_entity: 'Sensore di previsione della produzione. Il migliore è uno con la previsione negli attributi (es. Solcast "Forecast Today"): la curva copre tutta la giornata. Un sensore di potenza mostra la curva fino ad adesso; uno di energia (kWh) mostra solo il totale stimato.',
       stats_load: 'Grafico del consumo della casa nelle ultime 24 ore, colorato per intensità, con il picco evidenziato. Usa il sensore "Consumo casa".',
       stats_battery: 'Grafico della batteria nelle ultime 24 ore: carica (blu), scarica (arancione) e SOC.',
+      stats_mix: 'Grafico delle ultime 24 ore che mostra come è alimentata la casa: sopra lo zero il consumo diviso tra solare (giallo), batteria (blu) e rete (rosso); sotto lo zero dove va il surplus, cioè carica della batteria (azzurro) e immissione in rete (verde). Usa Consumo casa, Potenza rete, potenza batteria e stringhe FV (o FV totale). Tocca il grafico per i valori di ogni momento.',
       // Ventilazione
       vent_title: 'Titolo della sezione Ventilazione.',
       vent_state_entity: 'Stato termico del controller delle ventole: idle, cool, low, medium, high, very high, critical. Decide colore, testo e velocità della ventola grande.',
@@ -2540,6 +2547,7 @@ class FFlowCard extends HTMLElement {
     if (c.consump) ids.push(c.consump);
     if (c.battery_soc) ids.push(c.battery_soc);
     if (c.battery_power) ids.push(c.battery_power);
+    if (c.stats_mix !== false && c.grid_active_power) ids.push(c.grid_active_power);
     return [...new Set(ids.filter(Boolean))];
   }
 
@@ -2557,6 +2565,7 @@ class FFlowCard extends HTMLElement {
     if (this.config.stats_pv !== false) body += box('pv', 'Produzione FV oggi');
     if (this.config.stats_load !== false) body += box('load', 'Consumi casa · ultime 24 ore');
     if (this.config.stats_battery !== false) body += box('batt', 'Batteria · ultime 24 ore');
+    if (this.config.stats_mix !== false) body += box('mix', 'Casa · da dove arriva l’energia · 24 ore');
     return '<div class="dv"></div>' + this._secHTML('stats', this._secTitle('stats', 'Statistiche'), body || '<div class="st-info">Nessun grafico attivo: attivali dall’editor.</div>');
   }
 
@@ -2677,10 +2686,10 @@ class FFlowCard extends HTMLElement {
 
   _renderStats() {
     const root = this.shadowRoot;
-    if (!root.getElementById('stBox_pv') && !root.getElementById('stBox_load') && !root.getElementById('stBox_batt')) return;
+    if (!['pv', 'load', 'batt', 'mix'].some(k => root.getElementById('stBox_' + k))) return;
     const st = this._stats;
     const msg = (key, txt) => { const svg = root.getElementById('stSvg_' + key); if (svg) svg.innerHTML = `<text x="250" y="88" text-anchor="middle" font-size="13" fill="#8b949e">${txt}</text>`; };
-    if (!st || st.error || !st.raw) { ['pv', 'load', 'batt'].forEach(k => msg(k, st && st.error ? 'Storico non disponibile' : 'Caricamento storico…')); return; }
+    if (!st || st.error || !st.raw) { ['pv', 'load', 'batt', 'mix'].forEach(k => msg(k, st && st.error ? 'Storico non disponibile' : 'Caricamento storico…')); return; }
     if (!this._stData) this._stData = {};
     const esc = (t) => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     const fmtW = (v) => Math.abs(v) >= 1000 ? (+(v / 1000).toFixed(2)) + ' kW' : Math.round(v) + ' W';
@@ -2815,6 +2824,70 @@ class FFlowCard extends HTMLElement {
       this._stData.batt = { N, L: geo.L, pw: geo.pw, rows: (i) => `<div class="tt">${hhmm(st.start + i * (now - st.start) / N)}</div>`
         + `<div>${p[i] >= 0 ? 'Carica' : 'Scarica'} <b>${fmtW(Math.abs(p[i]))}</b></div>` + (soc ? `<div>SOC <b>${Math.round(soc[i])}%</b></div>` : '') };
       this._bindStatHover('batt');
+    }
+
+    // 4) v1.17.0 — the house over 24 h: above zero where its power comes from (solar, battery, grid),
+    // below zero where the surplus goes (battery charge, export). 5-minute buckets.
+    if (root.getElementById('stBox_mix')) {
+      const c = this.config, N = 288;
+      const need = c.consump || (c.grid_active_power && (c.battery_power || this._statsStrings().length || c.pv_total_power));
+      if (!need) { msg('mix', 'Servono Consumo casa e Potenza rete'); }
+      else {
+        const B = (e, o) => e ? this._bucketize(st.raw[e], e, st.start, now, N, o) : new Float64Array(N);
+        const strs = this._statsStrings().map(x => B(x.e));
+        const pvTot = B(c.pv_total_power);
+        const bat = B(c.battery_power, { signed: true, mul: c.invert_battery_power ? -1 : 1 });   // + charge, − discharge
+        const grid = B(c.grid_active_power, { signed: true, mul: c.invert_grid_power ? -1 : 1 }); // + import, − export
+        const load = c.consump ? B(c.consump) : null;
+        const sol = new Float64Array(N), bh = new Float64Array(N), gh = new Float64Array(N), ch = new Float64Array(N), ex = new Float64Array(N), Ld = new Float64Array(N);
+        let mx = 100, mn = 0;
+        const tot = { sol: 0, bat: 0, grid: 0, chg: 0, exp: 0, load: 0 };
+        for (let i = 0; i < N; i++) {
+          const pv = Math.max(pvTot[i], strs.reduce((a, s2) => a + s2[i], 0));
+          const dis = Math.max(0, -bat[i]), chg = Math.max(0, bat[i]), imp = Math.max(0, grid[i]), exp = Math.max(0, -grid[i]);
+          const L = load ? load[i] : Math.max(0, pv + dis + imp - chg - exp);
+          // the house takes solar first, then the battery, the rest from the grid
+          sol[i] = Math.min(pv, L); const rest = L - sol[i];
+          bh[i] = Math.min(dis, rest); gh[i] = Math.max(0, rest - bh[i]);
+          ch[i] = chg; ex[i] = exp; Ld[i] = L;
+          mx = Math.max(mx, L); mn = Math.min(mn, -(chg + exp));
+          tot.sol += sol[i]; tot.bat += bh[i]; tot.grid += gh[i]; tot.chg += chg; tot.exp += exp; tot.load += L;
+        }
+        const ax = this._yAxis(mn, mx, geo, fmtW);
+        const X = (i) => +(geo.L + (i + 0.5) / N * geo.pw).toFixed(1);
+        let g = ax.g + this._timeAxis(st.start, now, geo, 180);
+        // stacked band between lo(i) and hi(i)
+        const band = (lo, hi, col) => {
+          let top = '', bot = '';
+          for (let i = 0; i < N; i++) top += (i ? 'L' : 'M') + X(i) + ',' + ax.Y(hi(i));
+          for (let i = N - 1; i >= 0; i--) bot += 'L' + X(i) + ',' + ax.Y(lo(i));
+          return `<path d="${top}${bot}Z" fill="${col}" fill-opacity=".55" stroke="${col}" stroke-width=".6" stroke-opacity=".9"/>`;
+        };
+        g += band(i => 0, i => sol[i], '#f4d03f');
+        g += band(i => sol[i], i => sol[i] + bh[i], '#58a6ff');
+        g += band(i => sol[i] + bh[i], i => sol[i] + bh[i] + gh[i], '#f85149');
+        g += band(i => 0, i => -ch[i], '#00c8ff');
+        g += band(i => -ch[i], i => -ch[i] - ex[i], '#3fb950');
+        let ld = ''; for (let i = 0; i < N; i++) ld += (i ? 'L' : 'M') + X(i) + ',' + ax.Y(Ld[i]);
+        g += `<path d="${ld}" fill="none" stroke="#e6edf3" stroke-width="1.1" stroke-opacity=".8"/>`;
+        g += `<line x1="${geo.L}" x2="${geo.W - geo.R}" y1="${ax.Y(0)}" y2="${ax.Y(0)}" stroke="#8b949e" stroke-width="1"/>`;
+        g += `<line id="stCur_mix" x1="0" x2="0" y1="${geo.T}" y2="${geo.T + geo.ph}" stroke="#e6edf3" stroke-width="1" opacity="0"/>`;
+        root.getElementById('stSvg_mix').innerHTML = g;
+        const k = (v) => (v * 24 / N / 1000).toFixed(2) + ' kWh';
+        const info = root.getElementById('stInfo_mix');
+        if (info) info.textContent = tot.load > 0 ? `autosuff. ${Math.round((tot.sol + tot.bat) / tot.load * 100)}% · casa ${k(tot.load)}` : '';
+        const leg = root.getElementById('stLeg_mix');
+        if (leg) leg.innerHTML = `<span><i style="background:#f4d03f"></i>Da solare <b>${k(tot.sol)}</b></span><span><i style="background:#58a6ff"></i>Da batteria <b>${k(tot.bat)}</b></span><span><i style="background:#f85149"></i>Da rete <b>${k(tot.grid)}</b></span>`
+          + `<span><i style="background:#00c8ff"></i>In batteria <b>${k(tot.chg)}</b></span><span><i style="background:#3fb950"></i>Immessa <b>${k(tot.exp)}</b></span><span><i class="tot" style="border-top-style:solid"></i>Consumo</span>`;
+        this._stData.mix = { N, L: geo.L, pw: geo.pw, rows: (i) => `<div class="tt">${hhmm(st.start + i * (now - st.start) / N)}</div>`
+          + `<div>Consumo casa <b>${fmtW(Ld[i])}</b></div>`
+          + (sol[i] > 5 ? `<div><i style="color:#f4d03f">●</i> da solare <b>${fmtW(sol[i])}</b></div>` : '')
+          + (bh[i] > 5 ? `<div><i style="color:#58a6ff">●</i> da batteria <b>${fmtW(bh[i])}</b></div>` : '')
+          + (gh[i] > 5 ? `<div><i style="color:#f85149">●</i> da rete <b>${fmtW(gh[i])}</b></div>` : '')
+          + (ch[i] > 5 ? `<div><i style="color:#00c8ff">●</i> in batteria <b>${fmtW(ch[i])}</b></div>` : '')
+          + (ex[i] > 5 ? `<div><i style="color:#3fb950">●</i> immessa <b>${fmtW(ex[i])}</b></div>` : '') };
+        this._bindStatHover('mix');
+      }
     }
   }
 
