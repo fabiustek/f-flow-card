@@ -133,7 +133,11 @@
           let v;
           const sun = Math.max(0, Math.sin((h - 6.5) / 11 * Math.PI));
           const cloud = (h > 11.5 && h < 12.4) || (h > 14 && h < 14.6) ? 0.35 : 1;
-          if (id === 'sensor.load_power') v = 260 + Object.values(profile).reduce((a, f) => a + f(h), 0);
+          const loadW = () => 260 + Object.values(profile).reduce((a, f) => a + f(h), 0);
+          const pvW = () => 2300 * Math.pow(Math.max(0, Math.sin((h - 6) / 10 * Math.PI)), 1.2) * cloud + 2100 * Math.pow(Math.max(0, Math.sin((h - 8) / 10 * Math.PI)), 1.2) * cloud;
+          const batW = () => h < 7 ? -420 : h < 13 ? 1400 * sun : h < 17 ? 150 : h < 19 ? -900 : -520;
+          if (id === 'sensor.grid_power') v = loadW() + batW() - pvW();   // + import, − export
+          else if (id === 'sensor.load_power') v = loadW();
           else if (id === 'sensor.pv1_power') v = 2300 * Math.pow(Math.max(0, Math.sin((h - 6) / 10 * Math.PI)), 1.2) * cloud;   // Sud-Est: morning
           else if (id === 'sensor.pv2_power') v = 2100 * Math.pow(Math.max(0, Math.sin((h - 8) / 10 * Math.PI)), 1.2) * cloud;   // Nord-Ovest: afternoon
           else if (id === 'sensor.battery_power') v = h < 7 ? -420 : h < 13 ? 1400 * sun : h < 17 ? 150 : h < 19 ? -900 : -520;

@@ -74,6 +74,15 @@ const MDI = JSON.parse(fs.readFileSync(path.join(__dirname, 'icons.json'), 'utf8
     await shot('statistics.png', '#stBox_pv', '#stBox_batt');
     await page.mouse.move(0, 0);
   }
+  // statistics: where the house power comes from, with the tooltip in the afternoon
+  const mixSvg = (await page.evaluateHandle(() => window._card.shadowRoot.getElementById('stSvg_mix'))).asElement();
+  if (mixSvg) {
+    const mb = await mixSvg.boundingBox();
+    await page.mouse.move(mb.x + mb.width * 0.3, mb.y + mb.height * 0.5);
+    await page.waitForTimeout(200);
+    await shot('stats-mix.png', '#stBox_mix');
+    await page.mouse.move(0, 0);
+  }
 
   // wallbox + car (horizontal band around the EV drawing)
   await shot('wallbox.png', '#evPowerVal', '#evSocBar');
