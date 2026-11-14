@@ -1,5 +1,8 @@
-// f-flow-card.js – Unified Edition v1.17.0
-const FFC_VERSION = '1.17.0';
+// f-flow-card.js – Unified Edition v1.18.0
+const FFC_VERSION = '1.18.0';
+// Changes v1.18.0:
+//   NEW  – Ricarica EV: evc_limit (e.g. input_number.wb_max_a), a "Limite massimo" current slider that is
+//           always adjustable (also with smart PV on); the wallbox current slider is capped at that limit.
 // Changes v1.17.0:
 //   NEW  – Statistics: "Casa · da dove arriva l'energia" (stats_mix, on by default): 24 h stacked chart of
 //           the house load split into solar / battery / grid above zero, battery charge and export below,
@@ -1032,6 +1035,7 @@ class FFlowCardEditor extends HTMLElement {
       picker('evc_pv_auto', 'Carica intelligente FV (es. input_boolean.wb_pv_auto)', true),
       picker('evc_pause_enabled', 'Pausa sotto 6 A (es. input_boolean.wb_pause_enabled)', true),
       picker('evc_share', 'Quota del surplus all’accumulo di casa, 0% = tutto all’auto (es. input_number.wb_battery_share_pct)', true),
+      picker('evc_limit', 'Limite massimo di corrente, sempre regolabile (es. input_number.wb_max_a)', true),
       picker('evc_max_current', 'Corrente massima manuale (es. number.juicebox_maximum_current)', true),
       picker('evc_offered_current', 'Corrente offerta dalla wallbox (es. sensor.juicebox_current_offered)', true),
       numberField('evc_phases', 'Fasi (1 = monofase, 3 = trifase), per passare da A a W', 1, 3, 2),
@@ -1410,7 +1414,7 @@ class FFlowCard extends HTMLElement {
       _show_evc: false,
       evc_car_name: '', evc_charge_switch: '', evc_availability: '', evc_status: '', evc_power: '', evc_soc: '',
       evc_current: '', evc_voltage: '', evc_temp: '', evc_session_energy: '', evc_session_time: '',
-      evc_pv_auto: '', evc_pause_enabled: '', evc_share: '', evc_max_current: '', evc_offered_current: '',
+      evc_pv_auto: '', evc_pause_enabled: '', evc_share: '', evc_max_current: '', evc_limit: '', evc_offered_current: '',
       evc_error: '', evc_unlock: '', evc_reset: '', evc_phases: 1, evc_consumption: 14, evc_confirm_timeout: 60,
       background_opacity: 100,
       background_blur: false,
@@ -1972,6 +1976,7 @@ class FFlowCard extends HTMLElement {
       evc_pv_auto: 'Interruttore della carica intelligente: la corrente segue la produzione fotovoltaica (comandata dal tuo script). Mentre è acceso il cursore della corrente manuale è bloccato.',
       evc_pause_enabled: 'Interruttore che permette di mettere in pausa la ricarica quando il fotovoltaico non basta per i 6 A minimi.',
       evc_share: 'input_number con la percentuale del surplus che va all’accumulo di casa (il resto va all’auto): 0% = tutto all’auto, 100% = tutto alla batteria di casa. Nella card è una barra divisa in due da trascinare.',
+      evc_limit: 'input_number o number con il limite massimo di corrente in A che decidi tu (es. input_number.wb_max_a): la carica intelligente FV e la regolazione a mano non lo superano. Nella card è un cursore giallo, sempre regolabile anche con la carica FV accesa; il cursore della corrente alla wallbox non può andare oltre questo limite.',
       evc_max_current: 'number della corrente massima di ricarica in A. Nella card è un cursore con A e W; il valore viene inviato solo quando lasci il cursore, per non intasare la wallbox.',
       evc_offered_current: 'Corrente che la wallbox sta offrendo all’auto in questo momento (A), mostrata accanto al cursore.',
       evc_phases: 'Numero di fasi della ricarica: 1 per monofase, 3 per trifase. Serve per passare da ampere a watt.',
@@ -2031,7 +2036,7 @@ class FFlowCard extends HTMLElement {
       grid_status_entity: ['gridStatusPill'], ems_mode_entity: ['emsBadge'],
       vent_state_entity: ['ventState', 'ventMainIco'], vent_status_entity: ['ventStatus'], vent_ambient_temp: ['ventAmb'],
       evc_power: ['evcPow'], evc_current: ['evcCur'], evc_voltage: ['evcVolt'], evc_temp: ['evcTemp'],
-      evc_session_energy: ['evcEnergy'], evc_session_time: ['evcTime'], evc_soc: ['evcSoc'], evc_status: ['evcState'],
+      evc_limit: ['evcLimVal'], evc_session_energy: ['evcEnergy'], evc_session_time: ['evcTime'], evc_soc: ['evcSoc'], evc_status: ['evcState'],
       vent_pwm: ['ventPwm'], vent_rpm_avg: ['ventRpm'], vent_inv_temp: ['ventTemps'], vent_dc_temp: ['ventTemps'],
     };
   }
@@ -3194,10 +3199,15 @@ class FFlowCard extends HTMLElement {
           <div class="eshl"><span>🚗 tutto all’auto</span><span>tutto alla casa 🏠</span></div>
           <div class="es">Quota del surplus che va all’accumulo di casa: 0% = tutto all’auto, 100% = tutto alla batteria di casa</div></div>` : ''}
       </div>` : ''}
-      ${c.evc_max_current ? `<div class="esec"><div class="est"><span>Corrente massima</span><span class="eunit" id="evcUnit"><span data-u="A">A</span><span data-u="W">W</span></span></div>
+      ${(c.evc_max_current || c.evc_limit) ? `<div class="esec"><div class="est"><span>Corrente massima</span><span class="eunit" id="evcUnit"><span data-u="A">A</span><span data-u="W">W</span></span></div>
+        ${c.evc_limit ? `<div class="esub">Limite massimo</div>
+        <div class="ecur"><div class="ebig" id="evcLimVal">--</div><div class="es" id="evcLimInfo" style="text-align:right"></div></div>
+        <input type="range" id="evcLimRange" class="erange elim">
+        <div class="es">Tetto per la carica intelligente FV e per la regolazione a mano: sempre modificabile.</div>` : ''}
+        ${c.evc_max_current ? `${c.evc_limit ? '<div class="esub" style="margin-top:12px">Corrente alla wallbox</div>' : ''}
         <div class="ecur"><div class="ebig" id="evcCurVal">--</div><div class="es" id="evcCurInfo" style="text-align:right"></div></div>
         <input type="range" id="evcCurRange" class="erange">
-        <div class="es" id="evcCurNote">Il valore viene inviato quando lasci il cursore.</div></div>` : ''}
+        <div class="es" id="evcCurNote">Il valore viene inviato quando lasci il cursore.</div>` : ''}</div>` : ''}
       ${this._evcPowerId() ? `<div class="esec"><div class="est"><span id="evcChartTitle">Sessione</span><span id="evcChartInfo"></span></div>
         <svg id="evcChart" viewBox="0 0 480 130" style="width:100%;display:block"></svg>
         <div class="echips" id="evcChips"></div></div>
@@ -3297,6 +3307,11 @@ class FFlowCard extends HTMLElement {
       cr.addEventListener('input', () => { this._evcCurDrag = true; this._evcCurView(Number(cr.value)); });
       cr.addEventListener('change', () => { this._evcCurDrag = false; this._evcCurSent = { v: Number(cr.value), at: Date.now() }; this._evcSvc(c.evc_max_current, 'set_value', { value: Number(cr.value) }); });
     }
+    const lr = root.getElementById('evcLimRange');
+    if (lr) {
+      lr.addEventListener('input', () => { this._evcLimDrag = true; this._evcAmpView('evcLimVal', Number(lr.value)); });
+      lr.addEventListener('change', () => { this._evcLimDrag = false; this._evcLimSent = { v: Number(lr.value), at: Date.now() }; this._evcSvc(c.evc_limit, 'set_value', { value: Number(lr.value) }); this._updateEvc(); });
+    }
     const unit = root.getElementById('evcUnit');
     if (unit) unit.querySelectorAll('[data-u]').forEach(u => u.addEventListener('click', () => { this._lsSet('evcUnit', u.dataset.u); this._updateEvc(); }));
     this._evcBubbleSoc = null; this._evcIntroDue = true; this._evcB = null; if (this._evcLoop) { cancelAnimationFrame(this._evcLoop); this._evcLoop = null; }
@@ -3324,8 +3339,9 @@ class FFlowCard extends HTMLElement {
     const a = root.getElementById('evcShareCar'), b = root.getElementById('evcShareHome');
     if (b) b.style.width = home + '%'; if (a) a.style.width = (100 - home) + '%';
   }
-  _evcCurView(a) {
-    const root = this.shadowRoot, el = root.getElementById('evcCurVal');
+  _evcCurView(a) { this._evcAmpView('evcCurVal', a); }
+  _evcAmpView(id, a) {
+    const root = this.shadowRoot, el = root.getElementById(id);
     if (!el) return;
     const w = this._evcAtoW(a), unitW = this._lsGet('evcUnit') === 'W';
     const fw = w >= 1000 ? (w / 1000).toFixed(2) + ' kW' : Math.round(w) + ' W';
@@ -3557,11 +3573,25 @@ class FFlowCard extends HTMLElement {
       sh.value = v;
       this._evcShareView(v);
     }
+    // v1.18.0: user limit (e.g. input_number.wb_max_a), always adjustable; caps the slider below
+    const lr = g('evcLimRange'), lrSt = this._evcSt(c.evc_limit);
+    let limit = null;
+    if (lr && lrSt) {
+      const a = lrSt.attributes || {};
+      lr.min = a.min !== undefined ? a.min : 6; lr.max = a.max !== undefined ? a.max : 32; lr.step = a.step || 1;
+      let v = parseFloat(lrSt.state);
+      const sent = this._evcLimSent;
+      if (sent && v !== sent.v && Date.now() - sent.at < 10000) v = sent.v; else this._evcLimSent = null;
+      if (isFinite(v)) limit = v;
+      if (!this._evcLimDrag && this.shadowRoot.activeElement !== lr) { lr.value = v; this._evcAmpView('evcLimVal', v); }
+      const li = g('evcLimInfo'); if (li) FFlowCard._setH(li, `min ${lr.min} A · max ${lr.max} A`);
+    }
     // max current slider (locked while the smart PV mode drives it)
     const cr = g('evcCurRange'), crSt = this._evcSt(c.evc_max_current);
     if (cr && crSt) {
       const a = crSt.attributes || {};
       cr.min = a.min !== undefined ? a.min : 6; cr.max = a.max !== undefined ? a.max : 32; cr.step = a.step || 1;
+      if (limit !== null) cr.max = Math.max(Number(cr.min), Math.min(Number(cr.max), limit));   // never above the user limit
       const pv = this._evcSt(c.evc_pv_auto), locked = !!pv && pv.state === 'on';
       cr.disabled = locked;
       if (!this._evcCurDrag && this.shadowRoot.activeElement !== cr) {
@@ -3571,10 +3601,10 @@ class FFlowCard extends HTMLElement {
         cr.value = v; this._evcCurView(v);
       }
       const off = this._val(c.evc_offered_current);
-      const info = g('evcCurInfo'); if (info) FFlowCard._setH(info, `min ${cr.min} A · max ${cr.max} A` + (off !== null ? `<br>offerta dalla box: ${off} A` : ''));
+      const info = g('evcCurInfo'); if (info) FFlowCard._setH(info, `min ${cr.min} A · max ${cr.max} A${limit !== null ? ' (limite)' : ''}` + (off !== null ? `<br>offerta dalla box: ${off} A` : ''));
       const note = g('evcCurNote'); if (note) FFlowCard._setT(note, locked ? '🔒 Comandata dalla carica intelligente FV: spegnila per regolare a mano.' : 'Il valore viene inviato quando lasci il cursore.');
-      const unit = g('evcUnit'); if (unit) unit.querySelectorAll('[data-u]').forEach(u => u.classList.toggle('on', u.dataset.u === (this._lsGet('evcUnit') || 'A')));
     }
+    { const unit = g('evcUnit'); if (unit) unit.querySelectorAll('[data-u]').forEach(u => u.classList.toggle('on', u.dataset.u === (this._lsGet('evcUnit') || 'A'))); }
     // box availability badge next to the command: on = box free (no car), off = car plugged in
     const av = g('evcAvail');
     if (av) {
@@ -4535,6 +4565,8 @@ class FFlowCard extends HTMLElement {
       .erange{width:100%;margin:6px 0 4px;accent-color:#3fb950;cursor:pointer}
       .erange:disabled{opacity:.45;cursor:not-allowed}
       .ecur{display:flex;justify-content:space-between;align-items:flex-end;gap:8px}
+      .esub{font-size:.66rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#8b949e;margin:2px 0 2px}
+      .erange.elim{accent-color:#f4d03f}
       .ebig{font-size:1.5rem;font-weight:800;color:#e6edf3}.ebig small{font-size:.8rem;color:#8b949e;margin-left:2px}.ebig span{font-size:.78rem;color:#8b949e;font-weight:600;margin-left:4px}
       .eunit{display:inline-flex;border:1px solid #30363d;border-radius:8px;overflow:hidden;font-size:.64rem;font-weight:700;letter-spacing:0}
       .eunit span{padding:2px 9px;color:#8b949e;cursor:pointer}.eunit span.on{background:#1f6feb;color:#fff}
