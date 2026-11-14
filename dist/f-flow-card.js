@@ -1,5 +1,8 @@
-// f-flow-card.js – Unified Edition v1.18.0
-const FFC_VERSION = '1.18.0';
+// f-flow-card.js – Unified Edition v1.18.1
+const FFC_VERSION = '1.18.1';
+// Changes v1.18.1:
+//   FIX  – Hold-to-open popups (grid switch, EMS mode, EV start/stop, unlock, reset) are centred in the
+//           visible part of the card instead of sitting near its top.
 // Changes v1.18.0:
 //   NEW  – Ricarica EV: evc_limit (e.g. input_number.wb_max_a), a "Limite massimo" current slider that is
 //           always adjustable (also with smart PV on); the wallbox current slider is capped at that limit.
@@ -3250,7 +3253,7 @@ class FFlowCard extends HTMLElement {
     root.getElementById('evcModalTitle').textContent = title;
     root.getElementById('evcModalText').textContent = text;
     m.dataset.mode = mode;
-    m.style.display = 'flex';
+    this._showModal(m);
     root.getElementById('evcOk').onclick = () => { m.style.display = 'none'; onOk(); };
     root.getElementById('evcNo').onclick = () => { m.style.display = 'none'; };
   }
@@ -3326,6 +3329,22 @@ class FFlowCard extends HTMLElement {
 
   _evcVolt() { const v = this._val(this.config.evc_voltage); return v && v > 50 ? v : 230; }
   _evcAtoW(a) { return a * this._evcVolt() * (Number(this.config.evc_phases) || 1); }
+  // v1.18.1: open a confirmation popup centred in the part of the card that is on screen (it used to
+  // sit 70 px from the top of the card, often out of view on a long card or high on the page)
+  _showModal(m) {
+    if (!m) return;
+    m.style.display = 'flex';
+    m.style.alignItems = 'flex-start';
+    try {
+      const r = m.getBoundingClientRect(), box = m.firstElementChild;
+      const vh = window.innerHeight || document.documentElement.clientHeight;
+      const top = Math.max(r.top, 0), bottom = Math.min(r.bottom, vh);
+      const bh = box ? box.offsetHeight : 0;
+      let pad = (top - r.top) + Math.max(8, ((bottom - top) - bh) / 2);
+      pad = Math.max(8, Math.min(pad, r.height - bh - 8));   // keep the box inside the card
+      m.style.paddingTop = Math.round(pad) + 'px';
+    } catch (e) { m.style.paddingTop = '70px'; }
+  }
   // write only when the value changes: re-setting the same text still invalidates style/layout
   static _setH(el, h) { if (el && el._ffcH !== (h = String(h))) { el._ffcH = h; el.innerHTML = h; } }
   static _setT(el, t) { if (el && el._ffcT !== (t = String(t))) { el._ffcT = t; el.textContent = t; } }
@@ -4041,7 +4060,7 @@ class FFlowCard extends HTMLElement {
     };
     no.onclick = () => { modal.style.display = 'none'; };
     modal.dataset.mode = 'ems';
-    modal.style.display = 'flex';
+    this._showModal(modal);
   }
 
   // ── v1.5.0: on-grid / off-grid switch (hold + confirm, like a button-card hold_action) ──
@@ -4081,7 +4100,7 @@ class FFlowCard extends HTMLElement {
       ? 'Stai per mettere FUORI RETE (OFF GRID) l’impianto, vuoi procedere?'
       : 'Stai per rimettere IN RETE (ON GRID) l’impianto, vuoi procedere?';
     modal.dataset.mode = on ? 'off' : 'on';
-    modal.style.display = 'flex';
+    this._showModal(modal);
     const ok = root.getElementById('gridModalOk'), no = root.getElementById('gridModalNo');
     ok.onclick = () => { modal.style.display = 'none'; this._doGridSwitch(on, target); };
     no.onclick = () => { modal.style.display = 'none'; };
